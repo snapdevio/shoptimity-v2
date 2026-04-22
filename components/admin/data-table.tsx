@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Search } from "lucide-react"
+import { Search, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react"
 
 import {
   Table,
@@ -13,10 +13,12 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export interface DataTableColumn<T> {
   key: string
   header: string
+  sortable?: boolean
   render?: (row: T) => React.ReactNode
   className?: string
 }
@@ -30,13 +32,15 @@ interface DataTableProps<T> {
   totalPages: number
   searchValue: string
   searchPlaceholder?: string
+  sortField?: string
+  sortOrder?: "asc" | "desc"
   onSearchChange: (value: string) => void
   onPageChange: (page: number) => void
+  onSortChange?: (field: string, order: "asc" | "desc") => void
   actions?: (row: T) => React.ReactNode
   emptyMessage?: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function DataTable<T extends Record<string, any>>({
   columns,
   data,
@@ -45,8 +49,11 @@ export function DataTable<T extends Record<string, any>>({
   totalPages,
   searchValue,
   searchPlaceholder = "Search...",
+  sortField,
+  sortOrder,
   onSearchChange,
   onPageChange,
+  onSortChange,
   actions,
   emptyMessage = "No results found.",
 }: DataTableProps<T>) {
@@ -67,6 +74,13 @@ export function DataTable<T extends Record<string, any>>({
     }, 300)
   }
 
+  function handleSort(column: DataTableColumn<T>) {
+    if (!column.sortable || !onSortChange) return
+    const isCurrentField = sortField === column.key
+    const newOrder = isCurrentField && sortOrder === "asc" ? "desc" : "asc"
+    onSortChange(column.key, newOrder)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -84,16 +98,41 @@ export function DataTable<T extends Record<string, any>>({
         </p>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="overflow-hidden rounded-lg border bg-white">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-slate-50/50">
               {columns.map((col) => (
-                <TableHead key={col.key} className={col.className}>
-                  {col.header}
+                <TableHead
+                  key={col.key}
+                  className={cn(
+                    "font-bold text-slate-600",
+                    col.sortable &&
+                      "cursor-pointer select-none hover:text-slate-900",
+                    col.className
+                  )}
+                  onClick={() => handleSort(col)}
+                >
+                  <div className="flex items-center gap-2">
+                    {col.header}
+                    {col.sortable && (
+                      <ArrowUpDown
+                        className={cn(
+                          "size-3.5",
+                          sortField === col.key
+                            ? "text-primary"
+                            : "text-slate-400"
+                        )}
+                      />
+                    )}
+                  </div>
                 </TableHead>
               ))}
-              {actions && <TableHead className="w-25">Actions</TableHead>}
+              {actions && (
+                <TableHead className="pr-6 text-right font-bold text-slate-600">
+                  Actions
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -101,22 +140,32 @@ export function DataTable<T extends Record<string, any>>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length + (actions ? 1 : 0)}
-                  className="h-24 text-center text-muted-foreground"
+                  className="h-32 text-center text-muted-foreground"
                 >
                   {emptyMessage}
                 </TableCell>
               </TableRow>
             ) : (
               data.map((row, i) => (
-                <TableRow key={(row.id as string) ?? i}>
+                <TableRow
+                  key={(row.id as string) ?? i}
+                  className="transition-colors hover:bg-slate-50/50"
+                >
                   {columns.map((col) => (
-                    <TableCell key={col.key} className={col.className}>
+                    <TableCell
+                      key={col.key}
+                      className={cn("py-4", col.className)}
+                    >
                       {col.render
                         ? col.render(row)
                         : ((row[col.key] as React.ReactNode) ?? "-")}
                     </TableCell>
                   ))}
-                  {actions && <TableCell>{actions(row)}</TableCell>}
+                  {actions && (
+                    <TableCell className="pr-6 text-right">
+                      {actions(row)}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -125,27 +174,48 @@ export function DataTable<T extends Record<string, any>>({
       </div>
 
       {total > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
+        <div className="flex items-center justify-between px-2">
+          <p className="text-sm font-medium text-slate-500">
+            Showing{" "}
+            <span className="font-bold text-slate-900">
+              {Math.min(total, (page - 1) * 10 + 1)}
+            </span>{" "}
+            to{" "}
+            <span className="font-bold text-slate-900">
+              {Math.min(total, page * 10)}
+            </span>{" "}
+            of <span className="font-bold text-slate-900">{total}</span> entries
           </p>
           {totalPages > 1 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
+                className="size-8"
                 onClick={() => onPageChange(page - 1)}
                 disabled={page <= 1}
               >
-                Previous
+                <ChevronLeft className="size-4" />
               </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <Button
+                  key={p}
+                  variant={page === p ? "default" : "outline"}
+                  size="icon"
+                  className="size-8"
+                  onClick={() => onPageChange(p)}
+                >
+                  {p}
+                </Button>
+              ))}
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
+                className="size-8"
                 onClick={() => onPageChange(page + 1)}
                 disabled={page >= totalPages}
               >
-                Next
+                <ChevronRight className="size-4" />
               </Button>
             </div>
           )}

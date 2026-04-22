@@ -13,16 +13,24 @@ export default async function DashboardLayout({
     headers: await headers(),
   })
 
-  if (!session) {
+  if (process.env.NODE_ENV !== "development" && !session) {
     redirect("/login")
   }
 
-  const user = {
-    id: session.user.id,
-    name: session.user.name,
-    email: session.user.email,
-    role: (session.user as UserWithRole).role || "user",
-  }
+  // Provide mock user if no session in dev mode
+  const user = session
+    ? {
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+        role: (session.user as UserWithRole).role || "user",
+      }
+    : {
+        id: "dev-user-id",
+        name: "Dev User",
+        email: "dev@localhost",
+        role: "admin",
+      }
 
   return (
     <SidebarProvider>

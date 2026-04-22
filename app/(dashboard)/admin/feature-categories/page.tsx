@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit2, ExternalLink, Plus, Trash2 } from "lucide-react"
-import { getAllPlans, deletePlan } from "@/actions/admin-plans"
-import { PlanEditDialog } from "@/components/admin/plan-edit-dialog"
+import { Edit2, Plus, Trash2 } from "lucide-react"
+import { getAllCategories, deleteCategory } from "@/actions/admin-features"
+import { CategoryEditDialog } from "@/components/admin/feature-dialogs"
 import { DataTable, DataTableColumn } from "@/components/admin/data-table"
 import { toast } from "sonner"
 import {
@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-export default function AdminPlansPage() {
+export default function AdminCategoriesPage() {
   const [data, setData] = useState<any[]>([])
   const [metadata, setMetadata] = useState({
     total: 0,
@@ -28,9 +28,9 @@ export default function AdminPlansPage() {
     totalPages: 0,
   })
   const [loading, setLoading] = useState(true)
-  const [editingPlan, setEditingPlan] = useState<any | null>(null)
+  const [editingCategory, setEditingCategory] = useState<any | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [planToDelete, setPlanToDelete] = useState<string | null>(null)
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null)
 
   const [params, setParams] = useState({
     page: 1,
@@ -40,55 +40,34 @@ export default function AdminPlansPage() {
     sortOrder: "asc" as "asc" | "desc",
   })
 
-  const fetchPlans = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
-    const result = await getAllPlans(params)
+    const result = await getAllCategories(params)
     setData(result.data)
     setMetadata(result.metadata)
     setLoading(false)
   }, [params])
 
   useEffect(() => {
-    fetchPlans()
-  }, [fetchPlans])
+    fetchData()
+  }, [fetchData])
 
   const handleDelete = async () => {
-    if (!planToDelete) return
-    const result = await deletePlan(planToDelete)
+    if (!itemToDelete) return
+    const result = await deleteCategory(itemToDelete)
     if (result.success) {
-      toast.success("Plan deleted")
-      fetchPlans()
+      toast.success("Category deleted")
+      fetchData()
     } else {
-      toast.error("Failed to delete plan")
+      toast.error("Failed to delete category")
     }
-    setPlanToDelete(null)
+    setItemToDelete(null)
   }
 
   const columns: DataTableColumn<any>[] = [
-    {
-      key: "position",
-      header: "Pos",
-      sortable: true,
-      className: "w-[80px] font-mono text-xs",
-    },
+    { key: "position", header: "Pos", sortable: true, className: "w-[80px]" },
     { key: "name", header: "Name", sortable: true, className: "font-bold" },
-    {
-      key: "mode",
-      header: "Mode",
-      sortable: true,
-      render: (row) => (
-        <Badge variant="outline" className="capitalize">
-          {row.mode}
-        </Badge>
-      ),
-    },
-    { key: "slots", header: "Slots", sortable: true },
-    {
-      key: "finalPrice",
-      header: "Price",
-      sortable: true,
-      render: (row) => <span>${(row.finalPrice / 100).toFixed(2)}</span>,
-    },
+    { key: "slug", header: "Slug", sortable: true },
     {
       key: "isActive",
       header: "Status",
@@ -99,23 +78,6 @@ export default function AdminPlansPage() {
         </Badge>
       ),
     },
-    {
-      key: "stripePaymentLink",
-      header: "Stripe",
-      render: (row) =>
-        row.stripePaymentLink ? (
-          <a
-            href={row.stripePaymentLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-primary hover:underline"
-          >
-            Link <ExternalLink className="size-3" />
-          </a>
-        ) : (
-          "-"
-        ),
-    },
   ]
 
   return (
@@ -123,14 +85,14 @@ export default function AdminPlansPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-900">
-            Pricing Plans
+            Feature Categories
           </h1>
           <p className="mt-1 text-slate-500">
-            Manage your pricing tiers and feature bullet points.
+            Manage groupings for the plan comparison table.
           </p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
-          <Plus className="size-4" /> Create Plan
+          <Plus className="size-4" /> Create Category
         </Button>
       </div>
 
@@ -154,7 +116,7 @@ export default function AdminPlansPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setEditingPlan(row)}
+              onClick={() => setEditingCategory(row)}
             >
               <Edit2 className="size-4" />
             </Button>
@@ -162,7 +124,7 @@ export default function AdminPlansPage() {
               variant="ghost"
               size="icon"
               className="text-rose-500 hover:bg-rose-50 hover:text-rose-600"
-              onClick={() => setPlanToDelete(row.id)}
+              onClick={() => setItemToDelete(row.id)}
             >
               <Trash2 className="size-4" />
             </Button>
@@ -170,29 +132,29 @@ export default function AdminPlansPage() {
         )}
       />
 
-      <PlanEditDialog
-        plan={editingPlan}
-        open={!!editingPlan}
-        onOpenChange={(open) => !open && setEditingPlan(null)}
-        onSuccess={fetchPlans}
+      <CategoryEditDialog
+        category={editingCategory}
+        open={!!editingCategory}
+        onOpenChange={(open) => !open && setEditingCategory(null)}
+        onSuccess={fetchData}
       />
 
-      <PlanEditDialog
+      <CategoryEditDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
-        onSuccess={fetchPlans}
+        onSuccess={fetchData}
       />
 
       <AlertDialog
-        open={!!planToDelete}
-        onOpenChange={(o) => !o && setPlanToDelete(null)}
+        open={!!itemToDelete}
+        onOpenChange={(o) => !o && setItemToDelete(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the plan. This action cannot be
-              undone.
+              This will permanently delete the category. Features in this
+              category might be affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -201,7 +163,7 @@ export default function AdminPlansPage() {
               onClick={handleDelete}
               className="bg-rose-600 hover:bg-rose-700"
             >
-              Delete Plan
+              Delete Category
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

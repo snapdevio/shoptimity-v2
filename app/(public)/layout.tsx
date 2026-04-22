@@ -110,7 +110,7 @@ export default async function PublicLayout({
                 </li>
                 <li>
                   <Link
-                    href="/plans"
+                    href="/pricing"
                     className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                   >
                     Pricing

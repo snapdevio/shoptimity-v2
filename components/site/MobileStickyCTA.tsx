@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useBasePrice } from "@/hooks/use-base-price"
 import { ArrowRight } from "lucide-react"
+import { authClient } from "@/lib/auth-client"
+
+interface MobileStickyCTAProps {
+  price?: string
+}
 
 const MobileStickyCTA = () => {
   const [isVisible, setIsVisible] = useState<boolean>(true)
@@ -35,17 +41,21 @@ const MobileStickyCTA = () => {
     }
   }, [])
 
-  const scrollToPricing = () => {
-    router.push(`/plans`)
+  const scrollToPricing = async () => {
+    const { data: session } = await authClient.getSession()
+    if (session) {
+      router.push("/pricing")
+    } else {
+      router.push("/login?redirect=/pricing")
+    }
   }
 
   return (
     <div
-      className={`fixed right-8 bottom-8 left-8 z-40 transition-all duration-300 md:hidden ${
-        isVisible
+      className={`fixed right-8 bottom-8 left-8 z-40 transition-all duration-300 md:hidden ${isVisible
           ? "pointer-events-auto translate-y-0 opacity-100"
           : "pointer-events-none translate-y-5 opacity-0"
-      }`}
+        }`}
     >
       <div className="flex flex-col items-center gap-2">
         <button
