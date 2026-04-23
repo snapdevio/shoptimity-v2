@@ -77,7 +77,7 @@ export function ConversionConfirmationEmail({
             <Text style={heading}>Conversion Confirmed</Text>
             <Text style={paragraph}>
               Hi {contactName}, your trial has officially ended and been
-              converted to a full Lifetime license. Welcome to the Shoptimity
+              converted to an active Pro subscription. Welcome to the Shoptimity
               family!
             </Text>
 
@@ -137,7 +137,7 @@ export function ConversionConfirmationEmail({
             <Hr style={divider} />
 
             <Text style={paragraph}>
-              You now have permanent access to your {planName} features, premium
+              You now have full access to your {planName} features, premium
               templates, and updates. Thank you for choosing Shoptimity!
             </Text>
 

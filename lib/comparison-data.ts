@@ -103,14 +103,14 @@ export const comparisonData: Record<string, CompetitorData> = {
       "Shrine is a performance-focused Shopify theme. While fast, it often requires tiered payments for advanced features and lacks Shoptimity's niche-specific layouts.",
     heroHeadline: "Why Brand Owners are Switching from Shrine to Shoptimity",
     heroSubheadline:
-      "Stop paying for 'Pro' features. Shoptimity gives you everything you need to scale for a single one-time payment.",
+      "Stop paying for 'Extra' features. Shoptimity gives you everything you need to scale with simple, transparent pricing.",
     heroImage:
       "https://license.shoptimity.com/assets/comparisons/shrine-x-shoptimity.webp",
     features: [
       {
         category: "PRICING & VALUE",
         name: "Pricing Model",
-        shoptimity: "One-time Payment",
+        shoptimity: "Subscription Based",
         competitor: "Tiered (Standard/Pro)",
         description:
           "Shoptimity includes all features in one price, whereas Shrine locks key features behind tiers.",
@@ -157,7 +157,7 @@ export const comparisonData: Record<string, CompetitorData> = {
       },
     ],
     pros: [
-      "No recurring monthly fees",
+      "All features in one subscription",
       "Superior mobile conversion rate",
       "All templates included for free",
       "Native advertorial builders",
@@ -171,7 +171,7 @@ export const comparisonData: Record<string, CompetitorData> = {
       {
         title: "Performance That Doesn't Cut Corners",
         description:
-          "While Shrine focuses on minimalism, Shoptimity focuses on Conversion. We don't just make your site fast; we make it sell. Our one-time payment includes advanced features that Shrine locks behind their 'Pro' tier.",
+          "While Shrine focuses on minimalism, Shoptimity focuses on Conversion. We don't just make your site fast; we make it sell. Our Pro plan includes advanced features that Shrine locks behind their 'Pro' tier.",
         imageSrc:
           "https://license.shoptimity.com/assets/comparisons/shrine-x-shoptimity-1.webp",
       },
@@ -230,7 +230,7 @@ export const comparisonData: Record<string, CompetitorData> = {
       {
         category: "PERFORMANCE & SUPPORT",
         name: "Updates & Community",
-        shoptimity: "Lifetime Updates",
+        shoptimity: "Ongoing Updates",
         competitor: "Standard Support",
         description: "Access our active community of 1,000+ brand owners.",
       },

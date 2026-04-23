@@ -63,8 +63,8 @@ export default async function ThankYouPage({
 
   // const amountTotal = session?.amount_total ? session.amount_total / 100 : 0
   const currency = session?.currency?.toUpperCase() || "USD"
-  const isTrial =
-    session?.mode === "setup" || session?.metadata?.type === "trial_setup"
+  const isFreePlan =
+    session?.amount_total === 0 || session?.metadata?.type === "free_plan"
   const lineItems = session?.line_items?.data || []
 
   // Fetch plan details for summary calculation
@@ -91,8 +91,8 @@ export default async function ThankYouPage({
       : plan
         ? [
             {
-              id: "trial-item",
-              description: `${plan.name} Trial`,
+              id: "free-item",
+              description: `${plan.name}`,
               amount: 0,
               quantity: 1,
             },
@@ -107,17 +107,17 @@ export default async function ThankYouPage({
             <CheckCircle className="size-8 text-primary" />
           </div>
           <h1 className="mt-6 font-heading text-3xl font-bold tracking-tight sm:text-4xl">
-            {isTrial
-              ? "Trial Started Successfully!"
+            {isFreePlan
+              ? "Free Plan Activated Successfully!"
               : "Thank You for Your Purchase!"}
           </h1>
           <div className="mt-4 space-y-2">
             <p className="text-lg text-muted-foreground">
-              {isTrial
-                ? "Your trial license has been activated."
+              {isFreePlan
+                ? "Your Free Plan has been activated."
                 : "Your order has been successfully processed. You are all set to start managing your Shopify licenses."}
             </p>
-            {isTrial && (
+            {isFreePlan && (
               <p className="text-base text-muted-foreground">
                 You can now start managing your Shopify domains.{" "}
                 <Link
@@ -140,10 +140,10 @@ export default async function ThankYouPage({
                   <CardTitle>Order Summary</CardTitle>
                 </div>
                 <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold tracking-wider text-primary uppercase">
-                  {isTrial ? (
+                  {isFreePlan ? (
                     <>
                       <ShieldCheck className="size-3" />
-                      Trial
+                      Free
                     </>
                   ) : (
                     <>
@@ -185,7 +185,7 @@ export default async function ThankYouPage({
                             style: "currency",
                             currency: currency,
                           }).format(item.amount / 100)
-                        : "Free Trial"}
+                        : "Free"}
                     </p>
                   </div>
                 ))}

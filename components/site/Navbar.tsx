@@ -23,6 +23,7 @@ const Navbar: React.FC<{ isLoggedIn?: boolean }> = ({
 
   const navLinks = [
     { name: "Home", href: "/" },
+    { name: "Case Studies", href: "/case-studies" },
     { name: "Pricing", href: "/plans" },
     { name: "Setup Guide", href: "/setup" },
     { name: "Blogs", href: "/blogs" },

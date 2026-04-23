@@ -90,7 +90,7 @@ export function FAQClient() {
         {
           question: "How does Shoptimity help me eliminate monthly app costs?",
           answer:
-            "Shoptimity is engineered with over 80+ built-in blocks and conversion features—like countdown timers, sticky add-to-cart, and product swatches—that normally require expensive monthly subscriptions. By using our native features, you can save hundreds of dollars each month and significantly improve your loading speed.",
+            "Shoptimity is engineered with over 80+ built-in blocks and conversion features—like countdown timers, sticky add-to-cart, and product swatches—that normally require ten or more separate apps. Instead of paying multiple recurring subscriptions, Shoptimity provides everything in one streamlined platform, saving you hundreds of dollars each month and significantly improving your loading speed.",
         },
       ],
     },
@@ -100,12 +100,12 @@ export function FAQClient() {
         {
           question: "Can I use Shoptimity on multiple stores?",
           answer:
-            "This depends on the license you purchase. Each standard license is valid for a single Shopify store. If you manage multiple brands, our 3-license bundle offers the best value. You can manage and assign your licenses through your Shoptimity dashboard.",
+            "Our Free Plan includes 1 license slot. For brands looking to scale, our Pro Growth plan also provides license management for your store. You can manage and assign your licenses through your Shoptimity dashboard.",
         },
         {
-          question: "Does the theme include free updates?",
+          question: "Does the theme include updates?",
           answer:
-            "Yes, we regularly release new features, performance improvements, and conversion-optimized blocks based on the latest e-commerce trends. All version updates are provided free of charge to license holders.",
+            "Yes, we regularly release new features, performance improvements, and conversion-optimized blocks based on the latest e-commerce trends. All updates are included as part of your active subscription.",
         },
         {
           question: "What kind of support is included?",
@@ -131,15 +131,15 @@ export function FAQClient() {
           ),
         },
         {
-          question: "How do I cancel my free trial?",
+          question: "How do I cancel my subscription?",
           answer:
-            "You can cancel your trial at any time directly through your dashboard. Simply navigate to the Licenses page, locate the license you wish to cancel, and click the Cancel Trial button. Access to Shoptimity's premium features will be revoked immediately upon cancellation to prevent further charges.",
+            "You can cancel your subscription at any time directly through your Shoptimity dashboard. Simply navigate to the Licenses page, locate the subscription you wish to cancel, and click the Manage Subscription button. Access to premium features will remain active until the end of your current billing period.",
         },
         {
           question:
-            "What happens to my connected domains if I cancel or my trial expires?",
+            "What happens to my connected domains if I cancel my subscription?",
           answer:
-            "If you cancel your membership or your trial expires without a successful payment, your domain's license will be revoked. While your Shopify store will remain functional, all Shoptimity-specific features, templates, and performance optimizations will be deactivated until a valid license is restored.",
+            "If you cancel your Pro subscription, your domain's premium license will be revoked at the end of the billing cycle. While your Shopify store will remain functional, all Pro-level features, templates, and performance optimizations will be deactivated. You can still use the Free Plan for basic theme functionality.",
         },
       ],
     },

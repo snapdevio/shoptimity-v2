@@ -64,7 +64,7 @@ export default function TermsPage() {
                 a time.
               </li>
               <li>
-                Licenses are valid for the lifetime of your account access,
+                Licenses are valid for the duration of your active subscription,
                 subject to the terms of your purchased plan.
               </li>
               <li>
@@ -106,8 +106,8 @@ export default function TermsPage() {
                 purchase, you agree to Stripe&apos;s terms of service.
               </li>
               <li>
-                Payments are made on a one-time basis for lifetime access to the
-                licenses included in your plan.
+                Payments are made on a recurring subscription basis (monthly or
+                yearly) for access to the Service and included features.
               </li>
               <li>
                 You authorize us to charge your payment method for all fees

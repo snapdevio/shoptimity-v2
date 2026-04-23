@@ -2,10 +2,8 @@
 
 import { ArrowRight } from "lucide-react"
 import React, { useState, useEffect } from "react"
-import { useBasePrice } from "@/hooks/use-base-price"
 
 const OtherPageStickyCTA: React.FC = () => {
-  const { trialDays } = useBasePrice()
   const [isVisible, setIsVisible] = useState<boolean>(false)
 
   useEffect(() => {
@@ -59,13 +57,9 @@ const OtherPageStickyCTA: React.FC = () => {
           onClick={moveToPricing}
           className="flex h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#FD784E_0%,#F06A42_60%,#D95734_100%)] px-4 py-6 text-base font-medium text-white shadow-[0_10px_25px_rgba(253,120,78,0.35)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(253,120,78,0.45)] active:scale-[0.98] md:min-w-[320px] md:px-10"
         >
-          <span className="font-bold md:hidden">
-            {trialDays > 0 ? "Start Free Trial Now" : "Get Shoptimity Now"}
-          </span>
+          <span className="font-bold md:hidden">Get Shoptimity Now</span>
           <span className="hidden md:inline">
-            {trialDays > 0
-              ? "Start Free Trial Now"
-              : "UPGRADE TO THE SHOPTIMITY THEME NOW"}
+            UPGRADE TO THE SHOPTIMITY THEME NOW
           </span>
           <ArrowRight className="h-6 w-6 md:h-5 md:w-5" />
         </button>

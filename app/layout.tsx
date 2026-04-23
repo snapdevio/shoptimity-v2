@@ -34,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
       process.env.NEXT_PUBLIC_APP_URL || "https://shoptimity.com"
     ),
     title: `Shoptimity | High-Converting Shopify Theme for Just ${basePrice}`,
-    description: `Get Shoptimity – a premium Shopify theme designed to boost conversions, increase AOV, and eliminate app costs. One-time payment of just ${basePrice}. Build a high-performing store today.`,
+    description: `Get Shoptimity – a premium Shopify theme designed to boost conversions, increase AOV, and eliminate app costs. Starting at just ${basePrice}. Build a high-performing store today.`,
     keywords: [
       "Shoptimity",
       `Shopify theme ${basePrice}`,
@@ -59,7 +59,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://shoptimity.com",
       siteName: "Shoptimity",
       title: `Shoptimity | Premium Shopify Theme for ${basePrice}`,
-      description: `Launch a high-converting Shopify store with Shoptimity. No monthly apps, powerful features, and lifetime access – all for just ${basePrice}.`,
+      description: `Launch a high-converting Shopify store with Shoptimity. No monthly apps, powerful features, and full access – all for just ${basePrice}.`,
       images: [
         {
           url: "https://license.shoptimity.com/assets/og.png",

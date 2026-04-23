@@ -116,9 +116,7 @@ const WidgetsMarquee: React.FC = () => {
                 ?.scrollIntoView({ behavior: "smooth" })
             }
           >
-            {trialDays > 0
-              ? "Start Free Trial Now"
-              : `Get Shoptimity @ ${basePrice}`}
+            Get Shoptimity Now
           </button>
           <CTABadges
             trialDays={trialDays}

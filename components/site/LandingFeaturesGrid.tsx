@@ -67,9 +67,9 @@ const features = [
     color: "bg-purple-50",
   },
   {
-    title: "One-Time Payment",
+    title: "Flexible Plans",
     description:
-      "Forget recurring bills. Pay once and get lifetime updates and support for your Shopify store.",
+      "Choose a plan that fits your growth stage. Scale up as you build and manage your Shopify empire.",
     icon: (
       <svg
         className="h-8 w-8 text-green-500"

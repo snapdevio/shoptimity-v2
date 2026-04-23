@@ -132,19 +132,9 @@ const LandingHero: React.FC = () => {
                   onClick={scrollToPricing}
                   className="btn-orange flex w-full cursor-pointer items-center justify-center gap-2 rounded-full px-8 py-4 font-sans text-lg sm:w-auto"
                 >
-                  {trialDays > 0 ? (
-                    "Start Free Trial Now"
-                  ) : (
-                    <>
-                      Get Shoptimity @{" "}
-                      <span className="ml-[2px] font-bold">{basePrice}</span>
-                    </>
-                  )}
+                  Get Started For Free
                 </button>
-                <CTABadges
-                  trialDays={trialDays}
-                  className="items-center justify-center lg:justify-start"
-                />
+                <CTABadges className="items-center justify-center lg:justify-start" />
               </div>
 
               <button

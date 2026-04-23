@@ -44,13 +44,13 @@ const ComparisonStickyHeader: React.FC<ComparisonStickyHeaderProps> = ({
 
         <div className="flex items-center gap-4">
           <span className="hidden text-xs font-bold tracking-widest text-gray-400 capitalize md:block">
-            {trialDays > 0 ? "Fast & Simple Setup" : "Lifetime Access"}
+            Simple Scaling
           </span>
           <button
             onClick={scrollToPricing}
             className="rounded-full bg-orange-600 px-6 py-2.5 text-xs font-black text-white shadow-lg transition-transform hover:scale-105 active:scale-95 sm:px-8 sm:text-sm"
           >
-            {trialDays > 0 ? "START FREE TRIAL" : "GET SHOPTIMITY"}
+            VIEW PLANS
           </button>
         </div>
       </div>

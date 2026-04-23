@@ -118,9 +118,7 @@ export default async function PlansPage() {
                       "w-full capitalize"
                     )}
                   >
-                    {plan.trialDays > 0
-                      ? "Start Free Trial Now"
-                      : "get started"}
+                    Get Started
                   </a>
                 </CardFooter>
 
@@ -137,10 +135,7 @@ export default async function PlansPage() {
               </Card>
             )
           })}
-          <CTABadges
-            trialDays={displayPlans[0].trialDays}
-            className="items-center justify-center lg:col-span-3 lg:text-[14px]"
-          />
+          <CTABadges className="items-center justify-center lg:col-span-3 lg:text-[14px]" />
         </div>
       </div>
     </div>

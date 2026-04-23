@@ -1,12 +1,10 @@
 "use client"
 
 import React, { useEffect, useRef } from "react"
-import { useBasePrice } from "@/hooks/use-base-price"
 import CTABadges from "./CTABadges"
 
 const MobileFirstSection: React.FC = () => {
   const sectionRef = useRef<HTMLDivElement>(null)
-  const { basePrice, trialDays } = useBasePrice()
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -86,19 +84,9 @@ const MobileFirstSection: React.FC = () => {
               onClick={scrollToPricing}
               className="btn-orange cursor-pointer rounded-full px-10 py-4 text-lg font-bold text-white shadow-xl transition-all hover:scale-105 active:scale-95"
             >
-              {trialDays > 0 ? (
-                "Start Free Trial Now"
-              ) : (
-                <>
-                  Get Shoptimity @{" "}
-                  <span className="ml-[2px] text-primary">{basePrice}</span>
-                </>
-              )}
+              Get Shoptimity Now
             </button>
-            <CTABadges
-              trialDays={trialDays}
-              className="items-center justify-center"
-            />
+            <CTABadges className="items-center justify-center" />
           </div>
         </div>
       </div>

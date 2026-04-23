@@ -37,6 +37,9 @@ const TransformationSection = dynamic(
   () => import("@/components/site/TransformationSection")
 )
 const PricingSection = dynamic(() => import("@/components/site/PricingSection"))
+const NewPricingSection = dynamic(
+  () => import("@/components/site/NewPricingSection")
+)
 const StepsSection = dynamic(() => import("@/components/site/StepsSection"))
 const WorldClassBrandMarquee = dynamic(
   () => import("@/components/site/WorldClassBrandMarquee")
@@ -64,6 +67,7 @@ export default async function HomePage() {
       <TransformationSection />
       {/* <AdvancedSearchSection /> */}
       <PricingSection />
+      <NewPricingSection />
       <StepsSection />
       <DifferenceSection />
       <NoMonthlyFee />
