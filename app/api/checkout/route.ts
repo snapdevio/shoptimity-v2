@@ -16,6 +16,7 @@ const checkoutSchema = z.object({
   planId: z.string().uuid(),
   licenseQuantity: z.number().int().min(1).max(100),
   domains: z.array(z.string()).max(300).optional(),
+  isYearly: z.boolean().optional(),
 })
 
 function getStripe() {
@@ -31,6 +32,7 @@ async function createCheckoutSession({
   licenseQuantity,
   domains,
   appUrl,
+  isYearlyPlan,
 }: {
   stripe: Stripe
   plan: any
@@ -40,6 +42,7 @@ async function createCheckoutSession({
   licenseQuantity: number
   domains?: string[]
   appUrl: string
+  isYearlyPlan?: boolean
 }) {
   // Direct Check: Use all domains if they fit in 300 chars, otherwise fallback to first 3
   const domainsJson = domains ? JSON.stringify(domains) : ""
@@ -81,10 +84,15 @@ async function createCheckoutSession({
               price_data: {
                 currency: plan.currency || "usd",
                 product_data: {
-                  name: `${plan.name} (Lifetime ${plan.slots > 1 ? "Licenses" : "License"})`,
-                  description: `Lifetime access for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
+                  name: `${plan.name} (${isYearlyPlan ? "Yearly" : "Lifetime"} ${plan.slots > 1 ? "Licenses" : "License"})`,
+                  description: `${isYearlyPlan ? "1-Year" : "Lifetime"} access for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
                 },
-                unit_amount: plan.finalPrice,
+                unit_amount:
+                  isYearlyPlan && plan.yearlyDiscount
+                    ? Math.round(
+                        plan.finalPrice * (1 - plan.yearlyDiscount / 100)
+                      )
+                    : plan.finalPrice,
               },
               quantity: 1, // Quantity of the plan is always 1 as the price accounts for everything
             },
@@ -98,7 +106,7 @@ async function createCheckoutSession({
           allow_promotion_codes: true,
         }),
     success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${appUrl}/plans`,
+    cancel_url: `${appUrl}/pricing`,
   })
 }
 
@@ -107,9 +115,10 @@ export async function GET(request: NextRequest) {
   const planId = searchParams.get("planId")
   const quantityStr = searchParams.get("quantity") || "1"
   const quantity = parseInt(quantityStr, 10)
+  const isYearly = searchParams.get("isYearly") === "true"
 
   if (!planId) {
-    return NextResponse.redirect(new URL("/plans", request.url))
+    return NextResponse.redirect(new URL("/pricing", request.url))
   }
 
   // Get plan details
@@ -120,23 +129,26 @@ export async function GET(request: NextRequest) {
     .limit(1)
 
   if (!plan) {
-    return NextResponse.redirect(new URL("/plans", request.url))
+    return NextResponse.redirect(new URL("/pricing", request.url))
   }
 
-  // Get user session for pre-filling
+  // Get user session for pre-filling and security
   const session = await getAppSession()
-  let contactName = ""
-  let userEmail = ""
 
-  if (session) {
-    userEmail = session.email
-    const [userRecord] = await db
-      .select({ name: users.name })
-      .from(users)
-      .where(eq(users.id, session.userId))
-      .limit(1)
-    contactName = userRecord?.name || ""
+  if (!session) {
+    return NextResponse.redirect(
+      new URL("/login?redirect=/pricing", request.url)
+    )
   }
+
+  let contactName = ""
+  let userEmail = session.email
+  const [userRecord] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1)
+  contactName = userRecord?.name || ""
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://shoptimity.com"
   const stripe = getStripe()
@@ -173,6 +185,7 @@ export async function GET(request: NextRequest) {
       licenseQuantity: quantity,
       domains,
       appUrl,
+      isYearlyPlan: isYearly,
     })
 
     // await createAuditLog(
@@ -190,7 +203,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(stripeSession.url!, request.url))
   } catch (err) {
     console.error("Stripe direct checkout error:", err)
-    return NextResponse.redirect(new URL("/plans", request.url))
+    return NextResponse.redirect(new URL("/pricing", request.url))
   }
 }
 
@@ -209,7 +222,8 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { email, contactName, planId, licenseQuantity, domains } = parsed.data
+  const { email, contactName, planId, licenseQuantity, domains, isYearly } =
+    parsed.data
 
   // Get plan
   const [plan] = await db
@@ -261,6 +275,7 @@ export async function POST(request: NextRequest) {
       licenseQuantity,
       domains,
       appUrl,
+      isYearlyPlan: isYearly,
     })
 
     // await createAuditLog(null, "checkout.initiated", "checkout", session.id, {

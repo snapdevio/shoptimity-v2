@@ -100,7 +100,7 @@ export function FAQClient() {
         {
           question: "Can I use Shoptimity on multiple stores?",
           answer:
-            "Our Free Plan includes 1 license slot. For brands looking to scale, our Pro Growth plan also provides license management for your store. You can manage and assign your licenses through your Shoptimity dashboard.",
+            "Each license is valid for one Shopify store only. Both our Free and Pro plans include 1 license slot. If you want to use Shoptimity on additional stores, you can easily purchase or upgrade to add more license slots.",
         },
         {
           question: "Does the theme include updates?",
@@ -110,24 +110,39 @@ export function FAQClient() {
         {
           question: "What kind of support is included?",
           answer: (
-            <>
-              Every Shoptimity purchase comes with dedicated, round-the-clock
-              support. Whether you need help with technical on-boarding, feature
-              configuration, or minor styling adjustments, our expert team is
-              here to ensure your success. You can reach us instantly via live
-              chat, through our{" "}
-              <Link href="/contact" className="text-primary hover:underline">
-                contact page
-              </Link>
-              , or via{" "}
-              <a
-                href="mailto:support@shoptimity.com"
-                className="text-primary hover:underline"
-              >
-                email
-              </a>
-              .
-            </>
+            <div className="space-y-3 leading-relaxed">
+              <div>
+                Every Shoptimity plan comes with reliable, round-the-clock
+                support to help you succeed.
+              </div>
+
+              <div>
+                <strong>Free Plan:</strong> Includes access to our help
+                resources and email support for setup guidance, feature usage,
+                and basic troubleshooting.
+              </div>
+
+              <div>
+                <strong>Pro Plan:</strong> Includes everything in Free, plus
+                priority assistance from a dedicated developer for faster
+                resolutions, advanced configuration, and customizations.
+              </div>
+
+              <div>
+                You can reach us via live chat, through our{" "}
+                <Link href="/contact" className="text-primary hover:underline">
+                  contact page
+                </Link>
+                , or via{" "}
+                <a
+                  href="mailto:support@shoptimity.com"
+                  className="text-primary hover:underline"
+                >
+                  email
+                </a>
+                .
+              </div>
+            </div>
           ),
         },
         {

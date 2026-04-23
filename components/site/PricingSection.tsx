@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { getActivePlans } from "@/actions/admin-plans"
 import { getActiveTemplates } from "@/actions/admin-templates"
+import { authClient } from "@/lib/auth-client"
 import CTABadges from "./CTABadges"
 
 interface License {
@@ -21,6 +22,7 @@ interface License {
   bestValue?: boolean
   slots: number
   trialDays: number
+  licenses?: number
 }
 
 interface PricingSectionProps {
@@ -31,6 +33,10 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
   const router = useRouter()
   const [selectedLicenseIndex, setSelectedLicenseIndex] = useState<number>(0)
   const [licenses, setLicenses] = useState<License[]>([])
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">(
+    "yearly"
+  )
+  const [allDbPlans, setAllDbPlans] = useState<any[]>([])
   const [templates, setTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -40,31 +46,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
       const dbTemplates = await getActiveTemplates()
 
       if (dbPlans && dbPlans.length > 0) {
-        const mappedLicenses: License[] = dbPlans
-          .slice(0, 3)
-          .map((plan, idx) => {
-            const discount = plan.regularPrice - plan.finalPrice
-            const savePercent = Math.round((discount / plan.regularPrice) * 100)
-            const unitPrice = plan.finalPrice / plan.slots
-
-            return {
-              id: idx,
-              label: `${plan.slots} LICENSE${plan.slots > 1 ? "S" : ""}`,
-              save: `${savePercent}%`,
-              saveAmount: `$${(discount / 100).toFixed(0)}`,
-              price: `$${(plan.finalPrice / 100).toFixed(0)}`,
-              originalPrice: `$${(plan.regularPrice / 100).toFixed(0)}`,
-              badge: `${plan.slots} License${plan.slots > 1 ? "s" : ""}`,
-              unitPrice: `$${(unitPrice / 100).toFixed(2)}`,
-              stripe_payment_link: plan.stripePaymentLink || "#",
-              planId: plan.id,
-              popular: idx === 1,
-              bestValue: idx === 2,
-              slots: plan.slots,
-              trialDays: plan.trialDays || 0,
-            }
-          })
-        setLicenses(mappedLicenses)
+        setAllDbPlans(dbPlans)
       }
 
       if (dbTemplates) {
@@ -76,6 +58,70 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
 
     fetchData()
   }, [])
+
+  useEffect(() => {
+    if (allDbPlans.length > 0) {
+      // Take the top 3 plans to show, regardless of their mode in DB
+      const filtered = allDbPlans.slice(0, 3)
+
+      const mappedLicenses: License[] = filtered.map((plan, idx) => {
+        let currentRegularPrice = plan.regularPrice
+        let currentFinalPrice = plan.finalPrice
+        let activeDiscountPercent = 0
+
+        // If Yearly is selected and the plan has a yearlyDiscount
+        if (
+          billingCycle === "yearly" &&
+          plan.yearlyDiscount &&
+          plan.yearlyDiscount > 0
+        ) {
+          // Apply the yearly discount to the final price (e.g., 30% off the $29 price)
+          currentFinalPrice = Math.round(
+            plan.finalPrice * (1 - plan.yearlyDiscount / 100)
+          )
+          // For the badge, show the yearly discount percentage explicitly
+          activeDiscountPercent = plan.yearlyDiscount
+        } else {
+          // Normal monthly calculation
+          const discount = currentRegularPrice - currentFinalPrice
+          activeDiscountPercent = Math.round(
+            (discount / currentRegularPrice) * 100
+          )
+        }
+
+        const discountAmount = currentRegularPrice - currentFinalPrice
+        const savePercent = activeDiscountPercent
+        const unitPrice = currentFinalPrice / plan.slots
+
+        return {
+          id: idx,
+          label: `${plan.slots} LICENSE${plan.slots > 1 ? "S" : ""}`,
+          save: `${savePercent}%`,
+          saveAmount: `$${(discountAmount / 100).toFixed(0)}`,
+          price: `$${(currentFinalPrice / 100).toFixed(0)}`,
+          originalPrice: `$${(currentRegularPrice / 100).toFixed(0)}`,
+          badge: `${plan.slots} License${plan.slots > 1 ? "s" : ""}`,
+          unitPrice: `$${(unitPrice / 100).toFixed(2)}`,
+          stripe_payment_link: plan.stripePaymentLink || "#",
+          planId: plan.id,
+          popular: idx === 1,
+          bestValue: idx === 2,
+          slots: plan.slots,
+          trialDays: plan.trialDays || 0,
+        }
+      })
+      setLicenses(mappedLicenses)
+      // Reset selected index if it's out of bounds
+      if (selectedLicenseIndex >= mappedLicenses.length) {
+        setSelectedLicenseIndex(0)
+      }
+    }
+  }, [allDbPlans, billingCycle])
+
+  const maxYearlyDiscount = allDbPlans.reduce(
+    (max, p) => Math.max(max, p.yearlyDiscount || 0),
+    0
+  )
 
   const current = licenses[selectedLicenseIndex] || licenses[0]
 
@@ -90,10 +136,13 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
     )
   }
 
-  const buyLicense = () => {
-    router.push(
-      `/api/checkout?planId=${current.planId}&quantity=${current.slots}`
-    )
+  const buyLicense = async () => {
+    const { data: session } = await authClient.getSession()
+    if (session) {
+      router.push("/pricing")
+    } else {
+      router.push("/login?redirect=/pricing")
+    }
   }
 
   return (
@@ -114,6 +163,44 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
             <h2 className="mb-2 font-heading text-[32px] leading-tight text-base-content md:text-[40px]">
               {headline || "Shoptimity Shopify Theme"}
             </h2>
+
+            {/* Billing Cycle Toggle */}
+            <div className="mb-8 flex justify-start">
+              <div className="relative flex rounded-2xl bg-base-300 p-1">
+                <button
+                  onClick={() => setBillingCycle("monthly")}
+                  className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
+                    billingCycle === "monthly"
+                      ? "text-white"
+                      : "text-base-content-muted"
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingCycle("yearly")}
+                  className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
+                    billingCycle === "yearly"
+                      ? "text-white"
+                      : "text-base-content-muted"
+                  }`}
+                >
+                  Yearly
+                  {maxYearlyDiscount > 0 && (
+                    <span className="absolute -top-2 -right-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-lg">
+                      -{maxYearlyDiscount}%
+                    </span>
+                  )}
+                </button>
+                <div
+                  className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-primary transition-transform duration-300 ${
+                    billingCycle === "yearly"
+                      ? "translate-x-full"
+                      : "translate-x-0"
+                  }`}
+                />
+              </div>
+            </div>
             <div className="mb-4 flex items-center gap-3 font-sans">
               <div className="flex items-baseline gap-3">
                 <span className="text-[40px] font-bold tracking-tight text-base-content md:text-[52px]">
@@ -351,6 +438,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
                 title: "Access Dashboard",
                 desc: "Get magic link, select your templates & download zip files.",
               },
+
               {
                 step: "03",
                 title: "Link Store",

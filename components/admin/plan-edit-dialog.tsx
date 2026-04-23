@@ -20,13 +20,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { updatePlan } from "@/actions/admin-plans"
+import { upsertPlan } from "@/actions/admin-plans"
+import {
+  bulkUpdatePlanFeatures,
+  getGroupedFeatures,
+  getPlanFeatureMappings,
+} from "@/actions/admin-features"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Check, Loader2 } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
 
 interface Plan {
   id: string
   name: string
+  mode: "monthly" | "yearly" | "free" | "lifetime"
   slots: number
   regularPrice: number
   finalPrice: number
@@ -36,10 +46,12 @@ interface Plan {
   features: any // Using any for jsonb
   position: number
   trialDays: number
+  yearlyDiscount: number | null
+  badge: string | null
 }
 
 interface PlanEditDialogProps {
-  plan: Plan
+  plan?: Plan | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -53,17 +65,70 @@ export function PlanEditDialog({
 }: PlanEditDialogProps) {
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    name: plan.name,
-    slots: plan.slots,
-    regularPrice: plan.regularPrice,
-    finalPrice: plan.finalPrice,
-    currency: plan.currency,
-    stripePaymentLink: plan.stripePaymentLink || "",
-    isActive: plan.isActive,
-    featuresText: Array.isArray(plan.features) ? plan.features.join("\n") : "",
-    position: (plan.position || 0) as number,
-    trialDays: (plan.trialDays || 0) as number,
+    name: plan?.name || "",
+    mode: plan?.mode || "monthly",
+    slots: plan?.slots || 1,
+    regularPrice: plan?.regularPrice || 0,
+    finalPrice: plan?.finalPrice || 0,
+    currency: plan?.currency || "usd",
+    stripePaymentLink: plan?.stripePaymentLink || "",
+    isActive: plan?.isActive ?? true,
+    featuresText: Array.isArray(plan?.features)
+      ? plan?.features.join("\n")
+      : "",
+    position: (plan?.position || 0) as number,
+    trialDays: (plan?.trialDays || 0) as number,
+    yearlyDiscount: (plan?.yearlyDiscount || 0) as number,
+    badge: plan?.badge || "",
   })
+  const [availableFeatures, setAvailableFeatures] = useState<any[]>([])
+  const [selectedFeatureIds, setSelectedFeatureIds] = useState<string[]>([])
+  const [featuresLoading, setFeaturesLoading] = useState(false)
+
+  // Load features and mappings
+  React.useEffect(() => {
+    async function loadFeatures() {
+      setFeaturesLoading(true)
+      const grouped = await getGroupedFeatures()
+      setAvailableFeatures(grouped)
+
+      if (plan?.id) {
+        const mappings = await getPlanFeatureMappings(plan.id)
+        setSelectedFeatureIds(
+          mappings.filter((m) => m.isEnabled).map((m) => m.featureId)
+        )
+      } else {
+        setSelectedFeatureIds([])
+      }
+      setFeaturesLoading(false)
+    }
+    if (open) {
+      loadFeatures()
+    }
+  }, [open, plan])
+
+  // Reset form when plan changes or dialog opens
+  React.useEffect(() => {
+    if (open) {
+      setFormData({
+        name: plan?.name || "",
+        mode: plan?.mode || "monthly",
+        slots: plan?.slots || 1,
+        regularPrice: plan?.regularPrice || 0,
+        finalPrice: plan?.finalPrice || 0,
+        currency: plan?.currency || "usd",
+        stripePaymentLink: plan?.stripePaymentLink || "",
+        isActive: plan?.isActive ?? true,
+        featuresText: Array.isArray(plan?.features)
+          ? plan?.features.join("\n")
+          : "",
+        position: (plan?.position || 0) as number,
+        trialDays: (plan?.trialDays || 0) as number,
+        yearlyDiscount: (plan?.yearlyDiscount || 0) as number,
+        badge: plan?.badge || "",
+      })
+    }
+  }, [open, plan])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -74,9 +139,10 @@ export function PlanEditDialog({
       .map((f) => f.trim())
       .filter((f) => f !== "")
 
-    const result = await updatePlan({
-      id: plan.id,
+    const result = await upsertPlan({
+      id: plan?.id,
       name: formData.name,
+      mode: formData.mode,
       slots: formData.slots,
       regularPrice: formData.regularPrice,
       finalPrice: formData.finalPrice,
@@ -86,180 +152,325 @@ export function PlanEditDialog({
       features,
       position: formData.position,
       trialDays: formData.trialDays,
+      yearlyDiscount: formData.yearlyDiscount,
+      badge: formData.badge || null,
     })
 
-    setLoading(false)
+    if (result.success && result.id) {
+      // Sync dynamic features
+      await bulkUpdatePlanFeatures(result.id, selectedFeatureIds)
 
-    if (result.success) {
-      toast.success("Plan updated successfully")
+      setLoading(false)
+      toast.success(
+        plan ? "Plan updated successfully" : "Plan created successfully"
+      )
       onSuccess()
       onOpenChange(false)
     } else {
-      toast.error(
-        typeof result.error === "string"
-          ? result.error
-          : "Failed to update plan"
-      )
+      setLoading(false)
+      toast.error("Failed to save plan")
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Edit Plan: {plan.name}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                required
-              />
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden p-0">
+        <form onSubmit={handleSubmit} className="flex max-h-[90vh] flex-col">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle>
+              {plan ? `Edit Plan: ${plan.name}` : "Create New Plan"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 space-y-6 overflow-y-auto p-6">
+            <div className="space-y-4">
+              <h3 className="border-l-2 border-orange-500 pl-2 text-sm font-semibold text-slate-900">
+                Basic Information
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="mode">Plan Mode</Label>
+                  <Select
+                    value={formData.mode}
+                    onValueChange={(value: any) =>
+                      setFormData({ ...formData, mode: value })
+                    }
+                  >
+                    <SelectTrigger id="mode">
+                      <SelectValue placeholder="Select mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                      <SelectItem value="free">Free</SelectItem>
+                      <SelectItem value="lifetime">Lifetime</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="slots">Slots</Label>
+                  <Input
+                    id="slots"
+                    type="number"
+                    value={formData.slots}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        slots: parseInt(e.target.value),
+                      })
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="position">Position (Order)</Label>
+                  <Select
+                    value={String(formData.position)}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        position: parseInt(value || "0"),
+                      })
+                    }
+                  >
+                    <SelectTrigger id="position">
+                      <SelectValue placeholder="Order" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...Array(21)].map((_, i) => (
+                        <SelectItem key={i} value={i.toString()}>
+                          {i}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="regularPrice">Regular Price (cents)</Label>
+                  <Input
+                    id="regularPrice"
+                    type="number"
+                    value={formData.regularPrice}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        regularPrice: parseInt(e.target.value),
+                      })
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="finalPrice">Final Price (cents)</Label>
+                  <Input
+                    id="finalPrice"
+                    type="number"
+                    value={formData.finalPrice}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        finalPrice: parseInt(e.target.value),
+                      })
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="trialDays">Trial Days</Label>
+                  <Input
+                    id="trialDays"
+                    type="number"
+                    value={formData.trialDays}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        trialDays: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Input
+                    id="currency"
+                    value={formData.currency}
+                    onChange={(e) =>
+                      setFormData({ ...formData, currency: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="yearlyDiscount">Yearly Discount (%)</Label>
+                  <Input
+                    id="yearlyDiscount"
+                    type="number"
+                    value={formData.yearlyDiscount}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        yearlyDiscount: parseInt(e.target.value),
+                      })
+                    }
+                    placeholder="e.g. 30"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="badge">Badge Label</Label>
+                  <Input
+                    id="badge"
+                    value={formData.badge}
+                    onChange={(e) =>
+                      setFormData({ ...formData, badge: e.target.value })
+                    }
+                    placeholder="e.g. Most Popular, Best Value, Hot Deal"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="stripePaymentLink">Stripe Payment Link</Label>
+                <Input
+                  id="stripePaymentLink"
+                  type="url"
+                  value={formData.stripePaymentLink}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      stripePaymentLink: e.target.value,
+                    })
+                  }
+                  placeholder="https://buy.stripe.com/..."
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="features">Card Features (one per line)</Label>
+                <Textarea
+                  id="features"
+                  value={formData.featuresText}
+                  onChange={(e) =>
+                    setFormData({ ...formData, featuresText: e.target.value })
+                  }
+                  rows={4}
+                  placeholder="1 License Slot&#10;Community Support"
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="position">Position (Order)</Label>
-              <Select
-                value={String(formData.position) as string}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, position: parseInt(value || "0") })
-                }
-              >
-                <SelectTrigger id="position">
-                  <SelectValue placeholder="Order" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[...Array(21)].map((_, i) => (
-                    <SelectItem key={i} value={i.toString()}>
-                      {i}
-                    </SelectItem>
+
+            <div className="space-y-4">
+              <h3 className="border-l-2 border-orange-500 pl-2 text-sm font-semibold text-slate-900">
+                Comparison Table Features (Dynamic)
+              </h3>
+              {featuresLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                </div>
+              ) : (
+                <div className="grid gap-6 rounded-xl border bg-slate-50/50 p-4">
+                  {availableFeatures.map((category) => (
+                    <div key={category.id} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                          {category.name}
+                        </span>
+                        <Separator className="flex-1" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {category.features.map((feature: any) => (
+                          <div
+                            key={feature.id}
+                            className="flex items-center space-x-2"
+                          >
+                            <Checkbox
+                              id={feature.id}
+                              checked={selectedFeatureIds.includes(feature.id)}
+                              onCheckedChange={(checked) => {
+                                setSelectedFeatureIds((prev) =>
+                                  checked
+                                    ? [...prev, feature.id]
+                                    : prev.filter((id) => id !== feature.id)
+                                )
+                              }}
+                            />
+                            <Label
+                              htmlFor={feature.id}
+                              className={cn(
+                                "cursor-pointer text-sm leading-none transition-colors",
+                                selectedFeatureIds.includes(feature.id)
+                                  ? "font-medium text-slate-900"
+                                  : "text-slate-500"
+                              )}
+                            >
+                              {feature.name}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 pt-4">
+              <h3 className="border-l-2 border-orange-500 pl-2 text-sm font-semibold text-slate-900">
+                Display & Visibility
+              </h3>
+              <div className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <Switch
+                  id="isActive"
+                  checked={formData.isActive}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, isActive: checked })
+                  }
+                />
+                <Label
+                  htmlFor="isActive"
+                  className="cursor-pointer font-medium"
+                >
+                  Published & Visible to Users
+                </Label>
+              </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="slots">Slots</Label>
-              <Input
-                id="slots"
-                type="number"
-                value={formData.slots}
-                onChange={(e) =>
-                  setFormData({ ...formData, slots: parseInt(e.target.value) })
-                }
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Input
-                id="currency"
-                value={formData.currency}
-                onChange={(e) =>
-                  setFormData({ ...formData, currency: e.target.value })
-                }
-                required
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="regularPrice">Regular Price (cents)</Label>
-              <Input
-                id="regularPrice"
-                type="number"
-                value={formData.regularPrice}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    regularPrice: parseInt(e.target.value),
-                  })
-                }
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="finalPrice">Final Price (cents)</Label>
-              <Input
-                id="finalPrice"
-                type="number"
-                value={formData.finalPrice}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    finalPrice: parseInt(e.target.value),
-                  })
-                }
-                required
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="trialDays">Trial Days (0 for none)</Label>
-              <Input
-                id="trialDays"
-                type="number"
-                value={formData.trialDays}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    trialDays: parseInt(e.target.value),
-                  })
-                }
-              />
-            </div>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="stripePaymentLink">Stripe Payment Link</Label>
-            <Input
-              id="stripePaymentLink"
-              type="url"
-              value={formData.stripePaymentLink}
-              onChange={(e) =>
-                setFormData({ ...formData, stripePaymentLink: e.target.value })
-              }
-              placeholder="https://buy.stripe.com/..."
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="features">Features (one per line)</Label>
-            <Textarea
-              id="features"
-              value={formData.featuresText}
-              onChange={(e) =>
-                setFormData({ ...formData, featuresText: e.target.value })
-              }
-              rows={5}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="isActive"
-              checked={formData.isActive}
-              onCheckedChange={(checked) =>
-                setFormData({ ...formData, isActive: checked })
-              }
-            />
-            <Label htmlFor="isActive">Active</Label>
-          </div>
-          <DialogFooter>
+
+          <DialogFooter className="border-t bg-slate-50 px-6 py-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              className="rounded-xl"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="rounded-xl bg-orange-600 hover:bg-orange-700"
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
+              {plan ? "Save Changes" : "Create Plan"}
             </Button>
           </DialogFooter>
         </form>

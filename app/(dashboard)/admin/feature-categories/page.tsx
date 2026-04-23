@@ -1,0 +1,173 @@
+"use client"
+
+import React, { useState, useEffect, useCallback } from "react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Edit2, Plus, Trash2 } from "lucide-react"
+import { getAllCategories, deleteCategory } from "@/actions/admin-features"
+import { CategoryEditDialog } from "@/components/admin/feature-dialogs"
+import { DataTable, DataTableColumn } from "@/components/admin/data-table"
+import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
+export default function AdminCategoriesPage() {
+  const [data, setData] = useState<any[]>([])
+  const [metadata, setMetadata] = useState({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 0,
+  })
+  const [loading, setLoading] = useState(true)
+  const [editingCategory, setEditingCategory] = useState<any | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null)
+
+  const [params, setParams] = useState({
+    page: 1,
+    limit: 10,
+    search: "",
+    sortField: "position",
+    sortOrder: "asc" as "asc" | "desc",
+  })
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    const result = await getAllCategories(params)
+    setData(result.data)
+    setMetadata(result.metadata)
+    setLoading(false)
+  }, [params])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const handleDelete = async () => {
+    if (!itemToDelete) return
+    const result = await deleteCategory(itemToDelete)
+    if (result.success) {
+      toast.success("Category deleted")
+      fetchData()
+    } else {
+      toast.error("Failed to delete category")
+    }
+    setItemToDelete(null)
+  }
+
+  const columns: DataTableColumn<any>[] = [
+    { key: "position", header: "Pos", sortable: true, className: "w-[80px]" },
+    { key: "name", header: "Name", sortable: true, className: "font-bold" },
+    { key: "slug", header: "Slug", sortable: true },
+    {
+      key: "isActive",
+      header: "Status",
+      sortable: true,
+      render: (row) => (
+        <Badge variant={row.isActive ? "default" : "secondary"}>
+          {row.isActive ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-900">
+            Feature Categories
+          </h1>
+          <p className="mt-1 text-slate-500">
+            Manage groupings for the plan comparison table.
+          </p>
+        </div>
+        <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+          <Plus className="size-4" /> Create Category
+        </Button>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={data}
+        total={metadata.total}
+        page={metadata.page}
+        pageSize={metadata.limit}
+        totalPages={metadata.totalPages}
+        searchValue={params.search}
+        sortField={params.sortField}
+        sortOrder={params.sortOrder}
+        onSearchChange={(v) => setParams((p) => ({ ...p, search: v, page: 1 }))}
+        onPageChange={(p) => setParams((prev) => ({ ...prev, page: p }))}
+        onSortChange={(f, o) =>
+          setParams((p) => ({ ...p, sortField: f, sortOrder: o }))
+        }
+        actions={(row) => (
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setEditingCategory(row)}
+            >
+              <Edit2 className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+              onClick={() => setItemToDelete(row.id)}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        )}
+      />
+
+      <CategoryEditDialog
+        category={editingCategory}
+        open={!!editingCategory}
+        onOpenChange={(open) => !open && setEditingCategory(null)}
+        onSuccess={fetchData}
+      />
+
+      <CategoryEditDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onSuccess={fetchData}
+      />
+
+      <AlertDialog
+        open={!!itemToDelete}
+        onOpenChange={(o) => !o && setItemToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the category. Features in this
+              category might be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              Delete Category
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}

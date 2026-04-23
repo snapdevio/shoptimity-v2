@@ -4,73 +4,224 @@ if (existsSync(".env")) process.loadEnvFile()
 import { db } from "./index"
 import { plans } from "./schema/plans"
 import { templates } from "./schema/templates"
+import { featureCategories, features, planFeatures } from "./schema/features"
 import { eq } from "drizzle-orm"
 
 async function main() {
-  console.log("Seeding plans...")
-
-  const planData = [
+  console.log("Seeding feature categories...")
+  const categoriesData = [
+    { name: "Essential Widgets", slug: "essential-widgets", position: 1 },
     {
-      name: "Starter",
-      slots: 1,
-      regularPrice: 30000,
-      finalPrice: 7900,
-      currency: "usd",
-      stripePaymentLink: "https://buy.stripe.com/14A14n81z9ATdcX8sgdnW00",
-      features: [
-        "1 License Slot",
-        "1 Domain",
-        "Template Access",
-        "Email Support",
-      ],
+      name: "Premium Conversion Widgets",
+      slug: "premium-widgets",
+      position: 2,
     },
+    { name: "Core Store Sections", slug: "core-sections", position: 3 },
     {
-      name: "Professional",
-      slots: 2,
-      regularPrice: 60000,
-      finalPrice: 14900,
-      currency: "usd",
-      stripePaymentLink: "https://buy.stripe.com/aFacN5fu19ATeh1dMAdnW01",
-      features: [
-        "2 License Slots",
-        "2 Domains",
-        "Template Access",
-        "Priority Support",
-        "Early Access to Updates",
-      ],
-    },
-    {
-      name: "Agency",
-      slots: 3,
-      regularPrice: 90000,
-      finalPrice: 19900,
-      currency: "usd",
-      stripePaymentLink: "https://buy.stripe.com/5kQ5kD6Xv5kDeh18sgdnW02",
-      features: [
-        "3 License Slots",
-        "3 Domains",
-        "Template Access",
-        "Priority Support",
-        "Early Access to Updates",
-        "Dedicated Account Manager",
-      ],
+      name: "High-Conversion Sections",
+      slug: "conversion-sections",
+      position: 4,
     },
   ]
 
-  for (let i = 0; i < planData.length; i++) {
-    const existing = await db
+  const categoryIds: Record<string, string> = {}
+  for (const cat of categoriesData) {
+    const [existing] = await db
+      .select()
+      .from(featureCategories)
+      .where(eq(featureCategories.slug, cat.slug))
+      .limit(1)
+    if (existing) {
+      categoryIds[cat.slug] = existing.id
+    } else {
+      const [inserted] = await db
+        .insert(featureCategories)
+        .values(cat)
+        .returning({ id: featureCategories.id })
+      categoryIds[cat.slug] = inserted.id
+    }
+  }
+
+  console.log("Seeding features...")
+  const featuresData = [
+    // Essential Widgets
+    {
+      category: "essential-widgets",
+      name: "Add To Cart Button",
+      slug: "atc-button",
+      position: 1,
+    },
+    {
+      category: "essential-widgets",
+      name: "Product Price",
+      slug: "product-price",
+      position: 2,
+    },
+    {
+      category: "essential-widgets",
+      name: "Column & Product Container",
+      slug: "product-container",
+      position: 3,
+    },
+    // Premium Widgets
+    {
+      category: "premium-widgets",
+      name: "Countdown Timer & Urgency",
+      slug: "countdown-timer",
+      position: 1,
+      isHighlight: true,
+    },
+    {
+      category: "premium-widgets",
+      name: "Product Bundle Offer",
+      slug: "bundle-offer",
+      position: 2,
+      isHighlight: true,
+    },
+    {
+      category: "premium-widgets",
+      name: "Sticky Add To Cart",
+      slug: "sticky-atc",
+      position: 3,
+      isHighlight: true,
+    },
+    // Core Sections
+    {
+      category: "core-sections",
+      name: "Announcement Bar & Header",
+      slug: "header",
+      position: 1,
+    },
+    {
+      category: "core-sections",
+      name: "Collection Product Grid",
+      slug: "product-grid",
+      position: 2,
+    },
+    // Conversion Sections
+    {
+      category: "conversion-sections",
+      name: "Comparison Table & Slider",
+      slug: "comparison-table",
+      position: 1,
+      isHighlight: true,
+    },
+    {
+      category: "conversion-sections",
+      name: "Instagram Feed & TikTok",
+      slug: "social-feed",
+      position: 2,
+    },
+  ]
+
+  const featureIds: Record<string, string> = {}
+  for (const feat of featuresData) {
+    const [existing] = await db
+      .select()
+      .from(features)
+      .where(eq(features.slug, feat.slug))
+      .limit(1)
+    const data = {
+      name: feat.name,
+      slug: feat.slug,
+      categoryId: categoryIds[feat.category],
+      position: feat.position,
+      isHighlight: feat.isHighlight || false,
+    }
+    if (existing) {
+      featureIds[feat.slug] = existing.id
+      await db.update(features).set(data).where(eq(features.id, existing.id))
+    } else {
+      const [inserted] = await db
+        .insert(features)
+        .values(data)
+        .returning({ id: features.id })
+      featureIds[feat.slug] = inserted.id
+    }
+  }
+
+  console.log("Seeding plans...")
+  const planData = [
+    {
+      name: "Starter",
+      mode: "free" as const,
+      slots: 1,
+      regularPrice: 0,
+      finalPrice: 0,
+      currency: "usd",
+      stripePaymentLink: null,
+      features: [
+        "4 Industry Templates",
+        "1 Store License Slot",
+        "20 Advanced Features",
+        "Standard Email Support",
+      ],
+      position: 1,
+    },
+    {
+      name: "Professional",
+      mode: "monthly" as const,
+      slots: 1,
+      regularPrice: 4900,
+      finalPrice: 2900,
+      currency: "usd",
+      stripePaymentLink: "https://buy.stripe.com/14A14n81z9ATdcX8sgdnW00",
+      features: [
+        "10 Industry Templates",
+        "1 Store License Slot",
+        "80+ Advanced Features",
+        "Priority Help & Support",
+        "Development Support",
+      ],
+      position: 2,
+      yearlyDiscount: 20,
+      badge: "Most Popular",
+    },
+  ]
+
+  const planIds: Record<string, string> = {}
+  for (const planItem of planData) {
+    const [existing] = await db
       .select()
       .from(plans)
-      .where(eq(plans.name, planData[i].name))
+      .where(eq(plans.name, planItem.name))
       .limit(1)
-
-    if (existing && existing.length > 0) {
-      await db
-        .update(plans)
-        .set({ ...planData[i], position: i + 1 })
-        .where(eq(plans.id, existing[0].id))
+    if (existing) {
+      planIds[planItem.name] = existing.id
+      await db.update(plans).set(planItem).where(eq(plans.id, existing.id))
     } else {
-      await db.insert(plans).values({ ...planData[i], position: i + 1 })
+      const [inserted] = await db
+        .insert(plans)
+        .values(planItem)
+        .returning({ id: plans.id })
+      planIds[planItem.name] = inserted.id
+    }
+  }
+
+  console.log("Mapping features to plans...")
+  // Map all features to all plans for this seed demo, but differentiate enabled status
+  for (const featSlug of Object.keys(featureIds)) {
+    for (const planName of Object.keys(planIds)) {
+      const isEssential = [
+        "atc-button",
+        "product-price",
+        "product-container",
+        "header",
+        "product-grid",
+      ].includes(featSlug)
+      const isEnabled = isEssential || planName !== "Starter"
+
+      await db
+        .insert(planFeatures)
+        .values({
+          planId: planIds[planName],
+          featureId: featureIds[featSlug],
+          isEnabled,
+        })
+        .onConflictDoUpdate({
+          target: [planFeatures.planId, planFeatures.featureId],
+          set: { isEnabled },
+        })
     }
   }
 
@@ -262,17 +413,16 @@ async function main() {
   ]
 
   for (const template of templatesData) {
-    const existing = await db
+    const [existing] = await db
       .select()
       .from(templates)
       .where(eq(templates.title, template.title))
       .limit(1)
-
-    if (existing && existing.length > 0) {
+    if (existing) {
       await db
         .update(templates)
         .set(template)
-        .where(eq(templates.id, existing[0].id))
+        .where(eq(templates.id, existing.id))
     } else {
       await db.insert(templates).values(template)
     }

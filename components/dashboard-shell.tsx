@@ -9,6 +9,7 @@ import {
   CreditCardIcon,
   ShieldIcon,
   LogOutIcon,
+  DollarSignIcon,
 } from "lucide-react"
 
 import {
@@ -43,6 +44,7 @@ interface DashboardShellProps {
 const NAV_ITEMS = [
   { href: "/licenses", label: "Licenses", icon: KeyRoundIcon },
   { href: "/templates", label: "Templates", icon: LayoutTemplateIcon },
+  { href: "/plans", label: "Plans", icon: DollarSignIcon },
   { href: "/profile", label: "Profile", icon: UserIcon },
   { href: "/payments", label: "Payment History", icon: CreditCardIcon },
 ]

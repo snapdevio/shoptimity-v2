@@ -15,7 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/faq",
     "/landing-page",
     "/pages/why-brand-owners-are-switching-to-the-shoptimity-shopify-theme",
-    "/plans",
+    "/pricing",
     "/privacy-policy",
     "/refund-policy",
     "/review-app/blog",

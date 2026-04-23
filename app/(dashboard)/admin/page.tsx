@@ -9,7 +9,11 @@ import {
   ShoppingCart,
   ScrollText,
   Mail,
-  PlayCircle,
+  Settings,
+  DollarSign,
+  ChartBarStacked,
+  ChartColumnStacked,
+  BookDashed,
 } from "lucide-react"
 import { db } from "@/db"
 import {
@@ -22,6 +26,9 @@ import {
   plans,
   contacts,
   templates,
+  settings,
+  featureCategories,
+  features,
 } from "@/db/schema"
 import { count } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,6 +44,9 @@ async function getStats(): Promise<Record<string, number>> {
     [totalPlans],
     [totalContacts],
     [totalTemplates],
+    [totalSettings],
+    [totalFeatureCategories],
+    [totalFeatures],
   ] = await Promise.all([
     db.select({ value: count() }).from(users),
     db.select({ value: count() }).from(licenses),
@@ -47,6 +57,9 @@ async function getStats(): Promise<Record<string, number>> {
     db.select({ value: count() }).from(plans),
     db.select({ value: count() }).from(contacts),
     db.select({ value: count() }).from(templates),
+    db.select({ value: count() }).from(settings),
+    db.select({ value: count() }).from(featureCategories),
+    db.select({ value: count() }).from(features),
   ])
 
   return {
@@ -59,6 +72,9 @@ async function getStats(): Promise<Record<string, number>> {
     plans: totalPlans?.value ?? 0,
     contacts: totalContacts?.value ?? 0,
     templates: totalTemplates?.value ?? 0,
+    settings: totalSettings?.value ?? 0,
+    featureCategories: totalFeatureCategories?.value ?? 0,
+    features: totalFeatures?.value ?? 0,
   }
 }
 
@@ -78,13 +94,6 @@ const sections = [
     statKey: "licenses" as const,
   },
   {
-    title: "Payments",
-    description: "View payment transactions",
-    href: "/admin/payments",
-    icon: CreditCard,
-    statKey: "payments" as const,
-  },
-  {
     title: "Domains",
     description: "Manage registered domains",
     href: "/admin/domains",
@@ -99,6 +108,13 @@ const sections = [
     statKey: "orders" as const,
   },
   {
+    title: "Payments",
+    description: "View payment transactions",
+    href: "/admin/payments",
+    icon: CreditCard,
+    statKey: "payments" as const,
+  },
+  {
     title: "Audit Logs",
     description: "Review system activity",
     href: "/admin/audit-logs",
@@ -106,17 +122,31 @@ const sections = [
     statKey: "auditLogs" as const,
   },
   {
+    title: "Feature Categories",
+    description: "Manage feature categories",
+    href: "/admin/feature-categories",
+    icon: ChartBarStacked,
+    statKey: "featureCategories" as const,
+  },
+  {
+    title: "Features",
+    description: "Manage features",
+    href: "/admin/features",
+    icon: ChartColumnStacked,
+    statKey: "features" as const,
+  },
+  {
     title: "Pricing Plans",
     description: "Manage pricing tiers and links",
     href: "/admin/plans",
-    icon: ShoppingCart,
+    icon: DollarSign,
     statKey: "plans" as const,
   },
   {
     title: "Templates",
     description: "Manage templates",
     href: "/admin/templates",
-    icon: ShoppingCart,
+    icon: BookDashed,
     statKey: "templates" as const,
   },
   {
@@ -125,6 +155,13 @@ const sections = [
     href: "/admin/contacts",
     icon: Mail,
     statKey: "contacts" as const,
+  },
+  {
+    title: "System Settings",
+    description: "Manage global configs and coupons",
+    href: "/admin/settings",
+    icon: Settings,
+    statKey: "settings" as const,
   },
 ]
 
@@ -155,7 +192,7 @@ export default async function AdminDashboardPage() {
                       {section.title}
                     </CardTitle>
                     <span className="font-heading text-2xl font-semibold">
-                      {section.statKey
+                      {section.statKey && stats[section.statKey] !== undefined
                         ? stats[section.statKey].toLocaleString()
                         : ""}
                     </span>

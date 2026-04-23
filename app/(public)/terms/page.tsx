@@ -54,7 +54,8 @@ export default function TermsPage() {
               3. License Terms
             </h2>
             <p className="mt-3 leading-relaxed text-muted-foreground">
-              Upon purchasing a plan, you are granted a limited, non-exclusive,
+              Shoptimity offers both a Free Forever plan and paid Pro plan. By
+              activating a plan, you are granted a limited, non-exclusive,
               non-transferable license to use the Shopify themes associated with
               your plan according to the following terms:
             </p>
@@ -64,8 +65,8 @@ export default function TermsPage() {
                 a time.
               </li>
               <li>
-                Licenses are valid for the duration of your active subscription,
-                subject to the terms of your purchased plan.
+                Licenses are valid for the duration of your active subscription
+                (Free or Paid), subject to the terms of your selected plan.
               </li>
               <li>
                 You may not sublicense, resell, or distribute the licensed
@@ -106,8 +107,9 @@ export default function TermsPage() {
                 purchase, you agree to Stripe&apos;s terms of service.
               </li>
               <li>
-                Payments are made on a recurring subscription basis (monthly or
-                yearly) for access to the Service and included features.
+                For Pro plans, payments are made on a recurring subscription
+                basis (monthly or yearly) for continued access to premium
+                Service features.
               </li>
               <li>
                 You authorize us to charge your payment method for all fees
