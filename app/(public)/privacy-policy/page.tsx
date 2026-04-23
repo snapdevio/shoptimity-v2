@@ -57,8 +57,8 @@ export default function PrivacyPolicyPage() {
                 <strong className="text-foreground">
                   Payment Information:
                 </strong>{" "}
-                Payment details are processed securely through Stripe. We do not
-                store your credit card numbers on our servers.
+                Payments are processed securely. We store only essential billing
+                information required to manage transactions and provide support.
               </li>
               <li>
                 <strong className="text-foreground">Domain Information:</strong>{" "}

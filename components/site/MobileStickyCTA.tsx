@@ -52,10 +52,11 @@ const MobileStickyCTA = () => {
 
   return (
     <div
-      className={`fixed right-8 bottom-8 left-8 z-40 transition-all duration-300 md:hidden ${isVisible
+      className={`fixed right-8 bottom-8 left-8 z-40 transition-all duration-300 md:hidden ${
+        isVisible
           ? "pointer-events-auto translate-y-0 opacity-100"
           : "pointer-events-none translate-y-5 opacity-0"
-        }`}
+      }`}
     >
       <div className="flex flex-col items-center gap-2">
         <button

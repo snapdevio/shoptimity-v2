@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useMemo, useState, useCallback } from "react"
-import { redirect } from "next/navigation"
+import { redirect, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Check, X } from "lucide-react"
 import { PricingSectionModern, PricingPlan } from "@/components/ui/pricing"
@@ -80,6 +80,7 @@ export function PlansClient({
   redirectPath = "/plans",
   isPublic = false,
 }: PricingClientProps) {
+  const router = useRouter()
   const [billingCycle, setBillingCycle] = useState<
     "monthly" | "yearly" | "lifetime"
   >("monthly")
@@ -255,15 +256,12 @@ export function PlansClient({
 
       if (!finalPlan || finalPlan.finalPrice === 0) return
 
-      const url = new URL(`/api/checkout`, window.location.origin)
+      const url = new URL(`/checkout`, window.location.origin)
       url.searchParams.set("planId", finalPlan.id)
-      url.searchParams.set("quantity", finalPlan.slots.toString())
-      if (isVirtualYearly) {
-        url.searchParams.set("isYearly", "true")
-      }
-      redirect(url.toString())
+
+      router.push(url.pathname + url.search)
     },
-    [groupedPlans, billingCycle, redirectPath, isPublic]
+    [groupedPlans, billingCycle, redirectPath, isPublic, router]
   )
 
   const allTiersForTable = useMemo(() => {

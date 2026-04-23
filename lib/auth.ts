@@ -8,7 +8,9 @@ import { account as accountTable } from "@/db/schema/auth"
 import { desc } from "drizzle-orm"
 import { sendEmail } from "@/lib/email"
 import { render } from "@react-email/components"
-import { MagicLinkEmail } from "@/emails/magic-link"
+import { MagicLinkEmail } from "../emails/magic-link"
+import { VerificationEmail } from "../emails/verify-email"
+import { ResetPasswordEmail } from "../emails/reset-password"
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -33,6 +35,49 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
+    async sendResetPasswordEmail({ user, url }: { user: any; url: string }) {
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[AUTH] Password Reset Link for ${user.email}: ${url}`)
+      }
+      const html = await render(
+        ResetPasswordEmail({
+          resetPasswordUrl: url,
+          name: user.name || "there",
+        })
+      )
+      await sendEmail({
+        to: user.email,
+        subject: "Reset your Shoptimity password",
+        html,
+      })
+    },
+    requireEmailVerification: true,
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({
+      user,
+      url,
+    }: {
+      user: any
+      url: string
+    }) => {
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[AUTH] Verification Link for ${user.email}: ${url}`)
+      }
+      const html = await render(
+        VerificationEmail({
+          verificationUrl: url,
+          name: user.name || "there",
+        })
+      )
+      await sendEmail({
+        to: user.email,
+        subject: "Verify your Shoptimity account",
+        html,
+      })
+    },
   },
   plugins: [
     magicLink({
@@ -98,6 +143,14 @@ export const auth = betterAuth({
         required: false,
       },
       loginMode: {
+        type: "string",
+        required: false,
+      },
+      firstName: {
+        type: "string",
+        required: false,
+      },
+      lastName: {
         type: "string",
         required: false,
       },

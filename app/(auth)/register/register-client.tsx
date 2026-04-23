@@ -8,6 +8,8 @@ import {
   AlertCircleIcon,
   EyeIcon,
   EyeOffIcon,
+  CheckCircleIcon,
+  MailIcon,
 } from "lucide-react"
 import { usePostHog } from "posthog-js/react"
 
@@ -26,6 +28,40 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Spinner } from "@/components/ui/spinner"
 import { authClient } from "@/lib/auth-client"
 
+function getInboxDetails(email: string) {
+  const domain = email.split("@")[1]?.toLowerCase()
+  if (!domain) return null
+
+  const searchTerm = encodeURIComponent("Verify your Shoptimity account")
+
+  if (domain.includes("gmail.com") || domain.includes("googlemail.com")) {
+    return {
+      name: "Gmail",
+      url: `https://mail.google.com/mail/u/0/#search/${searchTerm}`,
+    }
+  }
+
+  if (
+    ["outlook.com", "hotmail.com", "live.com", "msn.com"].some((d) =>
+      domain.includes(d)
+    )
+  ) {
+    return {
+      name: "Outlook",
+      url: `https://outlook.live.com/mail/0/search/results?q=${searchTerm}`,
+    }
+  }
+
+  if (domain.includes("yahoo.com")) {
+    return {
+      name: "Yahoo Mail",
+      url: `https://mail.yahoo.com/d/search/keyword=${searchTerm}`,
+    }
+  }
+
+  return null
+}
+
 function RegisterForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -34,16 +70,18 @@ function RegisterForm() {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [name, setName] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
 
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   const { data: session, isPending: isSessionLoading } = authClient.useSession()
 
   useEffect(() => {
-    if (session) {
+    if (session?.user.emailVerified) {
       // @ts-ignore
       const role = session.user.role || "user"
       if (role === "admin" && redirectParam === "/licenses") {
@@ -67,7 +105,9 @@ function RegisterForm() {
       const { error: authError } = await authClient.signUp.email({
         email: email.trim().toLowerCase(),
         password,
-        name: name.trim(),
+        name: `${firstName.trim()} ${lastName.trim()}`,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         callbackURL: redirectParam,
       })
 
@@ -76,7 +116,7 @@ function RegisterForm() {
         return
       }
 
-      router.push(redirectParam)
+      setSuccess(true)
     } catch {
       setError("Unable to connect. Please check your internet and try again.")
     } finally {
@@ -93,6 +133,85 @@ function RegisterForm() {
             <p className="text-sm text-muted-foreground">Checking session...</p>
           </div>
         </CardContent>
+      </Card>
+    )
+  }
+
+  if (success) {
+    return (
+      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">
+            <CheckCircleIcon className="size-8 text-primary" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
+          <CardDescription className="text-base">
+            We sent a verification link to{" "}
+            <strong className="font-semibold text-foreground">{email}</strong>.
+            Click the link in the email to activate your account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-6 pt-0">
+          {(() => {
+            const inbox = getInboxDetails(email)
+            if (inbox) {
+              return (
+                <Button asChild className="w-full rounded-full" size="lg">
+                  <a
+                    href={inbox.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2"
+                  >
+                    <MailIcon className="size-5" />
+                    Go to {inbox.name}
+                  </a>
+                </Button>
+              )
+            }
+            const searchTerm = encodeURIComponent(
+              "Verify your Shoptimity account"
+            )
+            return (
+              <div className="flex flex-col gap-3">
+                <Button
+                  asChild
+                  className="flex w-full items-center justify-center gap-2 rounded-full"
+                  size="lg"
+                >
+                  <a
+                    href={`https://mail.google.com/mail/u/0/#search/${searchTerm}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MailIcon className="size-5" />
+                    Open in Gmail
+                  </a>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="flex w-full items-center justify-center gap-2 rounded-full"
+                  size="lg"
+                >
+                  <a
+                    href={`https://outlook.live.com/mail/0/search/results?q=${searchTerm}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MailIcon className="size-5" />
+                    Open in Outlook
+                  </a>
+                </Button>
+              </div>
+            )
+          })()}
+        </CardContent>
+        <CardFooter className="justify-center border-t border-border/50 pt-6">
+          <p className="text-sm text-muted-foreground">
+            Didn't receive the email? Check your spam folder.
+          </p>
+        </CardFooter>
       </Card>
     )
   }
@@ -114,17 +233,31 @@ function RegisterForm() {
         )}
 
         <form onSubmit={handleRegister} className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="John Doe"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              disabled={isLoading}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input
+                id="firstName"
+                type="text"
+                placeholder="John"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                type="text"
+                placeholder="Doe"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="email">Email address</Label>

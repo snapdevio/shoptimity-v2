@@ -2,7 +2,15 @@
 
 import { Suspense, useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { MailIcon, AlertCircleIcon, CheckCircleIcon } from "lucide-react"
+import {
+  MailIcon,
+  LockIcon,
+  AlertCircleIcon,
+  CheckCircleIcon,
+  EyeIcon,
+  EyeOffIcon,
+} from "lucide-react"
+import Link from "next/link"
 import { usePostHog } from "posthog-js/react"
 
 import { Button } from "@/components/ui/button"
@@ -69,6 +77,8 @@ function LoginForm() {
   const redirectParam = searchParams.get("redirect") || "/licenses"
 
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loadingProvider, setLoadingProvider] = useState<
     "email" | "google" | "microsoft" | null
   >(null)
@@ -84,7 +94,7 @@ function LoginForm() {
   const { data: session, isPending: isSessionLoading } = authClient.useSession()
 
   useEffect(() => {
-    if (session) {
+    if (session?.user.emailVerified) {
       // @ts-ignore
       const role = session.user.role || "user"
       if (role === "admin" && redirectParam === "/licenses") {
@@ -95,27 +105,34 @@ function LoginForm() {
     }
   }, [session, router, redirectParam])
 
-  async function handleMagicLink(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSignIn(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
     setLoadingProvider("email")
 
-    posthog.capture("login_requested", {
+    posthog.capture("login_attempted", {
       email: email.trim().toLowerCase(),
     })
 
     try {
-      const { error: authError } = await authClient.signIn.magicLink({
+      const { error: authError } = await authClient.signIn.email({
         email: email.trim().toLowerCase(),
+        password,
         callbackURL: redirectParam,
       })
 
       if (authError) {
-        setError(authError.message || "Something went wrong. Please try again.")
+        if (authError.code === "EMAIL_NOT_VERIFIED") {
+          setError(
+            "Your email is not verified. Please check your inbox for the verification link."
+          )
+        } else {
+          setError(authError.message || "Invalid email or password.")
+        }
         return
       }
 
-      setSuccess(true)
+      // Successful login will be handled by the useEffect session check
     } catch {
       setError("Unable to connect. Please check your internet and try again.")
     } finally {
@@ -252,7 +269,7 @@ function LoginForm() {
           </Alert>
         )}
 
-        <form onSubmit={handleMagicLink} className="grid gap-4">
+        <form onSubmit={handleSignIn} className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="email">Email address</Label>
             <Input
@@ -266,16 +283,51 @@ function LoginForm() {
               disabled={isLoading}
             />
           </div>
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-primary hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOffIcon className="size-4" />
+                ) : (
+                  <EyeIcon className="size-4" />
+                )}
+              </button>
+            </div>
+          </div>
           <Button type="submit" disabled={isLoading} className="w-full">
             {loadingProvider === "email" ? (
               <>
                 <Spinner className="mr-2" />
-                Sending link...
+                Signing in...
               </>
             ) : (
               <>
-                <MailIcon className="mr-2 size-4" />
-                Send Magic Link
+                <LockIcon className="mr-2 size-4" />
+                Sign In
               </>
             )}
           </Button>
@@ -290,7 +342,7 @@ function LoginForm() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4">
+        <div className="flex flex-col gap-4">
           <Button
             variant="outline"
             onClick={() => handleSocialLogin("google")}
@@ -341,6 +393,15 @@ function LoginForm() {
           </Button>
         </div>
       </CardContent>
+      <CardFooter className="flex flex-wrap justify-center gap-1 text-sm text-muted-foreground">
+        Don&apos;t have an account?{" "}
+        <Link
+          href="/register"
+          className="text-primary underline underline-offset-4 hover:text-primary/80"
+        >
+          Sign up
+        </Link>
+      </CardFooter>
     </Card>
   )
 }
