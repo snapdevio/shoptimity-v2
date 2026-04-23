@@ -47,19 +47,9 @@ const Footer: React.FC = () => {
             onClick={scrollToPricing}
             className="inline-flex h-[56px] w-full cursor-pointer items-center justify-center rounded-lg bg-base-content font-sans text-base font-normal text-primary-content transition hover:scale-[1.03] sm:w-[260px] md:h-[60px] md:text-lg"
           >
-            {trialDays > 0 ? (
-              "Start Free Trial Now"
-            ) : (
-              <>
-                Get Shoptimity @{" "}
-                <span className="ml-1 text-primary">{basePrice}</span>
-              </>
-            )}
+            Get Started For Free
           </button>
-          <CTABadges
-            trialDays={trialDays}
-            className="items-center justify-center"
-          />
+          <CTABadges className="items-center justify-center" />
         </div>
       </div>
     </footer>

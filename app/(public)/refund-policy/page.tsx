@@ -30,17 +30,31 @@ export default function RefundPolicyPage() {
               1. No Refund Policy
             </h2>
             <p className="mt-3 leading-relaxed text-muted-foreground">
-              All purchases made through the Shoptimity platform are final and
-              non-refundable. By completing a purchase, you acknowledge and
-              agree that no refunds will be issued under any circumstances,
-              including but not limited to dissatisfaction with the product,
-              change of mind, or failure to use the purchased license(s).
+              All subscription payments made through the Shoptimity platform are
+              final and non-refundable. By completing a purchase, you
+              acknowledge and agree that no refunds will be issued for any
+              reason, including but not limited to dissatisfaction with the
+              product, change of mind, or partial use of the subscription
+              period.
             </p>
           </section>
 
           <section>
             <h2 className="font-heading text-xl font-semibold">
-              2. Pre-Purchase Evaluation
+              2. Subscription Cancellation
+            </h2>
+            <p className="mt-3 leading-relaxed text-muted-foreground">
+              You may cancel your Shoptimity subscription at any time through
+              your account dashboard. Upon cancellation, your subscription will
+              remain active until the end of your current billing period, after
+              which it will not renew. We do not provide prorated refunds for
+              the remaining time in your billing cycle.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="font-heading text-xl font-semibold">
+              3. Pre-Purchase Evaluation
             </h2>
             <p className="mt-3 leading-relaxed text-muted-foreground">
               We encourage all prospective buyers to thoroughly evaluate our
@@ -48,6 +62,12 @@ export default function RefundPolicyPage() {
               available to help you make an informed decision:
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-6 text-muted-foreground">
+              <li>
+                <strong className="text-foreground">Free Forever Plan:</strong>{" "}
+                We offer a Free Forever plan that allows you to evaluate
+                Shoptimity's core features and theme quality at no cost before
+                upgrading to Pro.
+              </li>
               <li>
                 <strong className="text-foreground">
                   Product Descriptions:
@@ -70,13 +90,13 @@ export default function RefundPolicyPage() {
 
           <section>
             <h2 className="font-heading text-xl font-semibold">
-              3. Digital Product Nature
+              4. Digital Service Nature
             </h2>
             <p className="mt-3 leading-relaxed text-muted-foreground">
-              Shoptimity provides digital products in the form of software
-              licenses for Shopify themes. Due to the nature of digital goods,
-              once a license key is issued and access to the product is granted,
-              the transaction is considered complete. Digital products cannot be
+              Shoptimity provides a subscription-based digital service. Due to
+              the immediate access granted to our premium templates, widgets,
+              and features upon subscription, transactions are considered
+              complete once access is provided. Digital products cannot be
               &quot;returned&quot; in the traditional sense, and as such, all
               sales are final.
             </p>
@@ -84,7 +104,7 @@ export default function RefundPolicyPage() {
 
           <section>
             <h2 className="font-heading text-xl font-semibold">
-              4. Chargebacks and Disputes
+              5. Chargebacks and Disputes
             </h2>
             <p className="mt-3 leading-relaxed text-muted-foreground">
               Filing a chargeback or payment dispute with your bank or payment
@@ -97,7 +117,7 @@ export default function RefundPolicyPage() {
 
           <section>
             <h2 className="font-heading text-xl font-semibold">
-              5. Exceptions
+              6. Exceptions
             </h2>
             <p className="mt-3 leading-relaxed text-muted-foreground">
               In the event of a technical billing error caused by our system,
@@ -110,7 +130,7 @@ export default function RefundPolicyPage() {
 
           <section>
             <h2 className="font-heading text-xl font-semibold">
-              6. Updates to the Refund Policy
+              7. Updates to the Refund Policy
             </h2>
             <p className="mt-3 leading-relaxed text-muted-foreground">
               We reserve the right to update or modify this Refund Policy at any
@@ -124,7 +144,7 @@ export default function RefundPolicyPage() {
 
           <section>
             <h2 className="font-heading text-xl font-semibold">
-              7. Contact Us
+              8. Contact Us
             </h2>
             <p className="mt-3 leading-relaxed text-muted-foreground">
               If you have any questions about this Refund Policy or believe you

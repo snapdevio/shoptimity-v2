@@ -9,7 +9,9 @@ import { useBasePrice } from "@/hooks/use-base-price"
 import CTABadges from "@/components/site/CTABadges"
 import { Toaster, toast } from "sonner"
 
-const PricingSection = dynamic(() => import("@/components/site/PricingSection"))
+const NewPricingSection = dynamic(
+  () => import("@/components/site/NewPricingSection")
+)
 
 const WreathIcon = ({
   className,
@@ -43,10 +45,10 @@ const problemSolutionData = [
       "Complete branding system with custom colors, fonts, and professional design elements modeled after 7 and 8-figure brands.",
   },
   {
-    problem: "Paying Monthly For Page Builders",
-    solutionTitle: "One-Time Payment, No Subscriptions",
+    problem: "Expensive Monthly App Fees",
+    solutionTitle: "All-In-One Solution",
     solutionDesc:
-      "Get 70+ sections and 30+ blocks with one purchase. All future V1 updates included for life no recurring fees.",
+      "Get 80+ sections and blocks built-in. Eliminate 10+ monthly app subscriptions and save hundreds every month.",
   },
   {
     problem: "No Pre-Lander Support",
@@ -95,20 +97,7 @@ const LandingPage = () => {
       <Toaster position="bottom-center" />
 
       <div id="pricing-section">
-        <div className="bg-primary px-4 py-3 text-center">
-          <p className="font-sans text-sm font-bold tracking-wide text-white">
-            Exclusive Launch Sale: Use Code{" "}
-            <span
-              onClick={handleCopy}
-              title="Click to copy"
-              className="cursor-pointer rounded border border-dashed border-white/30 bg-white/20 px-2 py-0.5 transition-all hover:bg-white/40 active:scale-95"
-            >
-              SHOP5
-            </span>{" "}
-            for an EXTRA 5% OFF!
-          </p>
-        </div>
-        <PricingSection />
+        <NewPricingSection />
       </div>
       {/* Hero Section */}
       <section
@@ -163,15 +152,9 @@ const LandingPage = () => {
                     onClick={goToPricing}
                     className="btn-orange group relative flex w-full max-w-md cursor-pointer items-center justify-center gap-2 px-4 py-6 text-[15px] font-bold shadow-[0_20px_40px_rgba(255,89,36,0.25)] transition-all hover:scale-105 active:scale-95 sm:w-auto md:gap-4 md:px-8 md:py-4.5"
                   >
-                    <span className="md:hidden">
-                      {trialDays > 0
-                        ? "Start Free Trial Now"
-                        : "UPGRADE TO SHOPTIMITY THEME"}
-                    </span>
+                    <span className="md:hidden">GET STARTED FOR FREE</span>
                     <span className="hidden md:inline">
-                      {trialDays > 0
-                        ? "Start Free Trial Now"
-                        : "UPGRADE TO THE SHOPTIMITY THEME"}
+                      GET STARTED FOR FREE
                     </span>
 
                     <ArrowRight
@@ -179,10 +162,7 @@ const LandingPage = () => {
                       className="transition-transform group-hover:translate-x-1"
                     />
                   </button>
-                  <CTABadges
-                    trialDays={trialDays}
-                    className="items-center justify-center lg:justify-start"
-                  />
+                  <CTABadges className="items-center justify-center lg:justify-start" />
                 </div>
 
                 <div className="flex items-center gap-2 text-[14px] font-medium opacity-60 md:text-[16px]">
@@ -660,19 +640,14 @@ const LandingPage = () => {
                   onClick={goToPricing}
                   className="group relative flex max-w-md cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-full bg-linear-to-r from-primary to-[#FF8C66] px-6 py-3 text-[15px] font-black text-white shadow-[0_20px_40px_rgba(255,89,36,0.25)] transition-all hover:scale-105 active:scale-95 sm:w-auto md:gap-4 md:px-7 md:py-4.5"
                 >
-                  {trialDays > 0
-                    ? "Start Free Trial Now"
-                    : "GET SHOPTIMITY NOW"}
+                  GET STARTED FOR FREE
                   <ArrowRight
                     size={20}
                     className="transition-transform group-hover:translate-x-1"
                   />
                   <div className="absolute inset-0 bg-white/20 opacity-0 transition-opacity"></div>
                 </button>
-                <CTABadges
-                  trialDays={trialDays}
-                  className="items-center justify-center lg:justify-start"
-                />
+                <CTABadges className="items-center justify-center lg:justify-start" />
               </div>
             </div>
 

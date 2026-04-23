@@ -28,23 +28,20 @@ const DifferenceSection = dynamic(
 const TransformationSection = dynamic(
   () => import("@/components/site/TransformationSection")
 )
-const PricingSection = dynamic(() => import("@/components/site/PricingSection"))
+const NewPricingSection = dynamic(
+  () => import("@/components/site/NewPricingSection")
+)
 const StepsSection = dynamic(() => import("@/components/site/StepsSection"))
 const CaseStudy = dynamic(() => import("@/components/site/CaseStudy"))
 const FAQ = dynamic(() => import("@/components/site/FAQ"))
 const Footer = dynamic(() => import("@/components/site/Footer"))
 
 export default async function LandingPage() {
-  const plans = await getActivePlans()
-  const basePrice =
-    plans && plans.length > 0
-      ? `$${(plans[0].finalPrice / 100).toFixed(0)}`
-      : "$79"
-  const trialDays = plans && plans.length > 0 ? plans[0].trialDays : 0
-  const ctaText =
-    trialDays > 0
-      ? "Try Shoptimity Free Now"
-      : `Get Shoptimity Now @ ${basePrice}`
+  // const plans = await getActivePlans()
+  //   const basePrice =
+  //     plans && plans.length > 0
+  //       ? `$${(plans[0].finalPrice / 100).toFixed(0)}`
+  //       : "$79"
 
   const caseStudies = [
     { badge: "CRO", value: "+44", label: "Conversion Rate" },
@@ -60,7 +57,7 @@ export default async function LandingPage() {
       <ScrollObserver />
       <LandingHero />
       <ReadyDemos />
-      <PricingSection headline="Ready to Build a Store That Actually Converts?" />
+      <NewPricingSection />
       <ThemeBlockSection />
       <DifferenceSection
         headline="Everything You Need <span class='text-gradient-orange-pink'>Built In</span>"
@@ -78,7 +75,7 @@ export default async function LandingPage() {
       <FAQ />
       <BrandMarquee />
       <Footer />
-      <MobileStickyCTA price={basePrice} />
+      <MobileStickyCTA />
     </div>
   )
 }

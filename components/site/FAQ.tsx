@@ -90,19 +90,19 @@ const FAQ: React.FC = () => {
         'Absolutely. Our "3-step setup" process allows anyone to transfer their content and scale their store in minutes. You don\'t need any coding knowledge to achieve professional, high-converting results.',
     },
     {
-      question: "Does the theme include free updates?",
+      question: "Does the theme include updates?",
       answer:
-        "Yes, we regularly release new features, performance improvements, and conversion-optimized blocks based on the latest e-commerce trends.",
+        "Yes, we regularly release new features, performance improvements, and conversion-optimized blocks. All updates are included as part of your active subscription.",
     },
     {
       question: "Can I use Shoptimity on multiple stores?",
       answer:
-        "This depends on the license you purchase. We offer 1, 2, and 3 license options. Each license is valid for a single Shopify store. If you manage multiple brands, our 3-license bundle offers the best value.",
+        "Our Free Plan includes alicense slot. For brands looking to scale, our Pro plan also provides license management for your store. If you need more slots, you can easily upgrade your plan.",
     },
     {
       question: "How does Shoptimity help me eliminate monthly app costs?",
       answer:
-        "Shoptimity is engineered with 80+ built-in blocks and conversion features—like countdown timers and sticky ATC—that normally require expensive monthly subscriptions. By using our native features, you save hundreds of dollars and improve loading speed.",
+        "Shoptimity includes 80+ built-in blocks and conversion features that normally require ten or more separate apps. Instead of paying multiple recurring subscriptions, Shoptimity provides everything in one streamlined platform, saving you hundreds of dollars each month and improving speed.",
     },
     {
       question: "What kind of support is included?",
@@ -137,7 +137,8 @@ const FAQ: React.FC = () => {
             Your Questions, Answered
           </h2>
           <p className="scroll-animate mx-auto max-w-2xl font-sans text-base-content-muted">
-            Everything you need to know about the theme and our licenses.
+            Everything you need to know about the theme and our subscription
+            plans.
           </p>
         </div>
 

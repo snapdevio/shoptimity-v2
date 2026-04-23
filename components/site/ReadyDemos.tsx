@@ -124,15 +124,15 @@ const ReadyDemos: React.FC<ReadyDemosProps> = () => {
             </>
           )}
 
-          {/* Lifetime Card */}
+          {/* Subscription Card */}
           <div
             className={`flex flex-col rounded-[20px] bg-base-100 p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-12 ${!loading && demos.length % 2 === 0 ? "mx-auto max-w-xl lg:col-span-2" : ""}`}
           >
             <span className="scroll-animate mb-6 font-['Caveat'] text-[30px] font-bold">
-              Lifetime access
+              Start Growing Today
             </span>
             <h3 className="scroll-animate mb-8 max-w-md font-heading text-[32px] font-medium sm:text-[40px]">
-              Pay Once. Use Forever. Lifetime Guarantee
+              Launch Smarter. Sell Faster. Cancel Anytime.
             </h3>
             <ul className="scroll-animate mb-8 space-y-4 font-sans text-base-content-muted">
               <li className="flex items-center gap-3 font-medium">
@@ -156,9 +156,7 @@ const ReadyDemos: React.FC<ReadyDemosProps> = () => {
                       ?.scrollIntoView({ behavior: "smooth" })
                   }
                 >
-                  {trialDays > 0
-                    ? "Start Free Trial Now"
-                    : `Get Shoptimity @ ${basePrice}`}
+                  Get Shoptimity Now
                 </button>
                 <CTABadges
                   trialDays={trialDays}

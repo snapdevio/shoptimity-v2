@@ -311,9 +311,9 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
                   </span>
                 )}
                 <span
-                  className={`font-sans text-[16px] font-bold tracking-wider md:text-[20px] ${current.trialDays == 0 ? "capitalize" : "uppercase"}`}
+                  className={`font-sans text-[16px] font-bold tracking-wider capitalize md:text-[20px]`}
                 >
-                  {current.trialDays > 0 ? "Start Free Trial Now" : "BUY NOW"}
+                  BUY NOW
                 </span>
               </button>
               <CTABadges

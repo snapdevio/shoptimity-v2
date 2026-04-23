@@ -15,13 +15,13 @@ const CTABadges: React.FC<CTABadgesProps> = ({ trialDays, className = "" }) => {
         <div className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Check className="h-2.5 w-2.5" strokeWidth={3} />
         </div>
-        <span>3-Days Free Trial</span>
+        <span>No Hidden Charges</span>
       </div>
       <div className="flex items-center gap-1.5 transition-colors hover:text-gray-700">
         <div className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Check className="h-2.5 w-2.5" strokeWidth={3} />
         </div>
-        <span>No Hidden Charges</span>
+        <span>Cancel Anytime</span>
       </div>
     </div>
   )
