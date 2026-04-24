@@ -108,27 +108,37 @@ export function LicensesClient({ licenses }: LicensesClientProps) {
   if (licenses.length === 0) {
     return (
       <Card className="relative overflow-hidden border-border/50 bg-background/50 backdrop-blur-md">
-        <div className="pointer-events-none absolute top-0 right-0 h-[300px] w-[300px] translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-[80px]" />
-        <CardContent className="relative z-10 flex flex-col items-center justify-center py-20 text-center">
-          <div className="mb-6 flex size-16 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/20">
-            <ServerIcon className="size-8 text-primary" />
+        {/* Glow Effect */}
+        <div className="pointer-events-none absolute top-0 right-0 h-75 w-75 translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-[80px]" />
+
+        <CardContent className="relative z-10 flex flex-col items-center justify-between gap-10 px-6 py-12 md:flex-row md:px-10">
+          {/* LEFT SIDE CONTENT */}
+          <div className="max-w-lg text-left">
+            <h3 className="font-heading text-3xl font-bold tracking-tight text-gray-900">
+              No licenses found
+            </h3>
+
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              Purchase a license to start unlocking premium Shoptimity templates
+              and optimizations for your Shopify stores.
+            </p>
+
+            <Link
+              href="/plans"
+              className="mt-6 inline-block rounded-full bg-orange-600 p-4 px-8 text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-orange-500"
+            >
+              View our pricing
+            </Link>
           </div>
-          <h3 className="font-heading text-2xl font-semibold tracking-tight">
-            No licenses found
-          </h3>
-          <p className="mt-3 max-w-md text-base leading-relaxed text-muted-foreground">
-            Purchase a license to start unlocking premium Shoptimity templates
-            and optimizations for your Shopify stores.
-          </p>
-          <Link
-            href="/plans"
-            className={cn(
-              buttonVariants({ size: "lg" }),
-              "mt-8 rounded-full px-8 shadow-sm"
-            )}
-          >
-            View our pricing
-          </Link>
+
+          {/* RIGHT SIDE IMAGE */}
+          <div className="flex w-full justify-center md:w-auto md:justify-end">
+            <img
+              src="/assets/no-license.svg"
+              alt="No licenses"
+              className="h-auto w-65 md:w-[320px] lg:w-95"
+            />
+          </div>
         </CardContent>
       </Card>
     )
