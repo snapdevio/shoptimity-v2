@@ -145,7 +145,7 @@ export function LicensesClient({ licenses }: LicensesClientProps) {
       ))}
 
       <Card className="relative flex min-h-[300px] flex-col overflow-hidden border-dashed border-primary/30 bg-primary/5 transition-colors hover:border-primary/50 hover:bg-primary/10">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-primary/10 via-transparent to-transparent" />
         <div className="relative flex h-full flex-col items-center justify-center p-6 text-center">
           <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
             <PlusIcon className="size-6 text-primary" />

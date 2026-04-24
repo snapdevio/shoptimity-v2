@@ -37,14 +37,19 @@ const PricingSwitch = ({
 
   return (
     <div className={cn("flex w-full justify-center", className)}>
-      <div className="relative z-10 flex overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 p-1 shadow-inner">
+      <div className="relative z-10 flex w-full max-w-[280px] rounded-full border border-neutral-200 bg-neutral-100/50 p-1 shadow-inner backdrop-blur-sm sm:w-auto md:max-w-none md:p-2">
         <div
-          className="absolute inset-y-1 left-1 z-0 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 shadow-md shadow-orange-500/20"
-          style={{
-            width: `calc(${100 / options.length}%)`,
-            transform: `translateX(${activeIndex * 100}%)`,
-            transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
+          className={cn(
+            "absolute inset-y-1 left-1 z-0 rounded-full bg-linear-to-br from-orange-500 to-orange-600 shadow-md shadow-orange-500/20 transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] md:inset-y-2 md:left-2",
+            options.length === 2
+              ? "w-[calc((100%-8px)/2)] md:w-[calc((100%-16px)/2)]"
+              : "w-[calc((100%-8px)/3)] md:w-[calc((100%-16px)/3)]",
+            activeIndex === 0
+              ? "translate-x-0"
+              : activeIndex === 1
+                ? "translate-x-full"
+                : "translate-x-[200%]"
+          )}
         />
         {options.map((option) => (
           <button
@@ -52,27 +57,27 @@ const PricingSwitch = ({
             onClick={() => onSwitch(option.id)}
             style={{ width: `${100 / options.length}%` }}
             className={cn(
-              "relative z-10 flex h-10 cursor-pointer items-center justify-center rounded-lg px-2 text-sm font-semibold whitespace-nowrap transition-all duration-300 sm:px-6 md:text-base",
+              "relative z-10 flex h-10 cursor-pointer items-center justify-center transition-all duration-300 sm:h-11",
               billingCycle === option.id
                 ? "text-white"
                 : "text-neutral-500 hover:text-neutral-900"
             )}
           >
-            <span className="relative z-10 flex items-center gap-2">
-              {option.label}
+            <div className="relative flex items-center justify-center px-1.5 sm:px-9">
+              <span className="text-xs font-bold whitespace-nowrap sm:text-base">
+                {option.label}
+              </span>
               {option.badge && (
                 <span
                   className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-tight uppercase",
-                    billingCycle === option.id
-                      ? "bg-white/20 text-white"
-                      : "bg-orange-100 text-orange-600"
+                    "absolute -top-7 -right-14 flex rotate-20 items-center justify-center rounded-full bg-emerald-500 px-2 py-0.5 text-[8px] font-black tracking-tight whitespace-nowrap text-white uppercase shadow-sm ring-1 ring-white transition-all duration-300 sm:-top-8 sm:-right-8 sm:px-2.5 sm:text-[9px] sm:tracking-wider md:-right-8 md:text-[10px]"
                   )}
                 >
                   {option.badge}
+                  <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-white bg-emerald-500" />
                 </span>
               )}
-            </span>
+            </div>
           </button>
         ))}
       </div>
@@ -85,6 +90,7 @@ export interface PricingPlan {
   description: string
   price: number
   yearlyPrice: number
+  originalPrice?: number
   mode: string
   buttonText: string
   popular?: boolean
@@ -143,7 +149,7 @@ export const PricingSectionModern = memo(
 
         <div
           className={cn(
-            "grid gap-4 py-6",
+            "grid gap-6 py-8 md:gap-4 lg:gap-8",
             plans.length === 1
               ? "mx-auto max-w-md"
               : plans.length === 2
@@ -160,15 +166,22 @@ export const PricingSectionModern = memo(
                     : "bg-white"
                 }`}
               >
+                {plan.planBadge && (
+                  <div className="absolute -top-3 left-1/2 z-20 -translate-x-1/2">
+                    <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-md">
+                      {plan.planBadge}
+                    </span>
+                  </div>
+                )}
                 <CardHeader className="text-left">
                   <div className="flex items-start justify-between">
                     <h3 className="mb-2 text-3xl font-semibold text-gray-900 md:text-2xl xl:text-3xl">
                       {plan.name} Plan
                     </h3>
-                    {plan.planBadge && (
-                      <div className="">
-                        <span className="rounded-full bg-orange-500 px-3 py-1 text-sm font-medium text-white">
-                          {plan.planBadge}
+                    {plan.badge && (
+                      <div className="shrink-0">
+                        <span className="rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white md:px-3 md:py-1.5">
+                          {plan.badge}
                         </span>
                       </div>
                     )}
@@ -176,27 +189,31 @@ export const PricingSectionModern = memo(
                   <p className="mb-4 text-sm text-gray-600 md:text-xs xl:text-sm">
                     {plan.description}
                   </p>
-                  <div className="flex items-baseline">
-                    <span className="text-4xl font-semibold text-gray-900">
-                      $
-                      <NumberFlow
-                        format={{
-                          currency: "USD",
-                        }}
-                        value={
-                          billingCycle === "yearly"
-                            ? plan.yearlyPrice
-                            : plan.price
-                        }
-                        className="text-4xl font-semibold"
-                      />
-                    </span>
-                    <span className="ml-1 text-gray-600">/{plan.mode}</span>
-                    {plan.badge && (
-                      <span className="mt-3 ml-3 self-start rounded-full border border-green-200 bg-green-100 px-2 py-0.5 text-[10px] font-bold tracking-wider whitespace-nowrap text-green-700 capitalize">
-                        {plan.badge}
+                  <div className="flex flex-wrap items-baseline gap-1">
+                    <div className="flex items-baseline gap-2">
+                      {plan.originalPrice && (
+                        <span className="text-xl font-medium text-neutral-400 line-through md:text-2xl">
+                          ${plan.originalPrice.toFixed(0)}
+                        </span>
+                      )}
+                      <span className="text-3xl font-bold text-gray-900 md:text-4xl">
+                        $
+                        <NumberFlow
+                          format={{
+                            currency: "USD",
+                          }}
+                          value={
+                            billingCycle === "yearly"
+                              ? plan.yearlyPrice
+                              : plan.price
+                          }
+                          className="text-3xl font-bold md:text-4xl"
+                        />
                       </span>
-                    )}
+                      <span className="ml-1 text-sm text-gray-600 md:text-base">
+                        /{plan.mode}
+                      </span>
+                    </div>
                   </div>
                 </CardHeader>
 
@@ -211,8 +228,8 @@ export const PricingSectionModern = memo(
                     className={cn(
                       "mb-3 w-full cursor-pointer rounded-xl border p-4 text-xl font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]",
                       plan.buttonText === "Current Plan"
-                        ? "border-neutral-700 bg-gradient-to-t from-neutral-900 to-neutral-600 shadow-lg shadow-neutral-900/20"
-                        : "border-orange-400 bg-gradient-to-t from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20"
+                        ? "border-neutral-700 bg-linear-to-t from-neutral-900 to-neutral-600 shadow-lg shadow-neutral-900/20"
+                        : "border-orange-400 bg-linear-to-t from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20"
                     )}
                   >
                     {plan.buttonText}
@@ -225,13 +242,13 @@ export const PricingSectionModern = memo(
                     <h4 className="mb-3 text-base font-medium text-gray-900">
                       {plan.includes[0]}
                     </h4>
-                    <ul className="space-y-2 font-semibold">
+                    <ul className="space-y-3 font-semibold">
                       {plan.includes.slice(1).map((feature, featureIndex) => (
-                        <li key={featureIndex} className="flex items-center">
-                          <span className="mt-0.5 mr-3 grid h-6 w-6 shrink-0 place-content-center rounded-full border border-orange-500 bg-white">
-                            <CheckCheck className="h-4 w-4 text-orange-500" />
+                        <li key={featureIndex} className="flex items-start">
+                          <span className="mt-0.5 mr-3 grid h-5 w-5 shrink-0 place-content-center rounded-full border border-orange-500 bg-white">
+                            <CheckCheck className="h-3 w-3 text-orange-500" />
                           </span>
-                          <span className="text-sm text-gray-600">
+                          <span className="text-sm leading-snug text-gray-600 md:text-xs xl:text-sm">
                             {feature}
                           </span>
                         </li>

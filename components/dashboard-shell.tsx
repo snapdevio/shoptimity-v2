@@ -45,6 +45,7 @@ const NAV_ITEMS = [
   { href: "/licenses", label: "Licenses", icon: KeyRoundIcon },
   { href: "/templates", label: "Templates", icon: LayoutTemplateIcon },
   { href: "/plans", label: "Plans", icon: DollarSignIcon },
+  { href: "/billing", label: "Billing", icon: CreditCardIcon },
   { href: "/profile", label: "Profile", icon: UserIcon },
   { href: "/payments", label: "Payment History", icon: CreditCardIcon },
 ]
