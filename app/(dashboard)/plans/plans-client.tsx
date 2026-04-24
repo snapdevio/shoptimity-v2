@@ -31,7 +31,7 @@ function FeatureRow({
     <tr className="transition-colors hover:bg-slate-50/50">
       <td
         className={cn(
-          "p-4 text-sm font-medium md:p-6",
+          "p-3 text-sm font-medium md:p-6",
           highlight ? "text-slate-900" : "text-slate-600"
         )}
       >
@@ -54,15 +54,15 @@ function FeatureRow({
         )
 
         return (
-          <td key={activePlan.id} className="p-4 text-center md:p-6">
+          <td key={activePlan.id} className="p-3 text-center md:p-6">
             <div className="flex justify-center">
               {isEnabled ? (
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white shadow-sm">
-                  <Check className="size-3.5 stroke-[3]" />
+                  <Check className="size-3.5 stroke-3" />
                 </div>
               ) : (
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm">
-                  <X className="size-3.5 stroke-[3]" />
+                  <X className="size-3.5 stroke-3" />
                 </div>
               )}
             </div>
@@ -83,7 +83,7 @@ export function PlansClient({
   const router = useRouter()
   const [billingCycle, setBillingCycle] = useState<
     "monthly" | "yearly" | "lifetime"
-  >("monthly")
+  >("yearly")
 
   const availableCycles = useMemo(() => {
     const cycles = new Set<string>()
@@ -153,6 +153,7 @@ export function PlansClient({
       const finalPlan = plan || group.free || group.lifetime
 
       let price = (finalPlan?.finalPrice || 0) / 100
+      let originalPrice = (finalPlan?.regularPrice || 0) / 100
       let yearlyPrice =
         (group.yearly?.finalPrice ||
           group.free?.finalPrice ||
@@ -160,8 +161,14 @@ export function PlansClient({
           0) / 100
 
       if (isVirtualYearly) {
+        originalPrice = price
         yearlyPrice = Math.round(price * (1 - finalPlan.yearlyDiscount / 100))
       }
+
+      // Only show originalPrice if it's different from the display price
+      const displayPrice = billingCycle === "yearly" ? yearlyPrice : price
+      const finalOriginalPrice =
+        originalPrice > displayPrice ? originalPrice : undefined
 
       let description =
         group.name === "Starter"
@@ -183,7 +190,7 @@ export function PlansClient({
         }
         const savingsAmount = Math.round(monthlyTotal - currentYearlyPrice)
         if (savingsAmount > 0 && billingCycle === "yearly") {
-          badge = `Save $${savingsAmount}/year (${savingsPercent}%)`
+          badge = `Save $${savingsAmount}/year`
         }
       }
 
@@ -201,19 +208,24 @@ export function PlansClient({
         group.lifetime?.features ||
         []
 
+      const isPopular = group.name.toLowerCase().includes("pro")
+      const planBadge =
+        finalPlan?.badge || (isPopular ? "Most Popular" : undefined)
+
       return {
         name: group.name,
         description,
         price,
         yearlyPrice,
+        originalPrice: finalOriginalPrice,
         mode: isVirtualYearly
           ? "month"
           : modeDisplay[finalPlan?.mode as string] || finalPlan?.mode || "free",
-        buttonText: finalPlan?.finalPrice === 0 ? "Get Started" : "Choose Plan",
-        popular: group.name.toLowerCase().includes("pro"),
+        buttonText: "Get Started",
+        popular: isPopular,
         badge,
         includes: Array.isArray(tierFeatures) ? tierFeatures : [],
-        planBadge: finalPlan?.badge || badge,
+        planBadge: planBadge,
       }
     })
   }, [filteredGroups, billingCycle])
@@ -285,7 +297,7 @@ export function PlansClient({
       {settings.enable_discount &&
         settings.coupon_code &&
         settings.discount_percent > 0 && (
-          <div className="-mx-8 -mt-4 mb-8 bg-primary px-4 py-3 text-center md:-mx-6 md:-mt-6">
+          <div className="-mx-4 -mt-4 mb-8 bg-primary px-4 py-3 text-center md:-mx-8 md:-mt-6">
             <p className="font-sans text-sm font-bold tracking-wide text-white">
               Exclusive Launch Sale: Use Code{" "}
               <span className="cursor-pointer rounded border border-dashed border-white/30 bg-white/20 px-2 py-0.5 transition-all hover:bg-white/40 active:scale-95">
@@ -306,7 +318,7 @@ export function PlansClient({
         maxYearlyDiscount={maxYearlyDiscount}
       />
 
-      <div className="mx-auto mt-32 max-w-6xl">
+      <div className="mx-auto max-w-6xl px-4 py-10 md:py-16">
         <div className="mb-16 px-4 text-center">
           <h2 className="mb-4 text-3xl font-bold lg:text-5xl">
             The Complete Shoptimity Toolkit
@@ -317,18 +329,18 @@ export function PlansClient({
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-[32px] border border-slate-200 bg-white shadow-sm">
-          <table className="w-full table-fixed border-collapse text-left">
+        <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm md:rounded-[32px]">
+          <table className="w-full min-w-[600px] table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="w-1/2 p-6 text-xs font-bold tracking-widest text-slate-400 uppercase">
+                <th className="w-1/2 p-4 text-xs font-bold tracking-widest text-slate-400 uppercase md:p-6">
                   Features & Components
                 </th>
                 {allTiersForTable.map((plan) => (
                   <th
                     key={plan.id}
                     className={cn(
-                      "w-1/4 p-6 text-center font-bold",
+                      "w-1/4 p-4 text-center font-bold md:p-6",
                       plan.name.toLowerCase().includes("pro")
                         ? "bg-orange-50/30 text-orange-500"
                         : "text-slate-900"
