@@ -18,7 +18,7 @@ export function VideoTutorialModal() {
             title="Watch video tutorial"
             className="inline-flex items-center justify-center rounded-full text-muted-foreground ring-offset-background transition-all duration-200 hover:scale-110 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95"
           >
-            <HelpCircle className="size-4" />
+            <HelpCircle className="size-4 cursor-pointer" />
             <span className="sr-only">Video tutorial</span>
           </button>
         }
@@ -26,7 +26,7 @@ export function VideoTutorialModal() {
       <DialogContent className="gap-0 overflow-hidden border-border/50 bg-background/80 p-0 shadow-2xl backdrop-blur-2xl sm:max-w-[800px]">
         <DialogHeader className="p-6 pb-4">
           <DialogTitle className="flex items-center gap-2 text-xl font-bold tracking-tight">
-            <HelpCircle className="size-5 text-primary" />
+            <HelpCircle className="size-5 cursor-pointer text-primary" />
             License Management Tutorial
           </DialogTitle>
         </DialogHeader>

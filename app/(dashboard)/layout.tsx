@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { auth, UserWithRole } from "@/lib/auth"
 import { DashboardShell } from "@/components/dashboard-shell"
-import { SidebarProvider } from "@/components/ui/sidebar"
 
 export default async function DashboardLayout({
   children,
@@ -32,9 +31,5 @@ export default async function DashboardLayout({
         role: "admin",
       }
 
-  return (
-    <SidebarProvider>
-      <DashboardShell user={user}>{children}</DashboardShell>
-    </SidebarProvider>
-  )
+  return <DashboardShell user={user}>{children}</DashboardShell>
 }
