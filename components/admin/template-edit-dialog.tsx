@@ -483,7 +483,7 @@ export function TemplateEditDialog({
                     onChange={(e) =>
                       setFormData({ ...formData, img: e.target.value })
                     }
-                    placeholder="/assets/fashion-web.webp"
+                    placeholder="/assets/zenvyra-web.webp"
                     className="h-8 text-[10px]"
                   />
                 </div>
