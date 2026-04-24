@@ -49,6 +49,7 @@ const LandingHero: React.FC = () => {
     "/assets/templates/3.webp",
     "/assets/templates/1.webp",
     "/assets/templates/2.webp",
+    "/assets/templates/5.webp",
     "/assets/zenvyra-web.webp",
   ]
 
@@ -57,7 +58,7 @@ const LandingHero: React.FC = () => {
     "/assets/audify-web.webp",
     "/assets/bag-web.webp",
     "/assets/creamelle-web.webp",
-    "/assets/fashion-web.webp",
+    "/assets/zenvyra-web.webp",
     "/assets/glassie-web.webp",
   ]
 

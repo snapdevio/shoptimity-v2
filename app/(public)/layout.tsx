@@ -132,6 +132,14 @@ export default async function PublicLayout({
                     Contact
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    href="/case-study"
+                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Case Study
+                  </Link>
+                </li>
               </ul>
             </div>
 
