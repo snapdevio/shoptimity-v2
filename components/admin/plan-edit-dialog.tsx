@@ -46,8 +46,18 @@ interface Plan {
   features: any // Using any for jsonb
   position: number
   trialDays: number
-  yearlyDiscount: number | null
+  yearlyDiscountPercentage: number | null
+  yearlyDiscountCouponCode: string | null
+  couponCode: string | null
+  hasYearlyPlan: boolean
   badge: string | null
+  monthlyCancelDiscount: number
+  yearlyCancelDiscount: number
+  monthlyCancelCouponCode: string | null
+  yearlyCancelCouponCode: string | null
+  monthlyCancelDuration: number
+  yearlyCancelDuration: number
+  cancelApplyDiscount: boolean
 }
 
 interface PlanEditDialogProps {
@@ -78,8 +88,18 @@ export function PlanEditDialog({
       : "",
     position: (plan?.position || 0) as number,
     trialDays: (plan?.trialDays || 0) as number,
-    yearlyDiscount: (plan?.yearlyDiscount || 0) as number,
+    yearlyDiscountPercentage: (plan?.yearlyDiscountPercentage || 0) as number,
+    yearlyDiscountCouponCode: plan?.yearlyDiscountCouponCode || "",
+    couponCode: plan?.couponCode || "",
+    hasYearlyPlan: plan?.hasYearlyPlan ?? false,
     badge: plan?.badge || "",
+    monthlyCancelDiscount: plan?.monthlyCancelDiscount || 0,
+    yearlyCancelDiscount: plan?.yearlyCancelDiscount || 0,
+    monthlyCancelCouponCode: plan?.monthlyCancelCouponCode || "",
+    yearlyCancelCouponCode: plan?.yearlyCancelCouponCode || "",
+    monthlyCancelDuration: plan?.monthlyCancelDuration || 3,
+    yearlyCancelDuration: plan?.yearlyCancelDuration || 1,
+    cancelApplyDiscount: plan?.cancelApplyDiscount ?? false,
   })
   const [availableFeatures, setAvailableFeatures] = useState<any[]>([])
   const [selectedFeatureIds, setSelectedFeatureIds] = useState<string[]>([])
@@ -124,8 +144,18 @@ export function PlanEditDialog({
           : "",
         position: (plan?.position || 0) as number,
         trialDays: (plan?.trialDays || 0) as number,
-        yearlyDiscount: (plan?.yearlyDiscount || 0) as number,
+        yearlyDiscountPercentage: (plan?.yearlyDiscountPercentage || 0) as number,
+        yearlyDiscountCouponCode: plan?.yearlyDiscountCouponCode || "",
+        couponCode: plan?.couponCode || "",
+        hasYearlyPlan: plan?.hasYearlyPlan ?? false,
         badge: plan?.badge || "",
+        monthlyCancelDiscount: plan?.monthlyCancelDiscount || 0,
+        yearlyCancelDiscount: plan?.yearlyCancelDiscount || 0,
+        monthlyCancelCouponCode: plan?.monthlyCancelCouponCode || "",
+        yearlyCancelCouponCode: plan?.yearlyCancelCouponCode || "",
+        monthlyCancelDuration: plan?.monthlyCancelDuration || 3,
+        yearlyCancelDuration: plan?.yearlyCancelDuration || 1,
+        cancelApplyDiscount: plan?.cancelApplyDiscount ?? false,
       })
     }
   }, [open, plan])
@@ -152,8 +182,18 @@ export function PlanEditDialog({
       features,
       position: formData.position,
       trialDays: formData.trialDays,
-      yearlyDiscount: formData.yearlyDiscount,
+      yearlyDiscountPercentage: formData.yearlyDiscountPercentage,
+      yearlyDiscountCouponCode: formData.yearlyDiscountCouponCode || null,
+      couponCode: formData.couponCode || null,
+      hasYearlyPlan: formData.hasYearlyPlan,
       badge: formData.badge || null,
+      monthlyCancelDiscount: formData.monthlyCancelDiscount,
+      yearlyCancelDiscount: formData.yearlyCancelDiscount,
+      monthlyCancelCouponCode: formData.monthlyCancelCouponCode || null,
+      yearlyCancelCouponCode: formData.yearlyCancelCouponCode || null,
+      monthlyCancelDuration: formData.monthlyCancelDuration,
+      yearlyCancelDuration: formData.yearlyCancelDuration,
+      cancelApplyDiscount: formData.cancelApplyDiscount,
     })
 
     if (result.success && result.id) {
@@ -320,18 +360,66 @@ export function PlanEditDialog({
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="yearlyDiscount">Yearly Discount (%)</Label>
+                  <Label htmlFor="couponCode">Prefill Coupon Code</Label>
                   <Input
-                    id="yearlyDiscount"
+                    id="couponCode"
+                    value={formData.couponCode}
+                    onChange={(e) =>
+                      setFormData({ ...formData, couponCode: e.target.value })
+                    }
+                    placeholder="e.g. WELCOME20"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <div className="flex items-center gap-2 pt-8">
+                    <Switch
+                      id="hasYearlyPlan"
+                      checked={formData.hasYearlyPlan}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, hasYearlyPlan: checked })
+                      }
+                    />
+                    <Label htmlFor="hasYearlyPlan" className="cursor-pointer">
+                      Has Yearly Plan
+                    </Label>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="yearlyDiscountPercentage">
+                    Yearly Discount (%)
+                  </Label>
+                  <Input
+                    id="yearlyDiscountPercentage"
                     type="number"
-                    value={formData.yearlyDiscount}
+                    value={formData.yearlyDiscountPercentage}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        yearlyDiscount: parseInt(e.target.value),
+                        yearlyDiscountPercentage: parseInt(
+                          e.target.value || "0"
+                        ),
                       })
                     }
                     placeholder="e.g. 30"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="yearlyDiscountCouponCode">
+                    Yearly Discount Coupon Code
+                  </Label>
+                  <Input
+                    id="yearlyDiscountCouponCode"
+                    value={formData.yearlyDiscountCouponCode}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        yearlyDiscountCouponCode: e.target.value,
+                      })
+                    }
+                    placeholder="e.g. SAVE30"
                   />
                 </div>
 
@@ -431,6 +519,123 @@ export function PlanEditDialog({
                   ))}
                 </div>
               )}
+            </div>
+
+            <div className="space-y-4 pt-4">
+              <h3 className="border-l-2 border-orange-500 pl-2 text-sm font-semibold text-slate-900">
+                Cancellation Retention (Stay Offers)
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="monthlyCancelDiscount">
+                    Monthly Cancel Discount (%)
+                  </Label>
+                  <Input
+                    id="monthlyCancelDiscount"
+                    type="number"
+                    value={formData.monthlyCancelDiscount}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        monthlyCancelDiscount: parseInt(e.target.value || "0"),
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="yearlyCancelDiscount">
+                    Yearly Cancel Discount (%)
+                  </Label>
+                  <Input
+                    id="yearlyCancelDiscount"
+                    type="number"
+                    value={formData.yearlyCancelDiscount}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        yearlyCancelDiscount: parseInt(e.target.value || "0"),
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="monthlyCancelCouponCode">
+                    Monthly Cancel Coupon
+                  </Label>
+                  <Input
+                    id="monthlyCancelCouponCode"
+                    value={formData.monthlyCancelCouponCode}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        monthlyCancelCouponCode: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="yearlyCancelCouponCode">
+                    Yearly Cancel Coupon
+                  </Label>
+                  <Input
+                    id="yearlyCancelCouponCode"
+                    value={formData.yearlyCancelCouponCode}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        yearlyCancelCouponCode: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="monthlyCancelDuration">
+                    Monthly Discount Duration
+                  </Label>
+                  <Input
+                    id="monthlyCancelDuration"
+                    type="number"
+                    value={formData.monthlyCancelDuration}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        monthlyCancelDuration: parseInt(e.target.value || "3"),
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="yearlyCancelDuration">
+                    Yearly Discount Duration
+                  </Label>
+                  <Input
+                    id="yearlyCancelDuration"
+                    type="number"
+                    value={formData.yearlyCancelDuration}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        yearlyCancelDuration: parseInt(e.target.value || "1"),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border border-primary/10 bg-primary/5 p-3">
+                <Switch
+                  id="cancelApplyDiscount"
+                  checked={formData.cancelApplyDiscount}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, cancelApplyDiscount: checked })
+                  }
+                />
+                <Label
+                  htmlFor="cancelApplyDiscount"
+                  className="cursor-pointer font-medium text-primary"
+                >
+                  Enable Retention Discount Offer for this Plan
+                </Label>
+              </div>
             </div>
 
             <div className="space-y-4 pt-4">

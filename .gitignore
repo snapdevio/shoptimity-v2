@@ -35,3 +35,8 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 .env
+
+# mcp
+mcp.json
+.cursor/mcp.json
+.vscode/mcp.json

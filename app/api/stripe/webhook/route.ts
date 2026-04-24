@@ -6,7 +6,6 @@ import {
   users,
   payments,
   orders,
-  orderDomains,
   licenses,
   domains,
   webhookEvents,
@@ -43,7 +42,9 @@ export async function POST(request: NextRequest) {
     const message = err instanceof Error ? err.message : "Invalid signature"
     return NextResponse.json({ error: message }, { status: 400 })
   }
-  // console.log("event webhook Main=>", JSON.stringify(event))
+  if (process.env.NODE_ENV === "development") {
+    console.log("event webhook Main=>", JSON.stringify(event))
+  }
   // Idempotency check
   const existing = await db
     .select({ id: webhookEvents.id, processed: webhookEvents.processed })
@@ -70,7 +71,6 @@ export async function POST(request: NextRequest) {
       .returning()
     webhookRecordId = record.id
   }
-  // console.log("event webhook webhookRecord=>", JSON.stringify(webhookRecord))
   try {
     switch (event.type) {
       case "checkout.session.completed":
@@ -109,6 +109,14 @@ export async function POST(request: NextRequest) {
           event.data.object as Stripe.Subscription
         )
         break
+      case "customer.subscription.created":
+        await handleSubscriptionCreated(
+          event.data.object as Stripe.Subscription
+        )
+        break
+      case "charge.refunded":
+        await handleChargeRefunded(event.data.object as Stripe.Charge)
+        break
       default:
         break
     }
@@ -140,6 +148,9 @@ async function fulfillTrialSetup({
   stripeSessionId,
   stripeSetupIntentId,
   stripeCustomerId,
+  isYearly,
+  finalAmount,
+  promoCode,
 }: {
   email: string
   name?: string
@@ -148,6 +159,9 @@ async function fulfillTrialSetup({
   stripeSessionId: string
   stripeSetupIntentId: string
   stripeCustomerId: string
+  isYearly?: boolean
+  finalAmount?: number
+  promoCode?: string
 }) {
   const normalizedEmail = email.toLowerCase().trim()
 
@@ -167,8 +181,14 @@ async function fulfillTrialSetup({
           name: name || normalizedEmail.split("@")[0],
           email: normalizedEmail,
           emailVerified: true,
+          stripeCustomerId: stripeCustomerId,
         })
         .returning()
+    } else if (!user.stripeCustomerId) {
+      await tx
+        .update(users)
+        .set({ stripeCustomerId })
+        .where(eq(users.id, user.id))
     }
 
     // Get plan info to know trial days and slots
@@ -187,8 +207,11 @@ async function fulfillTrialSetup({
         userId: user.id,
         stripeSessionId: stripeSessionId,
         stripeCustomerId: stripeCustomerId,
-        amount: plan.finalPrice, // Future amount
+        stripeSubscriptionId: stripeSetupIntentId,
+        amount: finalAmount || plan.finalPrice, // Use custom amount if provided
         currency: plan.currency || "usd",
+        planId: planId,
+        appliedPromoCode: promoCode || null,
         status: "trialing",
       })
       .returning()
@@ -206,18 +229,36 @@ async function fulfillTrialSetup({
       })
       .returning()
 
-    // Create license with trial period
-    await tx.insert(licenses).values({
-      userId: user.id,
-      planId,
-      totalSlots: plan.slots,
-      status: "active",
-      sourceOrderId: order.id,
-      isTrial: true,
-      isLifetime: true, // Marker for conversion to lifetime
-      trialEndsAt: new Date(Date.now() + plan.trialDays * 86400000),
-      stripeSubscriptionId: stripeSetupIntentId, // HACK: Reusing field for setup intent ID
-    })
+    // Create license with trial period (Upsert to ensure 1 license per user)
+    await tx
+      .insert(licenses)
+      .values({
+        userId: user.id,
+        planId,
+        totalSlots: plan.slots,
+        status: "trialing",
+        sourceOrderId: order.id,
+        isTrial: true,
+        isLifetime: plan.mode === "lifetime",
+        billingCycle: isYearly ? "yearly" : (plan.mode as any),
+        trialEndsAt: new Date(Date.now() + plan.trialDays * 86400000),
+        stripeSubscriptionId: stripeSetupIntentId, // HACK: Reusing field for setup intent ID
+      })
+      .onConflictDoUpdate({
+        target: licenses.userId,
+        set: {
+          planId,
+          totalSlots: plan.slots,
+          status: "trialing",
+          sourceOrderId: order.id,
+          isTrial: true,
+          isLifetime: plan.mode === "lifetime",
+          billingCycle: isYearly ? "yearly" : (plan.mode as any),
+          trialEndsAt: new Date(Date.now() + plan.trialDays * 86400000),
+          stripeSubscriptionId: stripeSetupIntentId,
+          updatedAt: new Date(),
+        },
+      })
 
     await createAuditLog(
       null,
@@ -233,14 +274,13 @@ async function fulfillTrialSetup({
     )
   })
 }
-
 async function fulfillOrder({
   email,
   name,
   planId,
-  licenseId: customLicenseId,
+  licenseId,
   licenseQuantity,
-  domains: domainsJson,
+  domainsJson,
   stripeSessionId,
   stripePaymentIntentId,
   stripeCustomerId,
@@ -251,13 +291,16 @@ async function fulfillOrder({
   stripeSubscriptionId,
   stripeInvoiceId,
   stripeInvoiceUrl,
+  stripePaymentMethodId,
+  nextRenewalDate,
+  promoCode,
 }: {
   email: string
   name?: string
   planId: string
   licenseId?: string
   licenseQuantity: number
-  domains?: string
+  domainsJson?: string
   stripeSessionId: string
   stripePaymentIntentId?: string | null
   stripeCustomerId?: string | null
@@ -268,33 +311,10 @@ async function fulfillOrder({
   stripeSubscriptionId?: string | null
   stripeInvoiceId?: string | null
   stripeInvoiceUrl?: string | null
+  stripePaymentMethodId?: string | null
+  nextRenewalDate?: Date | null
+  promoCode?: string
 }) {
-  // 1. Idempotency Check: See if we already have a fulfilled payment for this Intent ID or Session ID
-  const conditions = []
-  if (stripePaymentIntentId)
-    conditions.push(eq(payments.stripePaymentIntentId, stripePaymentIntentId))
-  if (stripeSessionId)
-    conditions.push(eq(payments.stripeSessionId, stripeSessionId))
-
-  const [existingPayment] = await db
-    .select({ id: payments.id, status: payments.status })
-    .from(payments)
-    .where(sql`${sql.join(conditions, sql` OR `)}`)
-    .limit(1)
-
-  if (existingPayment) {
-    // Check if an order already exists for this payment
-    const [existingOrder] = await db
-      .select({ id: orders.id })
-      .from(orders)
-      .where(eq(orders.paymentId, existingPayment.id))
-      .limit(1)
-
-    if (existingOrder) {
-      return
-    }
-  }
-
   const normalizedEmail = email.toLowerCase().trim()
   let submittedDomains: string[] = []
   try {
@@ -313,109 +333,85 @@ async function fulfillOrder({
   let user: any = null
 
   await db.transaction(async (tx) => {
-    // Find or create user
+    // 0. Find or create user
     const [existingUser] = await tx
       .select()
       .from(users)
       .where(eq(users.email, normalizedEmail))
       .limit(1)
 
-    user = existingUser
+    if (existingUser) {
+      user = existingUser
+    }
 
     if (!user) {
-      ;[user] = await tx
+      const [newUser] = await tx
         .insert(users)
         .values({
           id: crypto.randomUUID(),
           name: name || normalizedEmail.split("@")[0],
           email: normalizedEmail,
           emailVerified: true,
+          stripeCustomerId: stripeCustomerId || null,
         })
         .returning()
+      user = newUser
+    } else if (stripeCustomerId && !user.stripeCustomerId) {
+      await tx
+        .update(users)
+        .set({ stripeCustomerId })
+        .where(eq(users.id, user.id))
     }
 
-    // Create or Update payment record
-    let paymentId: string
-    if (existingPayment) {
-      paymentId = existingPayment.id
-      await tx
-        .update(payments)
-        .set({
-          status: "paid",
-          stripeSessionId: stripeSessionId || existingPayment.id, // fallback
-          ...(stripeSubscriptionId && { stripeSubscriptionId }),
+    const userRecord = user
+
+    // 1. Create or Update Payment record using ON CONFLICT for atomicity
+    const [payment] = await tx
+      .insert(payments)
+      .values({
+        userId: userRecord.id,
+        stripeSessionId: stripeSessionId,
+        stripePaymentIntentId: stripePaymentIntentId || null,
+        stripeCustomerId: stripeCustomerId || null,
+        stripeSubscriptionId: stripeSubscriptionId || null,
+        stripeInvoiceId: stripeInvoiceId || null,
+        stripeInvoiceUrl: stripeInvoiceUrl || null,
+        amount: amount,
+        currency: currency,
+        planId: planId,
+        appliedPromoCode: promoCode || null,
+        status: isTrial ? "pending" : "paid",
+      })
+      .onConflictDoUpdate({
+        target: payments.stripeSessionId,
+        set: {
+          status: isTrial ? "pending" : "paid",
+          stripePaymentIntentId: stripePaymentIntentId || null,
+          stripeCustomerId: stripeCustomerId || null,
+          stripeSubscriptionId: stripeSubscriptionId || null,
           stripeInvoiceId: stripeInvoiceId || null,
           stripeInvoiceUrl: stripeInvoiceUrl || null,
+          planId: planId,
+          appliedPromoCode: promoCode || null,
           updatedAt: new Date(),
-        })
-        .where(eq(payments.id, paymentId))
-    } else {
-      // If we have a customLicenseId, try to find an existing trialing/pending payment
-      let existingTrialPayment: any = null
-      if (customLicenseId) {
-        const [license] = await tx
-          .select({ sourceOrderId: licenses.sourceOrderId })
-          .from(licenses)
-          .where(eq(licenses.id, customLicenseId))
-          .limit(1)
+        },
+      })
+      .returning()
 
-        if (license?.sourceOrderId) {
-          const [order] = await tx
-            .select({ paymentId: orders.paymentId })
-            .from(orders)
-            .where(eq(orders.id, license.sourceOrderId))
-            .limit(1)
+    const paymentId = payment.id
 
-          if (order?.paymentId) {
-            const [pay] = await tx
-              .select()
-              .from(payments)
-              .where(eq(payments.id, order.paymentId))
-              .limit(1)
-            existingTrialPayment = pay
-          }
-        }
-      }
+    // 2. Check if an order already exists for this payment (Idempotency)
+    const [existingOrder] = await tx
+      .select({ id: orders.id })
+      .from(orders)
+      .where(eq(orders.paymentId, paymentId))
+      .limit(1)
 
-      if (existingTrialPayment) {
-        paymentId = existingTrialPayment.id
-        await tx
-          .update(payments)
-          .set({
-            status: "paid",
-            stripePaymentIntentId: stripePaymentIntentId || null,
-            stripeCustomerId: stripeCustomerId || null,
-            stripeInvoiceId: stripeInvoiceId || null,
-            stripeInvoiceUrl: stripeInvoiceUrl || null,
-            amount: amount, // record the actual paid amount
-            updatedAt: new Date(),
-          })
-          .where(eq(payments.id, paymentId))
-      } else {
-        const [payment] = await tx
-          .insert(payments)
-          .values({
-            userId: user.id,
-            stripeSessionId: stripeSessionId,
-            stripePaymentIntentId: stripePaymentIntentId || null,
-            stripeCustomerId: stripeCustomerId || null,
-            stripeSubscriptionId: stripeSubscriptionId || null,
-            stripeInvoiceId: stripeInvoiceId || null,
-            stripeInvoiceUrl: stripeInvoiceUrl || null,
-            amount: amount,
-            currency: currency,
-            status: isTrial ? "pending" : "paid", // Pending for trials until first invoice paid
-          })
-          .returning()
-        paymentId = payment.id
-      }
+    if (existingOrder) {
+      return // Already fulfilled
     }
 
-    // Determine if this should be a lifetime license immediately
-    // If it's a paid checkout (no trial), it's lifetime
-    const isLifetime = !isTrial && amount > 0
-
-    // Get plan info
+    // 3. Get plan info
     const [plan] = await tx
       .select()
       .from(plans)
@@ -426,96 +422,146 @@ async function fulfillOrder({
       throw new Error(`Plan ${planId} not found`)
     }
 
-    // Create or Update License
-    let finalLicenseId: string
-    if (customLicenseId) {
-      const [license] = await tx
-        .update(licenses)
-        .set({
+    // Determine billing cycle and lifetime status
+    const isLifetime = plan.mode === "lifetime"
+    let billingCycle: "monthly" | "yearly" | "lifetime" = "monthly"
+    if (isLifetime) {
+      billingCycle = "lifetime"
+    } else if (amount > 0) {
+      const monthlyPrice = plan.finalPrice
+      const discount = (plan.yearlyDiscountPercentage || 0) / 100
+      const yearlyExpected = monthlyPrice * 12 * (1 - discount)
+      if (Math.abs(amount - yearlyExpected) < 100) {
+        billingCycle = "yearly"
+      }
+    }
+
+    // 4. Create or Update License (Atomic Upsert for 1 license per user)
+    const [license] = await tx
+      .insert(licenses)
+      .values({
+        userId: userRecord.id,
+        planId,
+        totalSlots: plan.slots * licenseQuantity,
+        status: "active",
+        isTrial: isTrial || false,
+        isLifetime: isLifetime || false,
+        billingCycle: billingCycle,
+        trialEndsAt: trialEndsAt || null,
+        nextRenewalDate:
+          nextRenewalDate ||
+          (billingCycle === "lifetime"
+            ? null
+            : new Date(
+              Date.now() + (billingCycle === "yearly" ? 365 : 30) * 86400000
+            )),
+        stripeSubscriptionId: stripeSubscriptionId || null,
+      })
+      .onConflictDoUpdate({
+        target: licenses.userId,
+        set: {
+          planId,
+          totalSlots: plan.slots * licenseQuantity,
           status: "active",
           isTrial: isTrial || false,
           isLifetime: isLifetime || false,
+          billingCycle: billingCycle,
           trialEndsAt: trialEndsAt || null,
+          nextRenewalDate:
+            nextRenewalDate ||
+            (billingCycle === "lifetime"
+              ? null
+              : new Date(
+                Date.now() + (billingCycle === "yearly" ? 365 : 30) * 86400000
+              )),
           stripeSubscriptionId: stripeSubscriptionId || null,
           updatedAt: new Date(),
-        })
-        .where(eq(licenses.id, customLicenseId))
-        .returning()
+        },
+      })
+      .returning()
 
-      if (!license) {
-        // Fallback: This shouldn't happen if customLicenseId is valid
-        const [newLicense] = await tx
-          .insert(licenses)
-          .values({
-            userId: user.id,
-            planId,
-            totalSlots: plan.slots,
-            status: "active",
-            isTrial: isTrial || false,
-            isLifetime: isLifetime || false,
-            trialEndsAt: trialEndsAt || null,
-            stripeSubscriptionId: stripeSubscriptionId || null,
-          })
-          .returning()
-        finalLicenseId = newLicense.id
-      } else {
-        finalLicenseId = license.id
+    const finalLicenseId = license.id
+
+    // 5. Create order record
+    await tx.insert(orders).values({
+      userId: userRecord.id,
+      paymentId: paymentId,
+      planId,
+      licenseQuantity,
+      contactName: name || userRecord.name || normalizedEmail.split("@")[0],
+      status: "fulfilled",
+    })
+
+    // Fetch existing domains after update to enqueue their metadata export
+    const existingDomains = await tx
+      .select({ domainName: domains.domainName })
+      .from(domains)
+      .where(
+        and(eq(domains.licenseId, finalLicenseId), isNull(domains.deletedAt))
+      )
+
+    for (const d of existingDomains) {
+      exportJobsToEnqueue.push({
+        domainName: d.domainName,
+        userId: userRecord.id,
+        action: "upsert",
+      })
+    }
+
+    // Handle Domain Attachments from metadata
+    for (const domainName of submittedDomains) {
+      const normalized = normalizeDomain(domainName)
+      if (!normalized) continue
+
+      // Check if domain already exists for this license
+      const [existingDomain] = await tx
+        .select()
+        .from(domains)
+        .where(
+          and(
+            eq(domains.domainName, normalized),
+            eq(domains.licenseId, finalLicenseId),
+            isNull(domains.deletedAt)
+          )
+        )
+        .limit(1)
+
+      if (!existingDomain) {
+        await tx.insert(domains).values({
+          userId: userRecord.id,
+          licenseId: finalLicenseId,
+          domainName: normalized,
+        })
+
+        exportJobsToEnqueue.push({
+          domainName: normalized,
+          userId: userRecord.id,
+          action: "upsert",
+        })
       }
-    } else {
-      // Standard flow: Create order and new license
-      const [order] = await tx
-        .insert(orders)
-        .values({
-          userId: user.id,
-          paymentId: paymentId,
-          planId,
-          licenseQuantity,
-          contactName: name || user.name || normalizedEmail.split("@")[0],
-          status: "fulfilled",
-        })
-        .returning()
-
-      const [license] = await tx
-        .insert(licenses)
-        .values({
-          userId: user.id,
-          planId,
-          totalSlots: plan.slots,
-          status: "active",
-          sourceOrderId: order.id,
-          isTrial: isTrial || false,
-          isLifetime: isLifetime || false,
-          trialEndsAt: trialEndsAt || null,
-          stripeSubscriptionId: stripeSubscriptionId || null,
-        })
-        .returning()
-      finalLicenseId = license.id
     }
 
     // Audit log
     await createAuditLog(
       null,
-      customLicenseId
-        ? "webhook.conversion_completed"
-        : "webhook.fulfillment_completed",
-      customLicenseId ? "license" : "order",
-      customLicenseId || paymentId,
+      "webhook.fulfillment_completed",
+      "license",
+      finalLicenseId,
       {
-        userId: user.id,
+        userId: userRecord.id,
         paymentId: paymentId,
         licenseId: finalLicenseId,
-        isConversion: !!customLicenseId,
       },
       tx
     )
 
     emailJobToEnqueue = {
-      template: customLicenseId
+      template: licenseId
         ? "conversion-confirmation"
         : "order-confirmation",
       to: normalizedEmail,
       props: {
-        contactName: name || user.name || normalizedEmail.split("@")[0],
+        contactName: name || userRecord.name || normalizedEmail.split("@")[0],
         email: normalizedEmail,
         planName: plan.name,
         licenseQuantity,
@@ -577,6 +623,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     license_quantity: licenseQuantityStr,
     contact_name: contactName,
     domains: domainsJson,
+    promo_code: promoCode,
   } = metadata
 
   const customerEmail =
@@ -628,6 +675,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         (typeof session.customer === "string"
           ? session.customer
           : session.customer?.id) || "",
+      isYearly: metadata.is_yearly === "true",
+      finalAmount: metadata.final_amount
+        ? parseInt(metadata.final_amount, 10)
+        : undefined,
+      promoCode: promoCode as string,
     })
     return
   }
@@ -657,7 +709,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (session.amount_total !== null && session.amount_total > plan.finalPrice) {
     throw new Error(
       `[webhook] Security Alert: Amount exceeds plan price for session ${session.id}. ` +
-        `Max expected ${plan.finalPrice}, received ${session.amount_total}. fulfillment aborted.`
+      `Max expected ${plan.finalPrice}, received ${session.amount_total}. fulfillment aborted.`
     )
   }
 
@@ -666,7 +718,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // Expand session to get invoice info
   const stripe = getStripe()
   const expandedSession = await stripe.checkout.sessions.retrieve(session.id, {
-    expand: ["invoice", "subscription"],
+    expand: ["invoice", "subscription", "payment_intent", "setup_intent"],
   })
 
   const stripePaymentIntentId =
@@ -679,7 +731,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     name: contactName || session.customer_details?.name || undefined,
     planId: planId as string,
     licenseQuantity,
-    domains: domainsJson,
+    domainsJson,
     stripeSessionId: session.id,
     stripePaymentIntentId,
     stripeCustomerId:
@@ -692,6 +744,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     trialEndsAt: isTrial
       ? new Date(Date.now() + plan.trialDays * 86400000)
       : undefined,
+    nextRenewalDate:
+      expandedSession.subscription &&
+        typeof expandedSession.subscription !== "string"
+        ? new Date(
+          (expandedSession.subscription as any).current_period_end * 1000
+        )
+        : null,
     stripeSubscriptionId:
       typeof expandedSession.subscription === "string"
         ? expandedSession.subscription
@@ -704,7 +763,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       typeof expandedSession.invoice === "string"
         ? null
         : (expandedSession.invoice as Stripe.Invoice)?.hosted_invoice_url ||
-          null,
+        null,
+    stripePaymentMethodId:
+      expandedSession.setup_intent &&
+        typeof expandedSession.setup_intent !== "string"
+        ? ((expandedSession.setup_intent as Stripe.SetupIntent)
+          .payment_method as string)
+        : expandedSession.payment_intent &&
+          typeof expandedSession.payment_intent !== "string"
+          ? ((expandedSession.payment_intent as Stripe.PaymentIntent)
+            .payment_method as string)
+          : null,
+    promoCode: promoCode as string,
   })
 }
 
@@ -723,7 +793,63 @@ async function handlePaymentIntentSucceeded(
 
   // Only attempt fulfillment if we have the necessary metadata
   // If it has a checkout session ID, let checkout.session.completed handle fulfillment to avoid duplicates
-  if (metadata.session_id || !planId || !licenseQuantityStr) {
+  let finalPlanId = planId
+  let finalLicenseQuantityStr = licenseQuantityStr
+  let finalEmail = metadata.email || paymentIntent.receipt_email || ""
+  let finalContactName = contactName
+  let finalDomainsJson = domainsJson
+  let finalSubscriptionId: string | null = null
+
+  const piAny = paymentIntent as any
+  const orderRef = piAny.payment_details?.order_reference
+
+  if (!finalPlanId && orderRef && orderRef.startsWith("in_")) {
+    // If metadata is missing but this is an invoice payment, fetch the invoice to get metadata
+    try {
+      const stripe = getStripe()
+      const invoice = await stripe.invoices.retrieve(orderRef)
+      const invAny = invoice as any
+
+      // Extract metadata from invoice
+      let invMetadata = invoice.metadata || {}
+      if (!invMetadata.plan_id && invoice.lines?.data?.length > 0) {
+        invMetadata = { ...invMetadata, ...invoice.lines.data[0].metadata }
+      }
+      if (!invMetadata.plan_id && invAny.subscription_details?.metadata) {
+        invMetadata = {
+          ...invMetadata,
+          ...invAny.subscription_details.metadata,
+        }
+      }
+      if (
+        !invMetadata.plan_id &&
+        invAny.parent?.subscription_details?.metadata
+      ) {
+        invMetadata = {
+          ...invMetadata,
+          ...invAny.parent.subscription_details.metadata,
+        }
+      }
+
+      finalPlanId = invMetadata.plan_id
+      finalLicenseQuantityStr = invMetadata.license_quantity
+      finalEmail = invMetadata.email || invoice.customer_email || finalEmail
+      finalContactName = invMetadata.contact_name || finalContactName
+      finalDomainsJson = invMetadata.domains || finalDomainsJson
+      finalSubscriptionId =
+        invAny.subscription ||
+        invAny.subscription_details?.subscription ||
+        invAny.parent?.subscription_details?.subscription ||
+        null
+    } catch (err) {
+      console.error(
+        `[webhook] Failed to retrieve invoice ${orderRef} for PI ${paymentIntent.id}:`,
+        err
+      )
+    }
+  }
+
+  if (metadata.session_id || !finalPlanId || !finalLicenseQuantityStr) {
     await db
       .update(payments)
       .set({ status: "paid", updatedAt: new Date() })
@@ -802,13 +928,14 @@ async function handlePaymentIntentSucceeded(
   }
 
   await fulfillOrder({
-    email,
-    name: contactName || undefined,
-    planId: planId as string,
+    email: finalEmail,
+    name: finalContactName || undefined,
+    planId: finalPlanId as string,
     licenseId: licenseId as string,
-    licenseQuantity: parseInt(licenseQuantityStr, 10),
-    domains: domainsJson,
-    stripeSessionId: metadata.session_id || paymentIntent.id, // Fallback to PI ID if no session ID in meta
+    licenseQuantity: parseInt(finalLicenseQuantityStr || "1", 10),
+    domainsJson: finalDomainsJson,
+    stripeSessionId:
+      finalSubscriptionId || metadata.session_id || paymentIntent.id, // Use sub ID if available
     stripePaymentIntentId: paymentIntent.id,
     stripeCustomerId:
       (typeof paymentIntent.customer === "string"
@@ -816,6 +943,7 @@ async function handlePaymentIntentSucceeded(
         : paymentIntent.customer?.id) || null,
     amount: paymentIntent.amount,
     currency: paymentIntent.currency,
+    isTrial: false,
     trialEndsAt: null,
     stripeInvoiceId,
     stripeInvoiceUrl,
@@ -882,10 +1010,19 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
 }
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-  const subscriptionId =
+  let subscriptionId =
     typeof (invoice as any).subscription === "string"
       ? (invoice as any).subscription
       : (invoice as any).subscription?.id
+
+  // Fallback for nested subscription details (seen in some API versions)
+  const invAny = invoice as any
+  if (!subscriptionId) {
+    subscriptionId =
+      invAny.subscription_details?.subscription ||
+      invAny.parent?.subscription_details?.subscription
+  }
+
   if (!subscriptionId) return
 
   // Find the license associated with this subscription
@@ -918,7 +1055,95 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       .where(sql`${sql.join(conditions, sql` OR `)}`)
   }
 
-  if (!license || !license.isTrial) return
+  // Determine next renewal date from the invoice line items
+  const nextRenewalDate =
+    invoice.lines?.data?.length > 0
+      ? new Date(invoice.lines.data[0].period.end * 1000)
+      : null
+
+  if (license) {
+    // If license exists, update its renewal date and ensure it's active
+    await db
+      .update(licenses)
+      .set({
+        status: "active",
+        nextRenewalDate: nextRenewalDate,
+        updatedAt: new Date(),
+      })
+      .where(eq(licenses.id, license.id))
+  } else {
+    // If no license exists, this might be a direct subscription creation from the API
+    // We need to fulfill the order now
+    const stripe = getStripe()
+
+    // Retrieve the full invoice if the payment_intent is missing from the payload
+    let finalPi = pi
+    if (!finalPi) {
+      try {
+        const retrievedInvoice = (await stripe.invoices.retrieve(
+          invoice.id
+        )) as any
+        finalPi =
+          typeof retrievedInvoice.payment_intent === "string"
+            ? retrievedInvoice.payment_intent
+            : retrievedInvoice.payment_intent?.id
+      } catch (err) {
+        console.error(
+          `[webhook] Failed to retrieve invoice ${invoice.id} for PI lookup:`,
+          err
+        )
+      }
+    }
+
+    // Extract metadata from multiple possible locations
+    let metadata = invoice.metadata || {}
+    if (!metadata.plan_id && invoice.lines?.data?.length > 0) {
+      metadata = { ...metadata, ...invoice.lines.data[0].metadata }
+    }
+    if (!metadata.plan_id && invAny.subscription_details?.metadata) {
+      metadata = { ...metadata, ...invAny.subscription_details.metadata }
+    }
+    if (!metadata.plan_id && invAny.parent?.subscription_details?.metadata) {
+      metadata = { ...metadata, ...invAny.parent.subscription_details.metadata }
+    }
+
+    // If still no plan_id, try fetching the subscription as a last resort
+    if (!metadata.plan_id) {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+      metadata = { ...metadata, ...(subscription.metadata || {}) }
+    }
+
+    if (metadata.plan_id) {
+      await fulfillOrder({
+        email:
+          invoice.customer_email ||
+          ((await stripe.customers.retrieve(invoice.customer as string)) as any)
+            .email,
+        name: metadata.contact_name || undefined,
+        planId: metadata.plan_id,
+        licenseQuantity: parseInt(metadata.license_quantity || "1", 10),
+        domainsJson: metadata.domains,
+        stripeSessionId: subscriptionId,
+        stripeSubscriptionId: subscriptionId,
+        stripePaymentIntentId: finalPi || null,
+        stripeCustomerId:
+          typeof invoice.customer === "string"
+            ? invoice.customer
+            : invoice.customer?.id || null,
+        amount: invoice.amount_paid,
+        currency: invoice.currency,
+        trialEndsAt: (invoice as any).subscription_details?.trial_end
+          ? new Date((invoice as any).subscription_details.trial_end * 1000)
+          : null,
+        stripeInvoiceId: invoice.id,
+        stripeInvoiceUrl: invoice.hosted_invoice_url,
+        nextRenewalDate: nextRenewalDate,
+      })
+    }
+    return
+  }
+
+  if (!license.isTrial) return
 
   // Trial payment succeeded! Convert to lifetime if amount is > 0
   if (invoice.amount_paid > 0) {
@@ -936,19 +1161,36 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
         .where(eq(licenses.id, license.id))
 
       // 2. Mark payment as paid and store invoice info
-      await tx
-        .update(payments)
-        .set({
-          status: "paid",
-          stripeInvoiceId: invoice.id || null,
-          stripeInvoiceUrl: invoice.hosted_invoice_url || null,
-          updatedAt: new Date(),
-        })
-        .where(eq(payments.id, license.sourceOrderId as string))
+      // Fix: lookup the payment record via the order
+      if (license.sourceOrderId) {
+        const [order] = await tx
+          .select({ paymentId: orders.paymentId })
+          .from(orders)
+          .where(eq(orders.id, license.sourceOrderId))
+          .limit(1)
+
+        if (order?.paymentId) {
+          await tx
+            .update(payments)
+            .set({
+              status: "paid",
+              stripeInvoiceId: invoice.id || null,
+              stripeInvoiceUrl: invoice.hosted_invoice_url || null,
+              stripePaymentIntentId: pi || null,
+              updatedAt: new Date(),
+            })
+            .where(eq(payments.id, order.paymentId))
+        }
+      }
 
       // 3. Cancel the subscription so they aren't charged again (Lifetime requirement)
-      // const stripe = getStripe()
-      // await stripe.subscriptions.cancel(subscriptionId)
+      const stripe = getStripe()
+      await stripe.subscriptions.cancel(subscriptionId).catch((err) => {
+        console.error(
+          `[webhook] Failed to cancel subscription ${subscriptionId}:`,
+          err
+        )
+      })
     })
   }
 
@@ -1042,49 +1284,61 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     return
   }
 
-  // Check if it was during trial (as requested by user)
+  // Check if it was during trial
   const isTrialCancellation =
     subscription.trial_end && subscription.status === "canceled"
 
-  // Revoke the license since the subscription is gone
+  // Transition to Free Plan instead of revoking
   await db.transaction(async (tx) => {
-    // 1. Update license status
+    // 1. Find the Starter (Free) plan
+    const [freePlan] = await tx
+      .select()
+      .from(plans)
+      .where(eq(plans.mode, "free"))
+      .limit(1)
+
+    if (!freePlan) {
+      // Fallback to revoke if no free plan exists
+      await tx
+        .update(licenses)
+        .set({
+          status: "revoked",
+          revokedReason: isTrialCancellation
+            ? "trial_canceled"
+            : "subscription_deleted",
+          updatedAt: new Date(),
+        })
+        .where(eq(licenses.id, license.id))
+      return
+    }
+
+    // 2. Update license to Free Plan
     await tx
       .update(licenses)
       .set({
-        status: "revoked",
-        revokedReason: isTrialCancellation
-          ? "trial_canceled"
-          : "subscription_deleted",
+        planId: freePlan.id,
+        status: "active",
+        totalSlots: freePlan.slots,
+        isTrial: false,
+        isLifetime: false,
+        billingCycle: "monthly",
+        trialEndsAt: null,
+        nextRenewalDate: null,
+        stripeSubscriptionId: null,
+        cancelAtPeriodEnd: false,
         updatedAt: new Date(),
       })
       .where(eq(licenses.id, license.id))
 
-    // 2. Fetch active domains and deactivate them
-    const activeDomains = await tx
-      .select()
-      .from(domains)
-      .where(and(eq(domains.licenseId, license.id), isNull(domains.deletedAt)))
-
-    for (const dom of activeDomains) {
-      // console.log(`[webhook] Revoking access for domain: ${dom.domainName} (License: ${license.id})`)
-      await db
-        .update(domains)
-        .set({ deletedAt: new Date(), updatedAt: new Date() })
-        .where(eq(domains.id, dom.id))
-      await enqueueLicenseMetadataExportJob({
-        domainName: dom.domainName,
-        userId: license.userId,
-        action: "delete", // Remove from active set
-      })
-    }
+    // 3. Keep existing domains but they might be limited by slots if necessary
+    // (Here we assume they stay, but since slots might be 1, if they had more they might need to manage them)
   })
 
   await createAuditLog(
     null,
     isTrialCancellation
-      ? "license.trial_canceled"
-      : "license.subscription_deleted",
+      ? "license.trial_converted_to_free"
+      : "license.subscription_converted_to_free",
     "license",
     license.id,
     {
@@ -1120,25 +1374,22 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     return
   }
 
-  // Determine our internal status
-  // If Stripe says it's trialing/active but will cancel at end of period, we show it as "canceled"
-  let ourStatus = subscription.status
-  if (subscription.cancel_at_period_end) {
-    ourStatus = "canceled"
-  }
-
   await db
     .update(licenses)
     .set({
       isTrial: subscription.status === "trialing",
       trialEndsAt: trialEndsAt,
-      status: ourStatus,
+      status: subscription.status,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
       updatedAt: new Date(),
     })
     .where(eq(licenses.id, license.id))
 
-  // If status changed to canceled or past_due, we should update R2 to revoke access immediately
-  if (ourStatus === "canceled" || ourStatus === "past_due") {
+  // If status changed to canceled (immediate) or past_due, we should update R2 to revoke access
+  if (
+    subscription.status === "canceled" ||
+    subscription.status === "past_due"
+  ) {
     const licenseDomains = await db
       .select()
       .from(domains)
@@ -1212,4 +1463,135 @@ async function handleSubscriptionTrialWillEnd(
       trialEndsAt: subscription.trial_end,
     }
   )
+}
+
+async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
+  // Log subscription creation for tracking
+  const metadata = subscription.metadata || {}
+
+  await createAuditLog(
+    null,
+    "subscription.created",
+    "subscription",
+    subscription.id,
+    {
+      customerId: subscription.customer,
+      status: subscription.status,
+      trialEnd: subscription.trial_end,
+      metadata: metadata,
+    }
+  )
+
+  // If this is the first subscription and we don't have it recorded yet,
+  // log it for investigation
+  const [license] = await db
+    .select()
+    .from(licenses)
+    .where(eq(licenses.stripeSubscriptionId, subscription.id))
+    .limit(1)
+
+  if (!license && metadata.plan_id) {
+    console.warn(
+      `[webhook] New subscription ${subscription.id} created but license not found. ` +
+      `Plan: ${metadata.plan_id}. Awaiting checkout.session.completed...`
+    )
+  }
+}
+
+async function handleChargeRefunded(charge: Stripe.Charge) {
+  // Find payment record by payment intent
+  const paymentIntentId = charge.payment_intent as string
+  if (!paymentIntentId) {
+    console.warn(`[webhook] Refund with no payment intent: ${charge.id}`)
+    return
+  }
+
+  const [payment] = await db
+    .select()
+    .from(payments)
+    .where(eq(payments.stripePaymentIntentId, paymentIntentId))
+    .limit(1)
+
+  if (!payment) {
+    console.warn(
+      `[webhook] Refund for unknown payment intent: ${paymentIntentId}`
+    )
+    return
+  }
+
+  // Update payment status
+  await db
+    .update(payments)
+    .set({
+      status: "refunded",
+      updatedAt: new Date(),
+    })
+    .where(eq(payments.id, payment.id))
+
+  // Find order associated with this payment
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.paymentId, payment.id))
+    .limit(1)
+
+  if (!order) {
+    console.warn(`[webhook] No order found for payment ${payment.id}`)
+    return
+  }
+
+  // Find license via sourceOrderId
+  const [license] = await db
+    .select()
+    .from(licenses)
+    .where(eq(licenses.sourceOrderId, order.id))
+    .limit(1)
+
+  if (!license) {
+    console.warn(`[webhook] No license found for order ${order.id}`)
+    return
+  }
+
+  // Revoke license and its domains
+  await db.transaction(async (tx) => {
+    // Revoke license
+    await tx
+      .update(licenses)
+      .set({
+        status: "revoked",
+        revokedReason: "refunded",
+        updatedAt: new Date(),
+      })
+      .where(eq(licenses.id, license.id))
+
+    // Revoke domains
+    const licenseDomains = await tx
+      .select()
+      .from(domains)
+      .where(and(eq(domains.licenseId, license.id), isNull(domains.deletedAt)))
+
+    for (const dom of licenseDomains) {
+      await enqueueLicenseMetadataExportJob({
+        domainName: dom.domainName,
+        userId: dom.userId,
+        action: "delete",
+      }).catch((err) => {
+        console.error(
+          `[webhook] Failed to enqueue revocation for ${dom.domainName}:`,
+          err
+        )
+      })
+    }
+  })
+
+  await createAuditLog(null, "payment.refunded", "payment", charge.id, {
+    paymentId: payment.id,
+    amount: charge.amount_refunded,
+    reason: (charge as any).reason || "unknown",
+    licenseId: license.id,
+  })
+
+  // console.log(
+  //   `[webhook] Refunded payment ${payment.id} and revoked license ${license.id}`
+  // )
 }

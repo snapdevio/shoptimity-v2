@@ -38,7 +38,7 @@ export function TrialEndingEmail({
   trialEndsAt,
   daysRemaining,
 }: TrialEndingEmailProps) {
-  const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
+  const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/licenses`
 
   return (
     <Html>

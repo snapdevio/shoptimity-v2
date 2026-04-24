@@ -33,8 +33,25 @@ export const plans = pgTable("plans", {
   isActive: boolean("is_active").notNull().default(true),
   stripePaymentLink: varchar("stripe_payment_link", { length: 255 }),
   trialDays: integer("trial_days").notNull().default(0),
-  yearlyDiscount: integer("yearly_discount"),
+  couponCode: varchar("coupon_code", { length: 255 }), // Prefill code for this plan
   badge: varchar("badge", { length: 255 }),
+
+  // Custom Yearly Overrides
+  hasYearlyPlan: boolean("has_yearly_plan").notNull().default(false),
+  yearlyDiscountPercentage: integer("yearly_discount_percent"), // percentage final price
+  yearlyDiscountCouponCode: varchar("yearly_discount_coupon_code", { length: 255 }), // Stripe promo code
+
+  // Cancellation Retention
+  cancelApplyDiscount: boolean("cancel_apply_discount")
+    .notNull()
+    .default(false),
+  monthlyCancelDiscount: integer("monthly_cancel_discount").default(0),
+  yearlyCancelDiscount: integer("yearly_cancel_discount").default(0),
+  monthlyCancelCouponCode: varchar("monthly_cancel_coupon_code", { length: 255 }),
+  yearlyCancelCouponCode: varchar("yearly_cancel_coupon_code", { length: 255 }),
+  monthlyCancelDuration: integer("monthly_cancel_duration").default(3), // months
+  yearlyCancelDuration: integer("yearly_cancel_duration").default(1), // years
+
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

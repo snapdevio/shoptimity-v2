@@ -1,10 +1,26 @@
 import { existsSync } from "fs"
-if (existsSync(".env")) process.loadEnvFile()
+
+// Load .env file
+if (existsSync(".env")) {
+  try {
+    process.loadEnvFile()
+  } catch (e) {
+    // Fallback for older node versions or environments where loadEnvFile fails
+    console.warn(
+      "Could not load .env file using process.loadEnvFile(). Ensure you are using Node 20.12+ or run via 'npm run db:seed'."
+    )
+  }
+}
 
 import { db } from "./index"
-import { plans } from "./schema/plans"
-import { templates } from "./schema/templates"
-import { featureCategories, features, planFeatures } from "./schema/features"
+import {
+  plans,
+  settings,
+  templates,
+  featureCategories,
+  features,
+  planFeatures,
+} from "./schema"
 import { eq } from "drizzle-orm"
 
 async function main() {
@@ -143,7 +159,7 @@ async function main() {
   console.log("Seeding plans...")
   const planData = [
     {
-      name: "Starter",
+      name: "Free",
       mode: "free" as const,
       slots: 1,
       regularPrice: 0,
@@ -159,11 +175,11 @@ async function main() {
       position: 1,
     },
     {
-      name: "Professional",
+      name: "Pro",
       mode: "monthly" as const,
       slots: 1,
-      regularPrice: 4900,
-      finalPrice: 2900,
+      regularPrice: 2900,
+      finalPrice: 1900,
       currency: "usd",
       stripePaymentLink: "https://buy.stripe.com/14A14n81z9ATdcX8sgdnW00",
       features: [
@@ -174,8 +190,18 @@ async function main() {
         "Development Support",
       ],
       position: 2,
-      yearlyDiscount: 20,
+      hasYearlyPlan: true,
+      yearlyDiscountPercentage: 20,
+      yearlyDiscountCouponCode: "SAVE20",
+      couponCode: "WELCOME20",
       badge: "Most Popular",
+      cancelApplyDiscount: true,
+      monthlyCancelDiscount: 50,
+      yearlyCancelDiscount: 50,
+      monthlyCancelCouponCode: "STAY50",
+      yearlyCancelCouponCode: "STAY50YEAR",
+      monthlyCancelDuration: 3,
+      yearlyCancelDuration: 1,
     },
   ]
 
@@ -209,7 +235,7 @@ async function main() {
         "header",
         "product-grid",
       ].includes(featSlug)
-      const isEnabled = isEssential || planName !== "Starter"
+      const isEnabled = isEssential || planName !== "Free"
 
       await db
         .insert(planFeatures)
@@ -268,7 +294,7 @@ async function main() {
       shortDesc: "Colorful and fun interface for kids' products.",
       description:
         "A vibrant and playful toy store design crafted to showcase kids' products, games, and gifts with an engaging and fun shopping interface.",
-      img: "/assets/templates/3.webp",
+      img: "/assets/templates/4.webp",
       banner: "/assets/kidzo-theme.webp",
       logo: "/assets/kidzo-logo.webp",
       bg: "bg-[#FFF3F5]",
@@ -286,7 +312,7 @@ async function main() {
       shortDesc: "Elegant product-focused layout for fashion accessories.",
       description:
         "A stylish and product-focused bag store layout ideal for displaying handbags, backpacks, and travel gear with a premium shopping feel.",
-      img: "/assets/templates/4.webp",
+      img: "/assets/templates/3.webp",
       banner: "/assets/velmora-theme.webp",
       logo: "/assets/velmora-logo.webp",
       bg: "bg-[#F0F5FD]",
@@ -426,6 +452,27 @@ async function main() {
     } else {
       await db.insert(templates).values(template)
     }
+  }
+
+  console.log("Seeding system settings...")
+  const defaultSettings = {
+    key: "general_settings",
+    value: {
+      coupon_code: "WELCOME5",
+      discount_percent: 5,
+      enable_discount: true,
+      cancel_offer_timeout: 300,
+    },
+  }
+
+  const [existingSettings] = await db
+    .select()
+    .from(settings)
+    .where(eq(settings.key, defaultSettings.key))
+    .limit(1)
+
+  if (!existingSettings) {
+    await db.insert(settings).values(defaultSettings as any)
   }
 
   console.log("Seeding complete.")

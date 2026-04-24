@@ -1,11 +1,11 @@
 export const dynamic = "force-dynamic"
 
 import { redirect } from "next/navigation"
-import { eq, and, isNull, count } from "drizzle-orm"
+import { eq, and, isNull, count, desc } from "drizzle-orm"
 
 import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"
-import { licenses, plans, domains } from "@/db/schema"
+import { licenses, plans, domains, orders, payments } from "@/db/schema"
 import { Metadata } from "next"
 import { LicensesClient } from "./licenses-client"
 import { VideoTutorialModal } from "./video-tutorial-modal"
@@ -37,11 +37,26 @@ export default async function LicensesPage() {
       trialEndsAt: licenses.trialEndsAt,
       stripeSubscriptionId: licenses.stripeSubscriptionId,
       isLifetime: licenses.isLifetime,
+      planMode: plans.mode,
+      stripeInvoiceUrl: payments.stripeInvoiceUrl,
+      amount: payments.amount,
+      currency: payments.currency,
     })
     .from(licenses)
     .innerJoin(plans, eq(licenses.planId, plans.id))
+    .leftJoin(orders, eq(licenses.sourceOrderId, orders.id))
+    .leftJoin(payments, eq(orders.paymentId, payments.id))
     .where(eq(licenses.userId, session.userId))
-    .orderBy(licenses.createdAt)
+    .orderBy(desc(licenses.createdAt))
+    .then((rows) => {
+      // Deduplicate by license ID just in case join produced duplicates
+      const seen = new Set()
+      return rows.filter((row) => {
+        if (seen.has(row.id)) return false
+        seen.add(row.id)
+        return true
+      })
+    })
 
   const licensesWithDomains = await Promise.all(
     userLicenses.map(async (license) => {

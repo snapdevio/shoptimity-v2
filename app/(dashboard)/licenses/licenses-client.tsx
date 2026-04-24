@@ -76,6 +76,10 @@ export interface License {
   trialEndsAt: string | null
   stripeSubscriptionId: string | null
   isLifetime: boolean
+  planMode?: string
+  stripeInvoiceUrl?: string | null
+  amount?: number | null
+  currency?: string | null
 }
 
 interface LicensesClientProps {
@@ -111,70 +115,7 @@ export function LicensesClient({ licenses }: LicensesClientProps) {
       onTryAgain,
     })
   }
-  if (licenses.length === 0) {
-    const dummyLicense: License = {
-      id: "lic_preview_only",
-      status: "active",
-      totalSlots: 1,
-      usedSlots: 0,
-      createdAt: new Date().toISOString(),
-      planName: "Pro Growth Plan",
-      domains: [],
-      isTrial: true,
-      trialEndsAt: new Date(Date.now() + 86400000 * 3).toISOString(),
-      stripeSubscriptionId: "sub_preview",
-      isLifetime: false,
-    }
-
-    return (
-      <div className="space-y-12">
-        <Card className="relative overflow-hidden border-border/50 bg-background/50 backdrop-blur-md">
-          {/* Glow Effect */}
-          <div className="pointer-events-none absolute top-0 right-0 h-75 w-75 translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-[80px]" />
-
-          <CardContent className="relative z-10 flex flex-col items-center justify-between gap-10 px-6 py-12 md:flex-row md:px-10">
-            {/* LEFT SIDE CONTENT */}
-            <div className="max-w-lg text-left">
-              <h3 className="font-heading text-3xl font-bold tracking-tight text-gray-900">
-                No licenses found
-              </h3>
-
-              <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-                Purchase a license to start unlocking premium Shoptimity
-                templates and optimizations for your Shopify stores.
-              </p>
-
-              <Link
-                href="/plans"
-                className="mt-6 inline-block rounded-full bg-orange-600 p-4 px-8 text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-orange-500"
-              >
-                View our pricing
-              </Link>
-            </div>
-
-            {/* RIGHT SIDE IMAGE */}
-            <div className="flex w-full justify-center md:w-auto md:justify-end">
-              <img
-                src="/assets/no-license.svg"
-                alt="No licenses"
-                className="h-auto w-65 md:w-[320px] lg:w-95"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-8 opacity-80 grayscale-[0.2]">
-          <div className="relative">
-            <SingleLicenseView
-              license={dummyLicense}
-              onCollision={onCollision}
-            />
-          </div>
-          <LicenseGuide />
-        </div>
-      </div>
-    )
-  }
+  if (licenses.length === 0) return <NoLicensesView />
 
   if (licenses.length === 1) {
     return (
@@ -185,6 +126,57 @@ export function LicensesClient({ licenses }: LicensesClientProps) {
     )
   }
 
+  return <MultipleLicensesView licenses={licenses} onCollision={onCollision} />
+}
+
+function NoLicensesView() {
+  return (
+    <div className="space-y-12">
+      <Card className="relative overflow-hidden border-border/50 bg-background/50 backdrop-blur-md">
+        {/* Glow Effect */}
+        <div className="pointer-events-none absolute top-0 right-0 h-75 w-75 translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-[80px]" />
+
+        <CardContent className="relative z-10 flex flex-col items-center justify-between gap-10 px-6 py-12 md:flex-row md:px-10">
+          {/* LEFT SIDE CONTENT */}
+          <div className="max-w-lg text-left">
+            <h3 className="font-heading text-3xl font-bold tracking-tight text-gray-900">
+              No licenses found
+            </h3>
+
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              Purchase a license to start unlocking premium Shoptimity templates
+              and optimizations for your Shopify stores.
+            </p>
+
+            <Link
+              href="/plans"
+              className="mt-6 inline-block rounded-full bg-orange-600 p-4 px-8 text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-orange-500"
+            >
+              View our pricing
+            </Link>
+          </div>
+
+          {/* RIGHT SIDE IMAGE */}
+          <div className="flex w-full justify-center md:w-auto md:justify-end">
+            <img
+              src="/assets/no-license.svg"
+              alt="No licenses"
+              className="h-auto w-65 md:w-[320px] lg:w-95"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function MultipleLicensesView({
+  licenses,
+  onCollision,
+}: {
+  licenses: License[]
+  onCollision: (domainName: string, onTryAgain?: () => void) => void
+}) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
       {licenses.map((license) => (
@@ -249,16 +241,17 @@ function SingleLicenseView({
                 <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
                   <LayoutDashboard className="size-5" />
                 </div>
-                <Badge
+                {/* <Badge
                   variant="secondary"
-                  className="rounded-lg border-primary/10 bg-primary/5 px-2 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase"
+                  className="rounded-lg border-primary/10 bg-primary/5 px-2 py-0.5 text-[10px] font-bold tracking-wider text-primary capitalize"
                 >
-                  {license.isLifetime ? "Lifetime Access" : "Subscription"}
-                </Badge>
+                  {license.planMode ||
+                    (license.isLifetime ? "lifetime" : "subscription")}
+                </Badge> */}
+                <h2 className=" ms-2 text-3xl font-bold tracking-tight text-foreground">
+                  {license.planName} Plan
+                </h2>
               </div>
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">
-                {license.planName}
-              </h2>
               <p className="mt-1 text-muted-foreground">
                 Current license status and domain assignment
               </p>
@@ -266,7 +259,7 @@ function SingleLicenseView({
 
             <div className="flex flex-col items-end gap-2">
               {license.status === "active" && !license.isTrial ? (
-                <div className="flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-bold text-green-600 uppercase dark:text-green-400">
+                <div className="flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-bold text-green-600 capitalize dark:text-green-400">
                   <span className="relative flex h-2 w-2">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
@@ -277,7 +270,7 @@ function SingleLicenseView({
                 <div className="flex flex-col items-end">
                   <div
                     className={cn(
-                      "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold uppercase",
+                      "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold capitalize",
                       isCanceled
                         ? "border-amber-500/20 bg-amber-500/10 text-amber-600"
                         : "border-blue-500/20 bg-blue-500/10 text-blue-600"
@@ -309,7 +302,7 @@ function SingleLicenseView({
           </div>
 
           <div className="mt-auto space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
                 <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                   Created
@@ -320,12 +313,60 @@ function SingleLicenseView({
               </div>
               <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
                 <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                  License ID
+                  Amount Paid
                 </p>
-                <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
-                  {license.id}
+                <p className="mt-1 text-sm font-semibold">
+                  {license.amount
+                    ? new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: license.currency || "USD",
+                    }).format(license.amount / 100)
+                    : "Free"}
                 </p>
               </div>
+              <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
+                <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                  Invoice
+                </p>
+                <div className="mt-1">
+                  {license.stripeInvoiceUrl ? (
+                    <a
+                      href={license.stripeInvoiceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                    >
+                      <ExternalLink className="size-3" />
+                      View Receipt
+                    </a>
+                  ) : (
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      N/A
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border/50 bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                  License ID
+                </p>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(license.id)
+                    toast.success("License ID copied")
+                  }}
+                  className="flex items-center gap-1 text-[10px] font-bold text-primary hover:opacity-80"
+                >
+                  <Copy className="size-3" />
+                  Copy
+                </button>
+              </div>
+              <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                {license.id}
+              </p>
             </div>
 
             {((license.isTrial && !license.isLifetime) ||
@@ -368,12 +409,57 @@ function SingleLicenseView({
                 !isActive && "opacity-50 grayscale"
               )}
             >
-              {hasDomain ? "1/1 Slots" : "0/1 Slots"}
+              {license.usedSlots}/{license.totalSlots} Slots
             </Badge>
           </div>
 
           <div className="flex flex-1 flex-col justify-center">
-            {hasDomain ? (
+            {license.totalSlots > 1 ? (
+              <div className="space-y-4">
+                {license.domains.map((domain) => (
+                  <div
+                    key={domain.id}
+                    className={cn(
+                      "group relative flex items-center justify-between rounded-2xl border border-border/50 bg-background/80 p-4 transition-all hover:border-primary/30 hover:bg-background",
+                      !isActive && "cursor-not-allowed opacity-60 grayscale"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-inner ring-1 ring-primary/20">
+                        <GlobeIcon className="size-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-foreground">
+                          {domain.domainName}
+                        </h4>
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          Connected since {formatDate(domain.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {isActive && (
+                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                        <EditDomainDialog domain={domain} />
+                        <DeleteDomainDialog domain={domain} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {Array.from({
+                  length: Math.max(0, license.totalSlots - license.usedSlots),
+                }).map((_, i) => (
+                  <EmptySlotRow
+                    key={`empty-${i}`}
+                    licenseId={license.id}
+                    isActive={isActive}
+                    status={license.status}
+                    onCollision={onCollision}
+                  />
+                ))}
+              </div>
+            ) : hasDomain ? (
               <div
                 className={cn(
                   "group relative flex flex-col items-center justify-center rounded-3xl border-2 border-border/50 bg-background/80 p-10 text-center shadow-xl transition-all hover:border-primary/30 hover:bg-background",
@@ -590,11 +676,11 @@ function LicenseCard({
                   >
                     {(license.status === "active" ||
                       license.status === "trialing") && (
-                      <span className="relative flex h-1.5 w-1.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75"></span>
-                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                      </span>
-                    )}
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75"></span>
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                        </span>
+                      )}
                     {license.status === "canceled" ? "Canceled" : "Free Trial"}
                   </div>
                   {license.trialEndsAt && (
@@ -1011,7 +1097,11 @@ function AddDomainDialog({
               <DialogClose render={<Button variant="outline" />}>
                 Cancel
               </DialogClose>
-              <Button type="submit" disabled={isPending || !form.isVerified}>
+              <Button
+                type="submit"
+                disabled={isPending || !form.isVerified}
+                className="cursor-pointer"
+              >
                 {isPending ? (
                   <>
                     <Spinner className="mr-2" />

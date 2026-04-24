@@ -10,6 +10,14 @@ export const user = pgTable("user", {
   image: text("image"),
   role: text("role").notNull().default("user"),
   loginMode: text("login_mode"), // email, google, microsoft
+  stripeCustomerId: text("stripe_customer_id"),
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  country: text("country"),
+  company: text("company"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })

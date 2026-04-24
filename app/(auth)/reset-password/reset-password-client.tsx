@@ -55,8 +55,10 @@ function ResetPasswordForm() {
     setIsLoading(true)
 
     try {
+      const token = searchParams.get("token") || ""
       const { error: authError } = await authClient.resetPassword({
         newPassword: password,
+        token: token,
       })
 
       if (authError) {
