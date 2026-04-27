@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { auth, UserWithRole } from "@/lib/auth"
+import { AdminSidebar } from "@/components/admin/admin-sidebar"
+import { AdminMobileNav } from "@/components/admin/admin-mobile-nav"
 
 export default async function AdminLayout({
   children,
@@ -11,7 +13,6 @@ export default async function AdminLayout({
     headers: await headers(),
   })
 
-  // Check if session exists and role is admin
   const user = session?.user as UserWithRole | undefined
 
   if (process.env.NODE_ENV !== "development") {
@@ -20,5 +21,17 @@ export default async function AdminLayout({
     }
   }
 
-  return <>{children}</>
+  return (
+    <div className="flex min-h-[calc(100vh-80px)] w-full flex-col gap-0 lg:flex-row lg:gap-8">
+      {/* Admin Sidebar (Desktop) */}
+      <AdminSidebar />
+
+      {/* Admin Content */}
+      <main className="min-w-0 flex-1">
+        {/* Mobile Navigation Trigger */}
+        <AdminMobileNav />
+        {children}
+      </main>
+    </div>
+  )
 }

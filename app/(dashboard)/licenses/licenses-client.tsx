@@ -13,6 +13,12 @@ import {
   Loader2,
   ShieldCheck,
   ShieldAlert,
+  ArrowRight,
+  ExternalLink,
+  Settings,
+  Copy,
+  Info,
+  LayoutDashboard,
 } from "lucide-react"
 
 import { usePostHog } from "posthog-js/react"
@@ -106,41 +112,76 @@ export function LicensesClient({ licenses }: LicensesClientProps) {
     })
   }
   if (licenses.length === 0) {
+    const dummyLicense: License = {
+      id: "lic_preview_only",
+      status: "active",
+      totalSlots: 1,
+      usedSlots: 0,
+      createdAt: new Date().toISOString(),
+      planName: "Pro Growth Plan",
+      domains: [],
+      isTrial: true,
+      trialEndsAt: new Date(Date.now() + 86400000 * 3).toISOString(),
+      stripeSubscriptionId: "sub_preview",
+      isLifetime: false,
+    }
+
     return (
-      <Card className="relative overflow-hidden border-border/50 bg-background/50 backdrop-blur-md">
-        {/* Glow Effect */}
-        <div className="pointer-events-none absolute top-0 right-0 h-75 w-75 translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-[80px]" />
+      <div className="space-y-12">
+        <Card className="relative overflow-hidden border-border/50 bg-background/50 backdrop-blur-md">
+          {/* Glow Effect */}
+          <div className="pointer-events-none absolute top-0 right-0 h-75 w-75 translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-[80px]" />
 
-        <CardContent className="relative z-10 flex flex-col items-center justify-between gap-10 px-6 py-12 md:flex-row md:px-10">
-          {/* LEFT SIDE CONTENT */}
-          <div className="max-w-lg text-left">
-            <h3 className="font-heading text-3xl font-bold tracking-tight text-gray-900">
-              No licenses found
-            </h3>
+          <CardContent className="relative z-10 flex flex-col items-center justify-between gap-10 px-6 py-12 md:flex-row md:px-10">
+            {/* LEFT SIDE CONTENT */}
+            <div className="max-w-lg text-left">
+              <h3 className="font-heading text-3xl font-bold tracking-tight text-gray-900">
+                No licenses found
+              </h3>
 
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              Purchase a license to start unlocking premium Shoptimity templates
-              and optimizations for your Shopify stores.
-            </p>
+              <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+                Purchase a license to start unlocking premium Shoptimity
+                templates and optimizations for your Shopify stores.
+              </p>
 
-            <Link
-              href="/plans"
-              className="mt-6 inline-block rounded-full bg-orange-600 p-4 px-8 text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-orange-500"
-            >
-              View our pricing
-            </Link>
-          </div>
+              <Link
+                href="/plans"
+                className="mt-6 inline-block rounded-full bg-orange-600 p-4 px-8 text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-orange-500"
+              >
+                View our pricing
+              </Link>
+            </div>
 
-          {/* RIGHT SIDE IMAGE */}
-          <div className="flex w-full justify-center md:w-auto md:justify-end">
-            <img
-              src="/assets/no-license.svg"
-              alt="No licenses"
-              className="h-auto w-65 md:w-[320px] lg:w-95"
+            {/* RIGHT SIDE IMAGE */}
+            <div className="flex w-full justify-center md:w-auto md:justify-end">
+              <img
+                src="/assets/no-license.svg"
+                alt="No licenses"
+                className="h-auto w-65 md:w-[320px] lg:w-95"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-8 opacity-80 grayscale-[0.2]">
+          <div className="relative">
+            <SingleLicenseView
+              license={dummyLicense}
+              onCollision={onCollision}
             />
           </div>
-        </CardContent>
-      </Card>
+          <LicenseGuide />
+        </div>
+      </div>
+    )
+  }
+
+  if (licenses.length === 1) {
+    return (
+      <div className="flex flex-col gap-8">
+        <SingleLicenseView license={licenses[0]} onCollision={onCollision} />
+        <LicenseGuide />
+      </div>
     )
   }
 
@@ -172,6 +213,332 @@ export function LicensesClient({ licenses }: LicensesClientProps) {
           </Button>
         </div>
       </Card>
+    </div>
+  )
+}
+
+function SingleLicenseView({
+  license,
+  onCollision,
+}: {
+  license: License
+  onCollision: (domainName: string, onTryAgain?: () => void) => void
+}) {
+  const isActive = ["active", "trialing"].includes(license.status)
+  const isCanceled = license.status === "canceled"
+  const hasDomain = license.domains.length > 0
+  const domain = license.domains[0]
+
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-border/50 bg-card/30 p-1 shadow-2xl backdrop-blur-xl transition-all hover:bg-card/40">
+      {/* Dynamic Background Glow */}
+      <div
+        className={cn(
+          "pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full blur-[100px] transition-all duration-1000",
+          isActive ? "bg-primary/10" : "bg-destructive/10"
+        )}
+      />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-primary/5 blur-[100px]" />
+
+      <div className="relative z-10 grid grid-cols-1 gap-0 overflow-hidden rounded-[calc(1.5rem-1px)] lg:grid-cols-2">
+        {/* Left Side: License Details */}
+        <div className="flex flex-col border-border/50 p-8 lg:border-r">
+          <div className="mb-8 flex items-start justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+                  <LayoutDashboard className="size-5" />
+                </div>
+                <Badge
+                  variant="secondary"
+                  className="rounded-lg border-primary/10 bg-primary/5 px-2 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase"
+                >
+                  {license.isLifetime ? "Lifetime Access" : "Subscription"}
+                </Badge>
+              </div>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                {license.planName}
+              </h2>
+              <p className="mt-1 text-muted-foreground">
+                Current license status and domain assignment
+              </p>
+            </div>
+
+            <div className="flex flex-col items-end gap-2">
+              {license.status === "active" && !license.isTrial ? (
+                <div className="flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-bold text-green-600 uppercase dark:text-green-400">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+                  </span>
+                  Active
+                </div>
+              ) : license.isTrial ? (
+                <div className="flex flex-col items-end">
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold uppercase",
+                      isCanceled
+                        ? "border-amber-500/20 bg-amber-500/10 text-amber-600"
+                        : "border-blue-500/20 bg-blue-500/10 text-blue-600"
+                    )}
+                  >
+                    {!isCanceled && (
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75"></span>
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+                      </span>
+                    )}
+                    {isCanceled ? "Canceled" : "Free Trial"}
+                  </div>
+                  {license.trialEndsAt && (
+                    <span className="mt-1 text-[10px] font-medium text-muted-foreground">
+                      Ends {formatDateRelative(license.trialEndsAt)}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <Badge
+                  variant={statusVariant(license.status)}
+                  className="px-3 py-1 capitalize"
+                >
+                  {license.status.replace("_", " ")}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-auto space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
+                <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                  Created
+                </p>
+                <p className="mt-1 text-sm font-semibold">
+                  {formatDate(license.createdAt)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
+                <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                  License ID
+                </p>
+                <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+                  {license.id}
+                </p>
+              </div>
+            </div>
+
+            {((license.isTrial && !license.isLifetime) ||
+              license.stripeSubscriptionId) &&
+              (license.status === "active" ||
+                license.status === "trialing") && (
+                <div className="flex items-center justify-between rounded-2xl border border-destructive/10 bg-destructive/5 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-8 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                      <AlertCircleIcon className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold tracking-tight text-destructive uppercase">
+                        Need to cancel?
+                      </p>
+                      <p className="text-[10px] text-destructive/70">
+                        Cancel your trial before it ends.
+                      </p>
+                    </div>
+                  </div>
+                  <CancelSubscriptionDialog
+                    licenseId={license.id}
+                    isTrial={license.isTrial}
+                  />
+                </div>
+              )}
+          </div>
+        </div>
+
+        {/* Right Side: Domain Slot */}
+        <div className="flex flex-col bg-muted/20 p-8">
+          <div className="mb-6 flex items-center justify-between">
+            <h3 className="text-lg font-semibold tracking-tight">
+              Domain Assignment
+            </h3>
+            <Badge
+              variant="outline"
+              className={cn(
+                "rounded-md border-primary/20 bg-primary/5 text-primary",
+                !isActive && "opacity-50 grayscale"
+              )}
+            >
+              {hasDomain ? "1/1 Slots" : "0/1 Slots"}
+            </Badge>
+          </div>
+
+          <div className="flex flex-1 flex-col justify-center">
+            {hasDomain ? (
+              <div
+                className={cn(
+                  "group relative flex flex-col items-center justify-center rounded-3xl border-2 border-border/50 bg-background/80 p-10 text-center shadow-xl transition-all hover:border-primary/30 hover:bg-background",
+                  !isActive && "cursor-not-allowed opacity-60 grayscale"
+                )}
+              >
+                <div className="mb-6 flex size-20 items-center justify-center rounded-3xl bg-primary/10 text-primary shadow-inner ring-1 ring-primary/20 transition-transform group-hover:scale-110">
+                  <GlobeIcon className="size-10" />
+                </div>
+                <h4 className="text-xl font-bold tracking-tight text-foreground">
+                  {domain.domainName}
+                </h4>
+                <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2Icon className="size-4 text-green-500" />
+                  <span>Connected since {formatDate(domain.createdAt)}</span>
+                </div>
+
+                <div className="mt-8 flex items-center gap-3">
+                  {isActive ? (
+                    <>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="h-9 rounded-xl"
+                      >
+                        <a
+                          href={`https://${domain.domainName}/admin`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="mr-2 size-4" />
+                          Open Admin
+                        </a>
+                      </Button>
+                      <EditDomainDialog domain={domain} />
+                      <DeleteDomainDialog domain={domain} />
+                    </>
+                  ) : (
+                    <Button
+                      disabled
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl opacity-50"
+                    >
+                      License Inactive
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                <AddDomainDialog
+                  licenseId={license.id}
+                  trigger={
+                    <button
+                      disabled={!isActive}
+                      className={cn(
+                        "group relative flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-primary/30 bg-primary/5 p-12 text-center transition-all hover:border-primary/50 hover:bg-primary/10 focus:ring-2 focus:ring-primary/20 focus:outline-none",
+                        !isActive && "cursor-not-allowed opacity-50 grayscale"
+                      )}
+                    >
+                      <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20 transition-transform group-hover:scale-110 group-active:scale-95">
+                        <PlusIcon className="size-10" />
+                      </div>
+                      <h4 className="text-xl font-bold tracking-tight text-primary">
+                        Assign Your Store
+                      </h4>
+                      <p className="mt-2 max-w-[200px] text-sm text-muted-foreground">
+                        {isActive
+                          ? "Enter your Shopify .myshopify.com domain to activate your license."
+                          : "Please activate your license to assign a domain."}
+                      </p>
+                    </button>
+                  }
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LicenseGuide() {
+  const steps = [
+    {
+      title: "Open Shopify Admin",
+      description:
+        "Login to your Shopify store admin panel at admin.shopify.com",
+      icon: ExternalLink,
+      link: "https://admin.shopify.com",
+      linkText: "admin.shopify.com",
+    },
+    {
+      title: "Navigate to Domains",
+      description:
+        "Click on Settings (bottom left) and then select the Domains section.",
+      icon: Settings,
+    },
+    {
+      title: "Copy Store Domain",
+      description:
+        "Copy your primary .myshopify.com domain (e.g., store-name.myshopify.com).",
+      icon: Copy,
+    },
+    {
+      title: "Activate License",
+      description:
+        "Paste the domain in the field above and click 'Add domain' to activate.",
+      icon: CheckCircle2Icon,
+    },
+  ]
+
+  return (
+    <div className="mt-4">
+      <div className="mb-6 flex items-center gap-2">
+        <Info className="size-5 text-primary" />
+        <h3 className="text-xl font-bold tracking-tight">
+          How to assign your domain
+        </h3>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {steps.map((step, index) => (
+          <div
+            key={index}
+            className="group relative flex flex-col rounded-3xl border border-border/50 bg-card/20 p-6 transition-all hover:bg-card/40 hover:shadow-lg"
+          >
+            <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 transition-transform group-hover:scale-110">
+              <step.icon className="size-6" />
+            </div>
+            <div className="mb-1 flex items-center gap-2">
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-black text-primary">
+                {index + 1}
+              </span>
+              <h4 className="font-bold text-foreground">{step.title}</h4>
+            </div>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {step.description}
+              {step.link && (
+                <a
+                  href={step.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
+                >
+                  {step.linkText} <ExternalLink className="size-3" />
+                </a>
+              )}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <Alert className="mt-8 rounded-2xl border-amber-500/20 bg-amber-500/5 text-amber-700 dark:text-amber-400">
+        <AlertCircleIcon className="size-4 text-amber-600 dark:text-amber-500" />
+        <AlertDescription className="text-xs font-medium">
+          <strong>Important:</strong> Always use your{" "}
+          <span className="italic">.myshopify.com</span> domain. Custom domains
+          (like .com or .net) are not supported for license assignment because
+          they can change, while the Shopify domain remains permanent.
+        </AlertDescription>
+      </Alert>
     </div>
   )
 }
