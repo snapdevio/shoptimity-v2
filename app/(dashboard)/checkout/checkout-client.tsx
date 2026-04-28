@@ -68,7 +68,7 @@ export function CheckoutClient({ initialPlan, allPlans }: CheckoutClientProps) {
       <div className="mb-6 flex flex-col items-start gap-2">
         <button
           onClick={() => router.push("/plans")}
-          className="group inline-flex items-center text-sm font-bold text-gray-500 transition-colors hover:text-primary"
+          className="group inline-flex cursor-pointer items-center text-sm font-bold text-gray-500 transition-colors hover:text-primary"
         >
           <MoveLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
           Back to plans
@@ -380,7 +380,7 @@ export function CheckoutClient({ initialPlan, allPlans }: CheckoutClientProps) {
             <div className="border-b border-gray-100 pt-1 pb-6">
               <button
                 onClick={() => setIsDiscountOpen(!isDiscountOpen)}
-                className="group flex w-full items-center justify-between text-[15px] font-medium text-gray-600 hover:text-primary"
+                className="group flex w-full cursor-pointer items-center justify-between text-[15px] font-medium text-gray-600 hover:text-primary"
               >
                 <span>Have a discount code?</span>
                 <ChevronDown
@@ -395,7 +395,7 @@ export function CheckoutClient({ initialPlan, allPlans }: CheckoutClientProps) {
                       placeholder="Discount code"
                       className="flex-1 truncate rounded-full border border-gray-200 bg-[#f9fbf9] px-4 py-2 text-[14px] text-base-content focus:border-primary focus:ring-4 focus:ring-primary/10 focus:outline-none"
                     />
-                    <button className="rounded-full bg-base-content px-6 py-2 text-[14px] font-bold text-white shadow-sm transition-all hover:bg-black active:scale-95">
+                    <button className="cursor-pointer rounded-full bg-base-content px-6 py-2 text-[14px] font-bold text-white shadow-sm transition-all hover:bg-black active:scale-95">
                       Apply
                     </button>
                   </div>
@@ -449,7 +449,7 @@ export function CheckoutClient({ initialPlan, allPlans }: CheckoutClientProps) {
                   )
                 }
               }}
-              className="mt-8 w-full rounded-full bg-primary py-4 text-[16px] font-bold text-white shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-95"
+              className="mt-8 w-full cursor-pointer rounded-full bg-primary py-4 text-[16px] font-bold text-white shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-95"
             >
               Start your plan
             </button>

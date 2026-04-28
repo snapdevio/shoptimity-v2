@@ -118,7 +118,7 @@ export function ChangePasswordClient() {
               <button
                 type="button"
                 onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
               >
                 {showCurrentPassword ? (
                   <EyeOffIcon className="size-4" />
@@ -143,7 +143,7 @@ export function ChangePasswordClient() {
               <button
                 type="button"
                 onClick={() => setShowNewPassword(!showNewPassword)}
-                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
               >
                 {showNewPassword ? (
                   <EyeOffIcon className="size-4" />
@@ -168,7 +168,7 @@ export function ChangePasswordClient() {
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
               >
                 {showConfirmPassword ? (
                   <EyeOffIcon className="size-4" />
@@ -179,7 +179,11 @@ export function ChangePasswordClient() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isPending}>
+          <Button
+            type="submit"
+            className="w-full cursor-pointer"
+            disabled={isPending}
+          >
             {isPending ? (
               <>
                 <Spinner className="mr-2" />

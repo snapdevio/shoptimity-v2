@@ -104,7 +104,11 @@ export function ProfileClient({
               />
             </div>
             <div>
-              <Button type="submit" disabled={isPending}>
+              <Button
+                type="submit"
+                className="cursor-pointer"
+                disabled={isPending}
+              >
                 {isPending ? (
                   <>
                     <Spinner className="mr-2" />

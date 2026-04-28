@@ -362,7 +362,7 @@ export default function BillingPage() {
                 {!isAddingCard && !editingCardId && (
                   <button
                     onClick={() => setIsAddingCard(true)}
-                    className="flex shrink-0 items-center gap-1.5 text-sm font-bold text-primary hover:underline"
+                    className="flex shrink-0 cursor-pointer items-center gap-1.5 text-sm font-bold text-primary hover:underline"
                   >
                     <Plus className="h-4 w-4" />
                     <span className="hidden sm:inline">Add Card</span>
@@ -612,7 +612,7 @@ export default function BillingPage() {
                             {!card.isDefault && (
                               <button
                                 onClick={() => handleSetDefault(card.id)}
-                                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-primary"
+                                className="cursor-pointer rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-primary"
                                 title="Set as Default"
                               >
                                 <Check className="h-4 w-4" />
@@ -620,14 +620,14 @@ export default function BillingPage() {
                             )}
                             <button
                               onClick={() => startEditing(card)}
-                              className="rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-primary"
+                              className="cursor-pointer rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-primary"
                               title="Edit Card"
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleRemoveCard(card.id)}
-                              className="rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-red-500"
+                              className="cursor-pointer rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-red-500"
                               title="Remove Card"
                             >
                               <Trash2 className="h-4 w-4" />
