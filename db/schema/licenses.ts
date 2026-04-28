@@ -7,9 +7,17 @@ import {
   integer,
   timestamp,
   index,
+  uniqueIndex,
   check,
   boolean,
+  pgEnum,
 } from "drizzle-orm/pg-core"
+
+export const billingCycleEnum = pgEnum("billing_cycle", [
+  "monthly",
+  "yearly",
+  "lifetime",
+])
 
 import { users } from "@/db/schema/users"
 import { plans } from "@/db/schema/plans"
@@ -33,7 +41,18 @@ export const licenses = pgTable(
     isTrial: boolean("is_trial").notNull().default(false),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     isLifetime: boolean("is_lifetime").notNull().default(false),
+    billingCycle: billingCycleEnum("billing_cycle")
+      .notNull()
+      .default("monthly"),
+    nextRenewalDate: timestamp("next_renewal_date", { withTimezone: true }),
+    retentionDiscountUsed: boolean("retention_discount_used")
+      .notNull()
+      .default(false),
+    retentionDiscountEndsAt: timestamp("retention_discount_ends_at", {
+      withTimezone: true,
+    }),
     lastTrialReminderSent: varchar("last_trial_reminder_sent", { length: 20 }),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
     revokedReason: varchar("revoked_reason", { length: 50 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -44,6 +63,7 @@ export const licenses = pgTable(
   },
   (table) => [
     index("licenses_user_id_idx").on(table.userId),
+    uniqueIndex("licenses_user_id_unique").on(table.userId),
     check("licenses_total_slots_check", sql`${table.totalSlots} >= 1`),
   ]
 )

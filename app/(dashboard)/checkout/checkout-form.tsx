@@ -14,7 +14,9 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, Check, CreditCard, Plus } from "lucide-react"
+import { getUserCards } from "@/actions/billing"
+import { useEffect } from "react"
 
 interface CheckoutFormProps {
   initialEmail?: string
@@ -46,6 +48,18 @@ export function CheckoutForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [savedCards, setSavedCards] = useState<any[]>([])
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadCards() {
+      const cards = await getUserCards()
+      setSavedCards(cards)
+      const def = cards.find((c) => c.isDefault)
+      if (def) setSelectedCardId(def.id)
+    }
+    loadCards()
+  }, [])
 
   function updateDomainValue(index: number, value: string) {
     const newDomains = [...domains]
@@ -105,6 +119,7 @@ export function CheckoutForm({
           contactName: name.trim(),
           licenseQuantity: domains.length,
           domains: domains.filter((d) => d.trim() !== ""),
+          paymentCardId: selectedCardId,
         }),
       })
 
@@ -255,6 +270,60 @@ export function CheckoutForm({
                   later in your dashboard.
                 </p>
               </div>
+
+              {savedCards.length > 0 && (
+                <div className="space-y-3">
+                  <Label>Select Payment Method</Label>
+                  <div className="grid gap-2">
+                    {savedCards.map((card) => (
+                      <div
+                        key={card.id}
+                        onClick={() => setSelectedCardId(card.id)}
+                        className={cn(
+                          "flex cursor-pointer items-center justify-between rounded-xl border p-3 transition-all hover:bg-slate-50",
+                          selectedCardId === card.id
+                            ? "border-primary bg-primary/5 ring-1 ring-primary"
+                            : "border-slate-200"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-4 w-4 text-slate-400" />
+                          <div className="text-sm">
+                            <span className="font-bold uppercase">
+                              {card.brand}
+                            </span>
+                            <span className="ml-2 text-slate-500">
+                              •••• {card.last4}
+                            </span>
+                          </div>
+                        </div>
+                        {selectedCardId === card.id && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    ))}
+                    <div
+                      onClick={() => setSelectedCardId(null)}
+                      className={cn(
+                        "flex cursor-pointer items-center justify-between rounded-xl border p-3 transition-all hover:bg-slate-50",
+                        selectedCardId === null
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-slate-200"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Plus className="h-4 w-4 text-slate-400" />
+                        <span className="text-sm font-medium">
+                          Use a new card
+                        </span>
+                      </div>
+                      {selectedCardId === null && (
+                        <Check className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <Button
                 type="submit"

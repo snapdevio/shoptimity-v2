@@ -26,10 +26,10 @@ const categoryIcons: Record<string, React.ReactNode> = {
 }
 
 export default function CaseStudiesPage() {
-  console.log(
-    "Rendering CaseStudiesPage. Total case studies:",
-    caseStudies.length
-  )
+  // console.log(
+  //   "Rendering CaseStudiesPage. Total case studies:",
+  //   caseStudies.length
+  // )
   return (
     <div className="mx-auto max-w-7xl bg-background">
       {/* Hero Section */}

@@ -1,9 +1,12 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Check, X, Zap, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import CTABadges from "./CTABadges"
+import { getActivePlans } from "@/actions/admin-plans"
+import { useBasePrice } from "@/hooks/use-base-price"
+import { useRouter } from "next/navigation"
 
 interface Feature {
   name: string
@@ -11,8 +14,36 @@ interface Feature {
   highlight?: boolean
 }
 
-interface Plan {
-  id: "free" | "pro"
+interface DBPlan {
+  id: string
+  name: string
+  mode: "monthly" | "yearly" | "free" | "lifetime"
+  slots: number
+  regularPrice: number
+  finalPrice: number
+  currency: string
+  features: unknown
+  isActive: boolean
+  stripePaymentLink?: string | null
+  trialDays: number
+  yearlyDiscountPercentage?: number | null
+  hasYearlyPlan: boolean
+  badge?: string | null
+  position: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface PlanGroup {
+  name: string
+  monthly: DBPlan | null
+  yearly: DBPlan | null
+  free: DBPlan | null
+  lifetime: DBPlan | null
+}
+
+interface GroupedPlan {
+  id: string
   name: string
   description: string
   monthlyPrice: number
@@ -21,41 +52,10 @@ interface Plan {
   badge?: string
   buttonText: string
   popular?: boolean
+  mode: string
+  canBeYearly: boolean
+  isFree: boolean
 }
-
-const PLANS: Plan[] = [
-  {
-    id: "free",
-    name: "Free",
-    description: "Perfect for beginners and testing.",
-    monthlyPrice: 0,
-    yearlyPrice: 0,
-    buttonText: "Get Started For Free",
-    features: [
-      { name: "4 Industry Templates", included: true },
-      { name: "1 Store License Slot", included: true },
-      { name: "20 Advanced Features", included: true },
-      { name: "Standard Email Support", included: true },
-    ],
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    description: "The complete conversion toolkit.",
-    monthlyPrice: 19,
-    yearlyPrice: 159,
-    buttonText: "Upgrade To Pro Now",
-    popular: true,
-    badge: "MOST POPULAR",
-    features: [
-      { name: "10 Industry Templates", included: true },
-      { name: "1 Store License Slot", included: true },
-      { name: "80+ Advanced Features", included: true },
-      { name: "Priority Help & Support", included: true },
-      { name: "Development Support", included: true },
-    ],
-  },
-]
 
 interface NewPricingSectionProps {
   headline?: string
@@ -66,21 +66,146 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
   headline = "Flexible Pricing For Every Brand",
   subheadline = "Ready to Build a Store That Actually Converts?",
 }) => {
+  const router = useRouter()
+  const { templateCount } = useBasePrice()
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">(
-    "yearly"
+    "monthly"
   )
+  const [dbPlans, setDbPlans] = useState<DBPlan[]>([])
   const [selectedPlanIndex, setSelectedPlanIndex] = useState<number>(1) // Default to Pro
 
-  const currentPlan = PLANS[selectedPlanIndex]
+  useEffect(() => {
+    const fetchPlans = async () => {
+      const plans = await getActivePlans()
+      if (plans && plans.length > 0) {
+        setDbPlans(plans)
+      }
+    }
+    fetchPlans()
+  }, [])
+
+  const dynamicPlans = useMemo((): GroupedPlan[] => {
+    if (dbPlans.length === 0) return []
+
+    const groups: Record<string, PlanGroup> = {}
+    dbPlans.forEach((plan: DBPlan) => {
+      if (!groups[plan.name]) {
+        groups[plan.name] = {
+          name: plan.name,
+          monthly: null,
+          yearly: null,
+          free: null,
+          lifetime: null,
+        }
+      }
+      groups[plan.name][plan.mode as keyof Omit<PlanGroup, "name">] = plan
+    })
+
+    return Object.values(groups).map((group: PlanGroup) => {
+      const isPro = group.name.toLowerCase().includes("pro")
+      const isFree = !!group.free
+      const monthlyPlan = group.monthly || group.free || group.lifetime
+      let yearlyPlan = group.yearly
+
+      const basePlan =
+        group.monthly || group.yearly || group.free || group.lifetime
+
+      // Calculate prices
+      const mPrice = monthlyPlan ? monthlyPlan.finalPrice / 100 : 0
+      let yPrice = yearlyPlan ? yearlyPlan.finalPrice / 100 : mPrice * 12
+
+      // Check for hasYearlyPlan flag
+      const canBeYearly =
+        yearlyPlan ||
+        (monthlyPlan && monthlyPlan.hasYearlyPlan) ||
+        false
+
+      const discountPercent =
+        yearlyPlan?.yearlyDiscountPercentage ||
+        monthlyPlan?.yearlyDiscountPercentage ||
+        0
+
+      // If no explicit yearly plan, but has flag and discount, calculate virtual yearly
+      if (!yearlyPlan && canBeYearly && discountPercent > 0 && mPrice > 0) {
+        yPrice = Math.round(mPrice * 12 * (1 - discountPercent / 100))
+      } else if (!canBeYearly) {
+        // If it can't be yearly, set yPrice to 0 or indicator (handled in UI)
+        yPrice = 0
+      }
+
+      return {
+        id: basePlan?.id || "",
+        name: group.name,
+        description: isPro
+          ? "The complete conversion toolkit."
+          : "Perfect for beginners and testing.",
+        monthlyPrice: mPrice,
+        yearlyPrice: yPrice,
+        buttonText: isFree ? "Get Started For Free" : "Upgrade To Pro Now",
+        popular: isPro,
+        badge: isPro ? "MOST POPULAR" : undefined,
+        mode: basePlan?.mode || "",
+        canBeYearly: !!canBeYearly,
+        isFree,
+        features: Array.isArray(basePlan?.features)
+          ? (basePlan.features as string[]).map((f) => {
+            let name = f
+            if (f.toLowerCase().includes("industry templates")) {
+              const count = isPro
+                ? templateCount || 10
+                : Math.round((templateCount || 10) / 2)
+              name = `${count} Industry Templates`
+            }
+            return {
+              name,
+              included: true,
+              highlight:
+                f.toLowerCase().includes("templates") ||
+                (isPro && f.toLowerCase().includes("priority")),
+            }
+          })
+          : [],
+      }
+    })
+  }, [dbPlans, templateCount])
+
+  const currentPlan = dynamicPlans[selectedPlanIndex] || dynamicPlans[0]
   const isYearly = billingCycle === "yearly"
 
-  const displayPrice = isYearly
-    ? currentPlan.id === "pro"
-      ? Math.round(currentPlan.yearlyPrice / 12)
-      : 0
-    : currentPlan.monthlyPrice
+  const displayPrice =
+    currentPlan && isYearly && currentPlan.yearlyPrice > 0
+      ? currentPlan.yearlyPrice
+      : currentPlan?.monthlyPrice || 0
 
-  const discount = Math.round(((19 * 12 - 159) / (19 * 12)) * 100)
+  const discount =
+    currentPlan && currentPlan.monthlyPrice > 0
+      ? Math.round(
+        ((currentPlan.monthlyPrice * 12 - currentPlan.yearlyPrice) /
+          (currentPlan.monthlyPrice * 12)) *
+        100
+      )
+      : 0
+
+  const handleAction = async () => {
+    if (!currentPlan) return
+    const { authClient } = await import("@/lib/auth-client")
+    const { data: session } = await authClient.getSession()
+
+    if (!session) {
+      router.push(`/login?redirect=/pricing`)
+      return
+    }
+
+    const url = new URL(`/checkout`, window.location.origin)
+    url.searchParams.set("planId", currentPlan.id)
+    if (isYearly && currentPlan.yearlyPrice > 0) {
+      url.searchParams.set("isyearly", "true")
+    }
+
+    router.push(url.pathname + url.search)
+  }
+
+  if (!currentPlan) return null
 
   return (
     <section className="relative bg-base-100 py-16 md:py-24" id="pricing">
@@ -104,53 +229,66 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
               <p className="text-lg text-base-content-muted">{headline}</p>
             </div>
 
-            <div className="mb-8 flex items-center gap-4">
-              <span
-                className={cn(
-                  "text-sm font-semibold",
-                  !isYearly ? "text-base-content" : "text-base-content-muted"
-                )}
-              >
-                Monthly
-              </span>
-              <button
-                onClick={() => setBillingCycle(isYearly ? "monthly" : "yearly")}
-                className="relative h-7 w-14 rounded-full bg-base-200 p-1 transition-colors hover:bg-base-200/80"
-              >
-                <div
-                  className={cn(
-                    "h-5 w-5 rounded-full bg-primary shadow-sm transition-transform duration-300",
-                    isYearly ? "translate-x-7" : "translate-x-0"
-                  )}
-                />
-              </button>
-              <div className="flex items-center gap-2">
+            {dbPlans.some((p) => p.hasYearlyPlan) && (
+              <div className="mb-8 flex items-center gap-4">
                 <span
                   className={cn(
                     "text-sm font-semibold",
-                    isYearly ? "text-base-content" : "text-base-content-muted"
+                    !isYearly ? "text-base-content" : "text-base-content-muted"
                   )}
                 >
-                  Yearly
+                  Monthly
                 </span>
-                <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-green-700 uppercase">
-                  Save {discount}%
-                </span>
+                <button
+                  onClick={() =>
+                    setBillingCycle(isYearly ? "monthly" : "yearly")
+                  }
+                  className="relative h-7 w-14 rounded-full bg-base-200 p-1 transition-colors hover:bg-base-200/80"
+                >
+                  <div
+                    className={cn(
+                      "h-5 w-5 rounded-full bg-primary shadow-sm transition-transform duration-300",
+                      isYearly ? "translate-x-7" : "translate-x-0"
+                    )}
+                  />
+                </button>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "text-sm font-semibold",
+                      isYearly ? "text-base-content" : "text-base-content-muted"
+                    )}
+                  >
+                    Yearly
+                  </span>
+                  <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-green-700 uppercase">
+                    Save {discount || 0}%
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="mb-4 flex items-center gap-3 font-sans">
               <div className="flex items-baseline gap-2">
+                {isYearly && currentPlan.monthlyPrice > 0 && (
+                  <span className="text-2xl font-medium text-neutral-400 line-through">
+                    ${currentPlan.monthlyPrice * 12}
+                  </span>
+                )}
                 <span className="text-[40px] font-bold tracking-tight text-base-content md:text-[52px]">
-                  ${displayPrice}
+                  {displayPrice === 0 ? "Free" : `$${displayPrice}`}
                 </span>
-                <span className="text-[20px] font-medium text-base-content-muted md:text-[24px]">
-                  /month
+                <span className="text-[18px] font-medium text-base-content-muted">
+                  {displayPrice === 0
+                    ? "forever"
+                    : isYearly && currentPlan.canBeYearly
+                      ? "/year"
+                      : "/month"}
                 </span>
               </div>
-              {isYearly && currentPlan.id === "pro" && (
-                <span className="ml-2 rounded-full bg-primary/10 px-3 py-1 text-[13px] font-bold text-primary">
-                  Billed yearly - ${currentPlan.yearlyPrice}/yr
+              {isYearly && currentPlan.yearlyPrice > 0 && discount > 0 && (
+                <span className="ml-2 rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-bold text-emerald-700">
+                  Save {discount}%
                 </span>
               )}
             </div>
@@ -161,7 +299,7 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
               </h4>
 
               <div className="space-y-4">
-                {PLANS.map((plan, idx) => (
+                {dynamicPlans.map((plan, idx) => (
                   <button
                     key={plan.id}
                     onClick={() => setSelectedPlanIndex(idx)}
@@ -192,11 +330,14 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                         <div className="flex items-center gap-2">
                           <span className="flex items-center gap-2 font-bold text-base-content">
                             {plan.name}
-                            {plan.id === "pro" && isYearly && (
+                            {plan.yearlyPrice > 0 && isYearly && (
                               <span
                                 className={`rounded bg-primary px-2 py-0.5 text-[10px] font-normal text-white uppercase`}
                               >
-                                Save $108
+                                Save $
+                                {Math.round(
+                                  plan.monthlyPrice * 12 - plan.yearlyPrice
+                                )}
                               </span>
                             )}
                           </span>
@@ -208,25 +349,38 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                     </div>
                     <div className="text-right">
                       <div className="gap text-[20px] leading-none font-bold text-base-content">
-                        $
-                        {isYearly
-                          ? plan.id === "pro"
-                            ? plan.yearlyPrice
-                            : 0
-                          : plan.monthlyPrice}
-                        <span className="ml-2 text-[14px] leading-none font-medium text-base-content-muted line-through">
-                          {isYearly && plan.id === "pro" ? "$228" : ""}
-                        </span>
+                        {isYearly && plan.yearlyPrice > 0 ? (
+                          <>
+                            ${plan.yearlyPrice}
+                            <span className="ml-1 text-[13px] font-medium text-base-content-muted">
+                              /yr
+                            </span>
+                          </>
+                        ) : plan.monthlyPrice > 0 ? (
+                          <>
+                            ${plan.monthlyPrice}
+                            <span className="ml-1 text-[13px] font-medium text-base-content-muted">
+                              /mo
+                            </span>
+                          </>
+                        ) : (
+                          "Free"
+                        )}
+                        {isYearly && plan.monthlyPrice > 0 && plan.yearlyPrice > 0 && (
+                          <span className="ml-2 text-[14px] leading-none font-medium text-base-content-muted line-through">
+                            ${plan.monthlyPrice * 12}
+                          </span>
+                        )}
                       </div>
-                      <div className="mt-1 text-[13px] leading-none font-medium text-base-content-muted">
-                        {plan.id === "pro" ? (
-                          isYearly ? (
-                            "Billed yearly"
+                      <div className="mt-1 text-[12px] leading-none font-medium text-base-content-muted">
+                        {plan.monthlyPrice > 0 ? (
+                          isYearly && plan.yearlyPrice > 0 ? (
+                            "Billed annually"
                           ) : (
                             "Billed monthly"
                           )
                         ) : (
-                          <p>Free forever</p>
+                          "Forever"
                         )}
                       </div>
                     </div>
@@ -266,7 +420,10 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
             </div>
 
             <div className="flex flex-col items-center gap-4">
-              <button className="group flex w-full cursor-pointer items-center justify-center gap-4 rounded-full bg-orange-500 py-4 text-white transition-all duration-300 hover:-translate-y-1 hover:bg-orange-600 hover:shadow-[0_10px_25px_rgba(249,115,22,0.35)]">
+              <button
+                onClick={handleAction}
+                className="group flex w-full cursor-pointer items-center justify-center gap-4 rounded-full bg-orange-500 py-4 text-white transition-all duration-300 hover:-translate-y-1 hover:bg-orange-600 hover:shadow-[0_10px_25px_rgba(249,115,22,0.35)]"
+              >
                 <span className="font-sans text-[16px] font-bold tracking-wider uppercase md:text-[20px]">
                   {currentPlan.buttonText}
                 </span>

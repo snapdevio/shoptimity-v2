@@ -22,6 +22,7 @@ export const auth = betterAuth({
     "https://shoptimity.com",
     "http://localhost:3000",
     "https://overstuff-landowner-overstuff.ngrok-free.dev",
+    "https://stepless-fendered-dominik.ngrok-free.dev",
   ],
   socialProviders: {
     google: {
@@ -35,7 +36,7 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    async sendResetPasswordEmail({ user, url }: { user: any; url: string }) {
+    async sendResetPassword({ user, url }: { user: any; url: string }) {
       if (process.env.NODE_ENV === "development") {
         console.log(`[AUTH] Password Reset Link for ${user.email}: ${url}`)
       }

@@ -5,6 +5,9 @@ export interface AppSession {
   userId: string
   role: string
   email: string
+  name?: string
+  firstName?: string
+  lastName?: string
 }
 
 /**
@@ -18,9 +21,13 @@ export async function getAppSession(): Promise<AppSession | null> {
 
   if (!session) return null
 
+  const user = session.user as any
   return {
-    userId: session.user.id,
-    role: ((session.user as Record<string, unknown>).role as string) || "user",
-    email: session.user.email,
+    userId: user.id,
+    role: user.role || "user",
+    email: user.email,
+    name: user.name,
+    firstName: user.firstName,
+    lastName: user.lastName,
   }
 }

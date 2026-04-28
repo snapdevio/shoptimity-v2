@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import NumberFlow from "@number-flow/react"
 import { CheckCheck } from "lucide-react"
 // import { motion, AnimatePresence } from "motion/react";
-import { memo, useRef } from "react"
+import React, { memo, useRef } from "react"
 // import { VerticalCutReveal } from "./vertical-cut-reveal";
 
 const PricingSwitch = ({
@@ -95,8 +95,10 @@ export interface PricingPlan {
   buttonText: string
   popular?: boolean
   badge?: string
-  planBadge?: string
   includes: string[]
+  isCurrent?: boolean
+  planBadge?: string
+  trialDays?: number
 }
 
 export const PricingSectionModern = memo(
@@ -108,6 +110,7 @@ export const PricingSectionModern = memo(
     showSwitch = true,
     availableCycles = ["monthly", "yearly"],
     maxYearlyDiscount,
+    loadingPlanName,
   }: {
     plans: PricingPlan[]
     onAction?: (planId: string, isYearly: boolean) => void
@@ -116,6 +119,7 @@ export const PricingSectionModern = memo(
     showSwitch?: boolean
     availableCycles?: string[]
     maxYearlyDiscount?: number
+    loadingPlanName?: string | null
   }) => {
     const pricingRef = useRef<HTMLDivElement>(null)
 
@@ -157,108 +161,148 @@ export const PricingSectionModern = memo(
                 : "md:grid-cols-3"
           )}
         >
-          {plans.map((plan) => (
-            <div key={plan.name} className="h-full">
-              <Card
-                className={`relative h-full border border-neutral-200 ${
-                  plan.popular
+          {plans.map((plan) => {
+            const isLoading = loadingPlanName === plan.name.toLowerCase()
+            const displayPrice =
+              billingCycle === "yearly" ? plan.yearlyPrice : plan.price
+            const isFree = displayPrice === 0
+
+            return (
+              <div key={plan.name} className="h-full">
+                <Card
+                  className={`relative h-full border border-neutral-200 ${plan.popular
                     ? "bg-orange-50 shadow-lg ring-2 shadow-orange-100 ring-orange-500"
                     : "bg-white"
-                }`}
-              >
-                {plan.planBadge && (
-                  <div className="absolute -top-3 left-1/2 z-20 -translate-x-1/2">
-                    <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-md">
-                      {plan.planBadge}
-                    </span>
-                  </div>
-                )}
-                <CardHeader className="text-left">
-                  <div className="flex items-start justify-between">
-                    <h3 className="mb-2 text-3xl font-semibold text-gray-900 md:text-2xl xl:text-3xl">
-                      {plan.name} Plan
-                    </h3>
-                    {plan.badge && (
-                      <div className="shrink-0">
-                        <span className="rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white md:px-3 md:py-1.5">
-                          {plan.badge}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="mb-4 text-sm text-gray-600 md:text-xs xl:text-sm">
-                    {plan.description}
-                  </p>
-                  <div className="flex flex-wrap items-baseline gap-1">
-                    <div className="flex items-baseline gap-2">
-                      {plan.originalPrice && (
-                        <span className="text-xl font-medium text-neutral-400 line-through md:text-2xl">
-                          ${plan.originalPrice.toFixed(0)}
-                        </span>
-                      )}
-                      <span className="text-3xl font-bold text-gray-900 md:text-4xl">
-                        $
-                        <NumberFlow
-                          format={{
-                            currency: "USD",
-                          }}
-                          value={
-                            billingCycle === "yearly"
-                              ? plan.yearlyPrice
-                              : plan.price
-                          }
-                          className="text-3xl font-bold md:text-4xl"
-                        />
-                      </span>
-                      <span className="ml-1 text-sm text-gray-600 md:text-base">
-                        /{plan.mode}
+                    }`}
+                >
+                  {plan.planBadge && (
+                    <div className="absolute -top-3 left-1/2 z-20 -translate-x-1/2">
+                      <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-md">
+                        {plan.planBadge}
                       </span>
                     </div>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="pt-0">
-                  <button
-                    onClick={() =>
-                      onAction?.(
-                        plan.name.toLowerCase(),
-                        billingCycle === "yearly"
-                      )
-                    }
-                    className={cn(
-                      "mb-3 w-full cursor-pointer rounded-xl border p-4 text-xl font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]",
-                      plan.buttonText === "Current Plan"
-                        ? "border-neutral-700 bg-linear-to-t from-neutral-900 to-neutral-600 shadow-lg shadow-neutral-900/20"
-                        : "border-orange-400 bg-linear-to-t from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20"
-                    )}
-                  >
-                    {plan.buttonText}
-                  </button>
-
-                  <div className="space-y-3 border-t border-neutral-200 pt-4">
-                    <h2 className="mb-3 text-xl font-semibold text-gray-900 uppercase">
-                      Features
-                    </h2>
-                    <h4 className="mb-3 text-base font-medium text-gray-900">
-                      {plan.includes[0]}
-                    </h4>
-                    <ul className="space-y-3 font-semibold">
-                      {plan.includes.slice(1).map((feature, featureIndex) => (
-                        <li key={featureIndex} className="flex items-start">
-                          <span className="mt-0.5 mr-3 grid h-5 w-5 shrink-0 place-content-center rounded-full border border-orange-500 bg-white">
-                            <CheckCheck className="h-3 w-3 text-orange-500" />
+                  )}
+                  <CardHeader className="text-left">
+                    <div className="flex items-start justify-between">
+                      <h3 className="mb-2 text-3xl font-semibold text-gray-900 md:text-2xl xl:text-3xl">
+                        {plan.name} Plan
+                      </h3>
+                      {plan.badge && (
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <span className="rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white md:px-3 md:py-1.5">
+                            {plan.badge}
                           </span>
-                          <span className="text-sm leading-snug text-gray-600 md:text-xs xl:text-sm">
-                            {feature}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ))}
+                        </div>
+                      )}
+                      {billingCycle === "yearly" && plan.price > 0 && (plan.price * 12 - plan.yearlyPrice) > 0 && (
+                        <div className="shrink-0 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-bold text-emerald-600 uppercase tracking-wider">
+                          Save ${Math.round(plan.price * 12 - plan.yearlyPrice)}
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="mt-2 text-sm leading-relaxed text-gray-500 md:text-base">
+                      {plan.description}
+                    </p>
+
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-baseline flex-wrap gap-1">
+
+                        {plan.originalPrice !== undefined &&
+                          plan.originalPrice > displayPrice && (
+                            <span className="mr-2 text-xl font-medium text-neutral-400 line-through md:text-2xl">
+                              ${plan.originalPrice.toFixed(0)}
+                            </span>
+                          )}
+                        <span className="text-2xl font-bold text-gray-900 md:text-3xl">
+                          $
+                        </span>
+                        <span className="text-4xl font-bold tracking-tight text-gray-900 md:text-5xl lg:text-6xl">
+                          <NumberFlow
+                            format={{
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            }}
+                            value={displayPrice}
+                            className="text-3xl font-bold md:text-4xl"
+                          />
+                        </span>
+                        <span className="ml-1 text-sm font-semibold text-gray-500 md:text-base">
+                          /{plan.mode}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="pt-0">
+                    <button
+                      onClick={() =>
+                        !plan.isCurrent &&
+                        !isLoading &&
+                        onAction?.(
+                          plan.name.toLowerCase(),
+                          billingCycle === "yearly"
+                        )
+                      }
+                      disabled={plan.isCurrent || !!loadingPlanName}
+                      className={cn(
+                        "mb-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-orange-400 bg-linear-to-t from-orange-500 to-orange-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed sm:text-lg lg:text-xl whitespace-nowrap",
+                        isLoading && "opacity-90"
+                      )}
+                    >
+                      {isLoading && (
+                        <svg
+                          className="h-5 w-5 animate-spin text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                      )}
+                      <span className="truncate">
+                        {plan.isCurrent
+                          ? "Current Plan"
+                          : plan.trialDays && plan.trialDays > 0
+                            ? `Start ${plan.trialDays}-Day Free Trial`
+                            : plan.buttonText}
+                      </span>
+                    </button>
+
+                    <div className="space-y-3 border-t border-neutral-200 pt-4">
+                      <h2 className="mb-3 text-xl font-semibold text-gray-900 uppercase">
+                        Features
+                      </h2>
+                      <ul className="space-y-3 font-semibold">
+                        {plan.includes.map((feature, featureIndex) => (
+                          <li key={featureIndex} className="flex items-start">
+                            <span className="mt-0.5 mr-3 grid h-5 w-5 shrink-0 place-content-center rounded-full border border-orange-500 bg-white">
+                              <CheckCheck className="h-3 w-3 text-orange-500" />
+                            </span>
+                            <span className="text-sm leading-snug text-gray-600 md:text-xs xl:text-sm">
+                              {feature}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          })}
         </div>
       </div>
     )

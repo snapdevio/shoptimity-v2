@@ -90,6 +90,12 @@ export default function AdminPlansPage() {
       render: (row) => <span>${(row.finalPrice / 100).toFixed(2)}</span>,
     },
     {
+      key: "trialDays",
+      header: "Trial Days",
+      sortable: true,
+      render: (row) => <span>{row.trialDays}</span>,
+    },
+    {
       key: "isActive",
       header: "Status",
       sortable: true,

@@ -45,12 +45,20 @@ export async function updateSettings(
       .where(eq(settings.key, key))
       .limit(1)
 
+    const updatedBy = session.userId === "dev-user" ? null : session.userId
+
     if (existing) {
+      // Merge the new values into the existing JSON object
+      const newValue = {
+        ...(existing.value as Record<string, any>),
+        ...value,
+      }
+
       await db
         .update(settings)
         .set({
-          value,
-          updatedBy: session.userId,
+          value: newValue,
+          updatedBy,
           updatedAt: new Date(),
         })
         .where(eq(settings.key, key))
@@ -58,7 +66,7 @@ export async function updateSettings(
       await db.insert(settings).values({
         key,
         value,
-        updatedBy: session.userId,
+        updatedBy,
       })
     }
 

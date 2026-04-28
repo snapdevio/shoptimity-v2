@@ -99,6 +99,20 @@ export default function AdminSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center justify-between space-x-2 rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label>Enable Site-wide Discount</Label>
+                <CardDescription>
+                  Toggle visibility of discount badges across the site.
+                </CardDescription>
+              </div>
+              <Switch
+                checked={!!settings.enable_discount}
+                onCheckedChange={(checked) =>
+                  updateValue("enable_discount", checked)
+                }
+              />
+            </div>
             <div className="space-y-2">
               <Label>Coupon Code</Label>
               <Input
@@ -118,18 +132,33 @@ export default function AdminSettingsPage() {
                 placeholder="e.g. 10"
               />
             </div>
-            <div className="flex items-center justify-between space-x-2 rounded-lg border p-3">
-              <div className="space-y-0.5">
-                <Label>Enable Site-wide Discount</Label>
-                <CardDescription>
-                  Toggle visibility of discount badges across the site.
-                </CardDescription>
-              </div>
-              <Switch
-                checked={!!settings.enable_discount}
-                onCheckedChange={(checked) =>
-                  updateValue("enable_discount", checked)
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Cancellation Retention</CardTitle>
+            <CardDescription>
+              Offer discounts when users try to cancel their subscription.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border bg-amber-50 p-3 text-xs text-amber-700">
+              Note: Cancellation discounts and durations are now managed
+              individually in the <strong>Plans</strong> section.
+            </div>
+            <div className="space-y-2">
+              <Label>Offer Expiration Timeout (Seconds)</Label>
+              <Input
+                type="number"
+                value={settings.cancel_offer_timeout ?? ""}
+                onChange={(e) =>
+                  updateValue(
+                    "cancel_offer_timeout",
+                    parseInt(e.target.value) || 0
+                  )
                 }
+                placeholder="e.g. 300"
               />
             </div>
           </CardContent>
@@ -150,9 +179,12 @@ export default function AdminSettingsPage() {
           <CardContent className="space-y-4">
             {Object.entries(settings).map(([key, value]) => {
               if (
-                ["coupon_code", "discount_percent", "enable_discount"].includes(
-                  key
-                )
+                [
+                  "coupon_code",
+                  "discount_percent",
+                  "enable_discount",
+                  "cancel_offer_timeout",
+                ].includes(key)
               )
                 return null
               return (
@@ -177,11 +209,19 @@ export default function AdminSettingsPage() {
                 </div>
               )
             })}
-            {Object.keys(settings).length <= 3 && (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                No custom flags added yet.
-              </div>
-            )}
+            {Object.keys(settings).filter(
+              (key) =>
+                ![
+                  "coupon_code",
+                  "discount_percent",
+                  "enable_discount",
+                  "cancel_offer_timeout",
+                ].includes(key)
+            ).length === 0 && (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  No custom flags added yet.
+                </div>
+              )}
           </CardContent>
         </Card>
       </div>

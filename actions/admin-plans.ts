@@ -31,8 +31,18 @@ const updatePlanSchema = z.object({
   features: z.array(z.string()).optional(),
   position: z.number().int().default(0),
   trialDays: z.number().int().min(0).default(0),
-  yearlyDiscount: z.number().int().min(0).nullable().optional(),
+  yearlyDiscountPercentage: z.number().int().min(0).nullable().optional(),
+  yearlyDiscountCouponCode: z.string().nullable().optional(),
+  couponCode: z.string().nullable().optional(),
+  hasYearlyPlan: z.boolean().default(false),
   badge: z.string().max(255).nullable().optional(),
+  monthlyCancelDiscount: z.number().int().min(0).default(0),
+  yearlyCancelDiscount: z.number().int().min(0).default(0),
+  monthlyCancelCouponCode: z.string().nullable().optional(),
+  yearlyCancelCouponCode: z.string().nullable().optional(),
+  monthlyCancelDuration: z.number().int().min(1).default(3),
+  yearlyCancelDuration: z.number().int().min(1).default(1),
+  cancelApplyDiscount: z.boolean().default(false),
 })
 
 export async function upsertPlan(data: z.infer<typeof updatePlanSchema>) {

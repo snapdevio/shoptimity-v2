@@ -1,10 +1,11 @@
 "use client"
 
 import React, { useMemo, useState, useCallback } from "react"
-import { redirect, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Check, X } from "lucide-react"
 import { PricingSectionModern, PricingPlan } from "@/components/ui/pricing"
+import { toast } from "sonner"
 
 interface PricingClientProps {
   dbPlans: any[]
@@ -12,6 +13,7 @@ interface PricingClientProps {
   settings?: any
   redirectPath?: string
   isPublic?: boolean
+  activePlanId?: string
 }
 
 function FeatureRow({
@@ -79,11 +81,13 @@ export function PlansClient({
   settings = {},
   redirectPath = "/plans",
   isPublic = false,
+  activePlanId,
 }: PricingClientProps) {
   const router = useRouter()
   const [billingCycle, setBillingCycle] = useState<
     "monthly" | "yearly" | "lifetime"
   >("yearly")
+  const [loadingPlanName, setLoadingPlanName] = useState<string | null>(null)
 
   const availableCycles = useMemo(() => {
     const cycles = new Set<string>()
@@ -91,7 +95,7 @@ export function PlansClient({
       if (p.mode === "monthly") cycles.add("monthly")
       if (
         p.mode === "yearly" ||
-        (p.mode === "monthly" && p.yearlyDiscount && p.yearlyDiscount > 0)
+        (p.mode === "monthly" && p.hasYearlyPlan)
       )
         cycles.add("yearly")
       if (p.mode === "lifetime") cycles.add("lifetime")
@@ -119,13 +123,8 @@ export function PlansClient({
   const filteredGroups = useMemo(() => {
     return groupedPlans.filter((group) => {
       if (billingCycle === "lifetime" && group.lifetime) return true
-      if (
-        billingCycle === "yearly" &&
-        (group.yearly || (group.monthly && group.monthly.yearlyDiscount > 0))
-      )
+      if (group.monthly || group.yearly || group.free || group.lifetime)
         return true
-      if (billingCycle === "monthly" && group.monthly) return true
-      if (group.free && group.free.finalPrice === 0) return true
       return false
     })
   }, [groupedPlans, billingCycle])
@@ -144,7 +143,7 @@ export function PlansClient({
         billingCycle === "yearly" &&
         !plan &&
         group.monthly &&
-        group.monthly.yearlyDiscount > 0
+        group.monthly.hasYearlyPlan
       ) {
         plan = group.monthly
         isVirtualYearly = true
@@ -156,22 +155,28 @@ export function PlansClient({
       let originalPrice = (finalPlan?.regularPrice || 0) / 100
       let yearlyPrice =
         (group.yearly?.finalPrice ||
-          group.free?.finalPrice ||
           group.lifetime?.finalPrice ||
           0) / 100
+      
+      // Fallback for monthly plans in yearly view
+      if (billingCycle === "yearly" && !group.yearly && !isVirtualYearly && group.monthly) {
+        yearlyPrice = (group.monthly.finalPrice / 100)
+      }
 
       if (isVirtualYearly) {
-        originalPrice = price
-        yearlyPrice = Math.round(price * (1 - finalPlan.yearlyDiscount / 100))
+        originalPrice = price * 12
+        yearlyPrice = Math.round(
+          price * (1 - (finalPlan.yearlyDiscountPercentage || 0) / 100) * 12
+        )
       }
 
       // Only show originalPrice if it's different from the display price
       const displayPrice = billingCycle === "yearly" ? yearlyPrice : price
       const finalOriginalPrice =
-        originalPrice > displayPrice ? originalPrice : undefined
+        billingCycle === "yearly" ? originalPrice : (originalPrice > displayPrice ? originalPrice : undefined)
 
       let description =
-        group.name === "Starter"
+        group.name === "Free"
           ? "Perfect for exploring Shoptimity."
           : "Premium features for growth."
       let badge
@@ -181,7 +186,7 @@ export function PlansClient({
         let savingsPercent = 0
         if (isVirtualYearly) {
           currentYearlyPrice = yearlyPrice * 12
-          savingsPercent = group.monthly.yearlyDiscount
+          savingsPercent = group.monthly.yearlyDiscountPercentage || 0
         } else {
           currentYearlyPrice = group.yearly.finalPrice / 100
           savingsPercent = Math.round(
@@ -197,8 +202,8 @@ export function PlansClient({
       const modeDisplay: Record<string, string> = {
         monthly: "month",
         yearly: "year",
-        free: "free",
-        lifetime: "lifetime",
+        free: "forever",
+        lifetime: "one-time",
       }
 
       const tierFeatures =
@@ -218,60 +223,85 @@ export function PlansClient({
         price,
         yearlyPrice,
         originalPrice: finalOriginalPrice,
-        mode: isVirtualYearly
-          ? "month"
-          : modeDisplay[finalPlan?.mode as string] || finalPlan?.mode || "free",
+        mode: displayPrice === 0
+          ? "forever"
+          : (billingCycle === "yearly" && (group.yearly || isVirtualYearly))
+            ? "year"
+            : billingCycle === "lifetime"
+              ? "one-time"
+              : "month",
         buttonText: "Get Started",
         popular: isPopular,
         badge,
         includes: Array.isArray(tierFeatures) ? tierFeatures : [],
         planBadge: planBadge,
+        isCurrent: finalPlan?.id === activePlanId,
+        trialDays: finalPlan?.trialDays || 0,
       }
     })
-  }, [filteredGroups, billingCycle])
+  }, [filteredGroups, billingCycle, activePlanId])
 
   const handleAction = useCallback(
     async (planName: string, isYearlyAction: boolean) => {
-      const group = groupedPlans.find(
-        (g) => g.name.toLowerCase() === planName.toLowerCase()
-      )
-      let plan =
-        billingCycle === "yearly"
-          ? group?.yearly
-          : billingCycle === "lifetime"
-            ? group?.lifetime
-            : group?.monthly
+      try {
+        setLoadingPlanName(planName.toLowerCase())
 
-      let isVirtualYearly = false
-      if (
-        billingCycle === "yearly" &&
-        !plan &&
-        group?.monthly &&
-        group.monthly.yearlyDiscount > 0
-      ) {
-        plan = group.monthly
-        isVirtualYearly = true
+        const group = groupedPlans.find(
+          (g) => g.name.toLowerCase() === planName.toLowerCase()
+        )
+        let plan =
+          billingCycle === "yearly"
+            ? group?.yearly
+            : billingCycle === "lifetime"
+              ? group?.lifetime
+              : group?.monthly
+
+        let isVirtualYearly = false
+        if (
+          billingCycle === "yearly" &&
+          !plan &&
+          group?.monthly &&
+          group.monthly.hasYearlyPlan
+        ) {
+          plan = group.monthly
+          isVirtualYearly = true
+        }
+
+        const finalPlan = plan || group?.free || group?.lifetime
+
+        if (!finalPlan) {
+          toast.error("Plan not found. Please try again.")
+          return
+        }
+
+        const url = new URL(`/checkout`, window.location.origin)
+        url.searchParams.set("planId", finalPlan.id)
+        if (billingCycle === "yearly" || isVirtualYearly) {
+          url.searchParams.set("isyearly", "true")
+        }
+        const checkoutPath = url.pathname + url.search
+
+        const { authClient } = await import("@/lib/auth-client")
+        const { data: session } = await authClient.getSession()
+
+        if (!session) {
+          toast.info("Please login to continue")
+          router.push(`/login?redirect=${encodeURIComponent(checkoutPath)}`)
+          return
+        }
+
+        if (isPublic) {
+          router.push(checkoutPath)
+          return
+        }
+
+        router.push(checkoutPath)
+      } catch (error) {
+        console.error("Action failed:", error)
+        toast.error("Something went wrong. Please try again later.")
+      } finally {
+        setLoadingPlanName(null)
       }
-
-      const finalPlan = plan || group?.free || group?.lifetime
-
-      const { authClient } = await import("@/lib/auth-client")
-      const { data: session } = await authClient.getSession()
-
-      if (!session) {
-        redirect(`/login?redirect=${redirectPath}`)
-      }
-
-      if (isPublic) {
-        redirect(redirectPath)
-      }
-
-      if (!finalPlan || finalPlan.finalPrice === 0) return
-
-      const url = new URL(`/checkout`, window.location.origin)
-      url.searchParams.set("planId", finalPlan.id)
-
-      router.push(url.pathname + url.search)
     },
     [groupedPlans, billingCycle, redirectPath, isPublic, router]
   )
@@ -289,7 +319,10 @@ export function PlansClient({
   }, [availableCycles])
 
   const maxYearlyDiscount = useMemo(() => {
-    return dbPlans.reduce((max, p) => Math.max(max, p.yearlyDiscount || 0), 0)
+    return dbPlans.reduce(
+      (max, p) => Math.max(max, p.yearlyDiscountPercentage || 0),
+      0
+    )
   }, [dbPlans])
 
   return (
@@ -316,6 +349,7 @@ export function PlansClient({
         showSwitch={showSwitch}
         availableCycles={availableCycles}
         maxYearlyDiscount={maxYearlyDiscount}
+        loadingPlanName={loadingPlanName}
       />
 
       <div className="mx-auto max-w-6xl px-4 py-10 md:py-16">

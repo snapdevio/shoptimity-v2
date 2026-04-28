@@ -12,14 +12,16 @@ import {
 
 import { users } from "@/db/schema/users"
 import { orders } from "@/db/schema/orders"
+import { plans } from "@/db/schema/plans"
 
 export const payments = pgTable(
   "payments",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: text("user_id")
-      .notNull()
-      .references(() => users.id),
+    .notNull()
+    .references(() => users.id),
+    planId: uuid("plan_id").references(() => plans.id),
     stripeSessionId: varchar("stripe_session_id", { length: 255 })
       .notNull()
       .unique(),
@@ -32,6 +34,7 @@ export const payments = pgTable(
     stripeInvoiceUrl: text("stripe_invoice_url"),
     amount: integer("amount").notNull(),
     currency: varchar("currency", { length: 10 }).notNull(),
+    appliedPromoCode: varchar("applied_promo_code", { length: 255 }),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

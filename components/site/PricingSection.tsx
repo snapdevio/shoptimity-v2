@@ -69,20 +69,17 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
         let currentFinalPrice = plan.finalPrice
         let activeDiscountPercent = 0
 
-        // If Yearly is selected and the plan has a yearlyDiscount
-        if (
-          billingCycle === "yearly" &&
-          plan.yearlyDiscount &&
-          plan.yearlyDiscount > 0
-        ) {
+        // If Yearly is selected and the plan has hasYearlyPlan enabled
+        if (billingCycle === "yearly" && plan.hasYearlyPlan) {
+          const discountPercent = plan.yearlyDiscountPercentage || 0
           // Apply the yearly discount to the final price (e.g., 30% off the $29 price)
           currentFinalPrice = Math.round(
-            plan.finalPrice * (1 - plan.yearlyDiscount / 100)
+            plan.finalPrice * (1 - discountPercent / 100)
           )
           // For the badge, show the yearly discount percentage explicitly
-          activeDiscountPercent = plan.yearlyDiscount
+          activeDiscountPercent = discountPercent
         } else {
-          // Normal monthly calculation
+          // Normal monthly calculation or if plan doesn't support yearly
           const discount = currentRegularPrice - currentFinalPrice
           activeDiscountPercent = Math.round(
             (discount / currentRegularPrice) * 100
@@ -98,7 +95,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
           label: `${plan.slots} LICENSE${plan.slots > 1 ? "S" : ""}`,
           save: `${savePercent}%`,
           saveAmount: `$${(discountAmount / 100).toFixed(0)}`,
-          price: `$${(currentFinalPrice / 100).toFixed(0)}`,
+          price: currentFinalPrice === 0 ? "Free" : `$${(currentFinalPrice / 100).toFixed(0)}`,
           originalPrice: `$${(currentRegularPrice / 100).toFixed(0)}`,
           badge: `${plan.slots} License${plan.slots > 1 ? "s" : ""}`,
           unitPrice: `$${(unitPrice / 100).toFixed(2)}`,
@@ -119,7 +116,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
   }, [allDbPlans, billingCycle])
 
   const maxYearlyDiscount = allDbPlans.reduce(
-    (max, p) => Math.max(max, p.yearlyDiscount || 0),
+    (max, p) => Math.max(max, p.yearlyDiscountPercentage || 0),
     0
   )
 
@@ -164,43 +161,45 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
               {headline || "Shoptimity Shopify Theme"}
             </h2>
 
-            {/* Billing Cycle Toggle */}
-            <div className="mb-8 flex justify-start">
-              <div className="relative flex rounded-2xl bg-base-300 p-1">
-                <button
-                  onClick={() => setBillingCycle("monthly")}
-                  className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
-                    billingCycle === "monthly"
-                      ? "text-white"
-                      : "text-base-content-muted"
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setBillingCycle("yearly")}
-                  className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
-                    billingCycle === "yearly"
-                      ? "text-white"
-                      : "text-base-content-muted"
-                  }`}
-                >
-                  Yearly
-                  {maxYearlyDiscount > 0 && (
-                    <span className="absolute -top-2 -right-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-lg">
-                      -{maxYearlyDiscount}%
-                    </span>
-                  )}
-                </button>
-                <div
-                  className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-primary transition-transform duration-300 ${
-                    billingCycle === "yearly"
-                      ? "translate-x-full"
-                      : "translate-x-0"
-                  }`}
-                />
+            {/* Billing Cycle Toggle - Only show if any plan has a yearly variant */}
+            {allDbPlans.some((p) => p.hasYearlyPlan) && (
+              <div className="mb-8 flex justify-start">
+                <div className="relative flex rounded-2xl bg-base-300 p-1">
+                  <button
+                    onClick={() => setBillingCycle("monthly")}
+                    className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
+                      billingCycle === "monthly"
+                        ? "text-white"
+                        : "text-base-content-muted"
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setBillingCycle("yearly")}
+                    className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
+                      billingCycle === "yearly"
+                        ? "text-white"
+                        : "text-base-content-muted"
+                    }`}
+                  >
+                    Yearly
+                    {maxYearlyDiscount > 0 && (
+                      <span className="absolute -top-2 -right-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-lg">
+                        -{maxYearlyDiscount}%
+                      </span>
+                    )}
+                  </button>
+                  <div
+                    className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-primary transition-transform duration-300 ${
+                      billingCycle === "yearly"
+                        ? "translate-x-full"
+                        : "translate-x-0"
+                    }`}
+                  />
+                </div>
               </div>
-            </div>
+            )}
             <div className="mb-4 flex items-center gap-3 font-sans">
               <div className="flex items-baseline gap-3">
                 <span className="text-[40px] font-bold tracking-tight text-base-content md:text-[52px]">

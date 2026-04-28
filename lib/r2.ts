@@ -32,7 +32,7 @@ export async function uploadLicenseMetadata(
   await client.send(
     new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
-      Key: `licenses/${domainName}.json`,
+      Key: `license/${domainName}.json`,
       Body: JSON.stringify(data),
       ContentType: "application/json",
     })
@@ -45,7 +45,7 @@ export async function deleteLicenseMetadata(domainName: string): Promise<void> {
   await client.send(
     new DeleteObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
-      Key: `licenses/${domainName}.json`,
+      Key: `license/${domainName}.json`,
     })
   )
 }
