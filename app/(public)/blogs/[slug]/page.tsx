@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft, ArrowRight, Calendar, Clock, Share2, X } from "lucide-react"
-import { LinkedinIcon, FacebookIcon } from "@/components/site/BrandIcons"
+import { ArrowLeft, ArrowRight, Calendar, Clock } from "lucide-react"
 import { getShopifyArticleBySlug, getShopifyArticles } from "@/lib/shopify"
 import { formatDate } from "@/lib/format"
 
@@ -39,11 +38,11 @@ export default async function BlogDetailPage({
       {/* Header / Hero Section */}
       <header className="relative overflow-hidden pt-10 pb-10 sm:pt-16 md:pt-24">
         {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-pink-50/30 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-br from-orange-50/50 via-pink-50/30 to-transparent" />
 
         {/* Floating decorative elements */}
         <div className="absolute top-20 left-10 h-3 w-3 animate-pulse rounded-full bg-[#ff602e]/20" />
-        <div className="absolute top-32 right-20 h-2 w-2 animate-pulse rounded-full bg-[#ff6fb5]/30 delay-100" />
+        <div className="absolute top-32 right-20 h-2 w-2 animate-pulse rounded-full bg-secondary/30 delay-100" />
         <div className="absolute bottom-20 left-1/4 h-2 w-2 animate-pulse rounded-full bg-[#ff602e]/15 delay-200" />
 
         <div className="relative container mx-auto max-w-6xl px-4">
@@ -60,7 +59,7 @@ export default async function BlogDetailPage({
             {article.tags?.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full bg-gradient-to-r from-[#ff602e] to-[#ff6fb5] px-4 py-1.5 text-xs font-bold tracking-wider text-white uppercase shadow-md"
+                className="rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-4 py-1.5 text-xs font-bold tracking-wider text-white uppercase shadow-md"
               >
                 {tag}
               </span>
@@ -126,7 +125,7 @@ export default async function BlogDetailPage({
 
       {/* Read More Section */}
       {moreArticles.length > 0 && (
-        <section className="border-t border-gray-100 bg-white/50 py-20 md:py-28">
+        <section className="border-t border-gray-100 bg-white/50 py-20">
           <div className="container mx-auto max-w-6xl px-4">
             <div className="mb-14 text-center">
               <span className="mb-4 inline-flex items-center gap-2 text-sm font-bold tracking-widest text-[#ff602e] uppercase">
@@ -154,19 +153,19 @@ export default async function BlogDetailPage({
                       alt={post.title}
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                    <div className="absolute top-4 left-4 flex flex-wrap gap-1">
-                      {post.tags?.slice(0, 1).map((tag) => (
+                    <div className="absolute inset-0 bg-linear-to-t from-black/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  </div>
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                      {post.tags?.slice(0, 2).map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold tracking-wide text-[#ff602e] uppercase shadow-sm backdrop-blur-sm"
+                          className="rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-3 py-1 text-[9px] font-bold tracking-wide text-white uppercase shadow-sm"
                         >
                           {tag}
                         </span>
                       ))}
                     </div>
-                  </div>
-                  <div className="flex flex-1 flex-col p-6">
                     <div className="mb-3 flex items-center justify-between text-xs font-medium text-gray-500">
                       <span className="flex items-center gap-1.5">
                         <Calendar size={12} />
@@ -196,7 +195,7 @@ export default async function BlogDetailPage({
             <div className="mt-14 text-center">
               <Link
                 href="/blogs"
-                className="group inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-[#ff602e] to-[#ff6fb5] px-8 py-4 font-bold text-white shadow-lg shadow-orange-200 transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                className="group inline-flex items-center gap-3 rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-8 py-4 font-bold text-white shadow-lg shadow-orange-200 transition-all hover:-translate-y-0.5 hover:shadow-xl"
               >
                 View All Articles
                 <ArrowRight className="size-5 transition-transform group-hover:translate-x-2" />

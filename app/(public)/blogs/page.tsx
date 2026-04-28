@@ -107,7 +107,7 @@ export default async function BlogPage({
                 <div className="flex flex-1 flex-col gap-4 p-6 sm:p-8 lg:gap-6 lg:p-10">
                   {/* Category Badge */}
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#ff602e] to-[#ff6fb5] px-4 py-2 text-xs font-bold tracking-wider text-white uppercase shadow-md">
+                    <span className="flex items-center gap-1.5 rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-4 py-2 text-xs font-bold tracking-wider text-white uppercase shadow-md">
                       <Tag size={12} />
                       Featured
                     </span>
@@ -156,13 +156,13 @@ export default async function BlogPage({
                 </div>
 
                 {/* Image */}
-                <div className="relative aspect-[4/3] w-full overflow-hidden lg:w-1/2 lg:shrink-0">
+                <div className="relative aspect-4/3 w-full overflow-hidden lg:w-1/2 lg:shrink-0">
                   <img
                     src={featuredPost.image}
                     alt={featuredPost.title}
                     className="h-full w-full transition-transform duration-700 group-hover:scale-110"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 </div>
               </Link>
             )}
@@ -180,20 +180,20 @@ export default async function BlogPage({
                       <img
                         src={post.image}
                         alt={post.title}
-                        className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
-                      <div className="absolute top-4 left-4 flex flex-wrap gap-1">
+                    </div>
+                    <div className="flex flex-col gap-3 p-6">
+                      <div className="flex flex-wrap items-center gap-2">
                         {post.tags?.slice(0, 2).map((tag) => (
                           <span
                             key={tag}
-                            className="rounded-full bg-white/95 px-3 py-1.5 text-[9px] font-bold tracking-wide text-[#ff602e] uppercase shadow-sm backdrop-blur-sm"
+                            className="rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-3 py-1 text-[9px] font-bold tracking-wide text-white uppercase shadow-sm"
                           >
                             {tag}
                           </span>
                         ))}
                       </div>
-                    </div>
-                    <div className="flex flex-col gap-3 p-6">
                       <div className="flex items-center justify-between gap-3 text-xs font-medium text-gray-500">
                         <span className="flex items-center gap-1.5">
                           <Calendar size={12} />
@@ -236,7 +236,7 @@ export default async function BlogPage({
                 </p>
                 <Link
                   href="/blogs"
-                  className="rounded-full bg-gradient-to-r from-[#ff602e] to-[#ff6fb5] px-8 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                  className="rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-8 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition-all hover:-translate-y-0.5 hover:shadow-xl"
                 >
                   Browse All Articles
                 </Link>
@@ -293,7 +293,7 @@ export default async function BlogPage({
                         }).toString()}`}
                         className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-all ${
                           currentPage === pageNum
-                            ? "bg-gradient-to-r from-[#ff602e] to-[#ff6fb5] text-white shadow-md shadow-orange-200"
+                            ? "bg-linear-to-r from-[#ff602e] to-secondary text-white shadow-md shadow-orange-200"
                             : "border border-gray-200 bg-white hover:border-[#ff602e]/30 hover:bg-orange-50 hover:text-[#ff602e]"
                         }`}
                       >
