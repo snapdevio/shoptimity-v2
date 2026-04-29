@@ -120,7 +120,9 @@ export function CancelClient({
         toast.error(res.error)
       } else {
         setIsDiscountClaimed(true)
-        toast.success(`Success! Your next payment on ${res.nextPaymentDate} will be $${((res.amountDue || 0) / 100).toFixed(2)}.`)
+        toast.success(
+          `Success! Your next payment on ${res.nextPaymentDate} will be $${((res.amountDue || 0) / 100).toFixed(2)}.`
+        )
       }
     } catch (error) {
       toast.error("Something went wrong. Please try again.")
@@ -130,7 +132,14 @@ export function CancelClient({
   }
 
   const discountedPrice = price * (1 - discountPercent / 100)
-  const durationUnit = billingCycle === "yearly" ? (discountDuration === 1 ? "year" : "years") : (discountDuration === 1 ? "month" : "months")
+  const durationUnit =
+    billingCycle === "yearly"
+      ? discountDuration === 1
+        ? "year"
+        : "years"
+      : discountDuration === 1
+        ? "month"
+        : "months"
   const priceUnit = billingCycle === "yearly" ? "/yr" : "/mo"
 
   if (isCancelled) {
@@ -187,7 +196,8 @@ export function CancelClient({
             <span className="font-bold text-primary">
               {discountPercent}% discount
             </span>{" "}
-            to your next {discountDuration} {durationUnit} of Shoptimity {planName}.
+            to your next {discountDuration} {durationUnit} of Shoptimity{" "}
+            {planName}.
           </p>
           <button
             onClick={() => router.push("/billing")}
@@ -205,7 +215,7 @@ export function CancelClient({
       <div className="mx-auto max-w-2xl">
         <button
           onClick={() => router.back()}
-          className="group mb-8 inline-flex items-center text-sm font-bold text-slate-500 transition-colors hover:text-primary cursor-pointer"
+          className="group mb-8 inline-flex cursor-pointer items-center text-sm font-bold text-slate-500 transition-colors hover:text-primary"
         >
           <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
           Back to Billing
@@ -260,8 +270,9 @@ export function CancelClient({
                   <AlertCircle className="mt-0.5 h-5 w-5 text-slate-400" />
                   <p className="text-xs leading-relaxed text-slate-500">
                     <span className="font-bold text-slate-700">Note:</span> This
-                    exclusive {discountPercent}% discount will be automatically applied to your
-                    next {billingCycle} renewal. You will keep all your current {planName}
+                    exclusive {discountPercent}% discount will be automatically
+                    applied to your next {billingCycle} renewal. You will keep
+                    all your current {planName}
                     features and your billing cycle will remain unchanged.
                   </p>
                 </div>
@@ -279,9 +290,12 @@ export function CancelClient({
                       </span>
                     ) : (
                       <div className="flex flex-col items-center leading-tight">
-                        <span className="text-lg">Claim {discountPercent}% Discount</span>
+                        <span className="text-lg">
+                          Claim {discountPercent}% Discount
+                        </span>
                         <span className="text-[13px] font-medium opacity-90">
-                          Pay ${(discountedPrice / 100).toFixed(2)} on your next {billingCycle === "yearly" ? "year" : "month"}
+                          Pay ${(discountedPrice / 100).toFixed(2)} on your next{" "}
+                          {billingCycle === "yearly" ? "year" : "month"}
                         </span>
                       </div>
                     )}
@@ -292,7 +306,7 @@ export function CancelClient({
                   >
                     No thanks, continue to cancel
                   </button>
-                  <p className="text-center text-[11px] font-medium text-slate-400 uppercase tracking-widest">
+                  <p className="text-center text-[11px] font-medium tracking-widest text-slate-400 uppercase">
                     Applied automatically to your next payment
                   </p>
                 </div>
@@ -322,16 +336,18 @@ export function CancelClient({
                       <button
                         key={reason}
                         onClick={() => setSelectedReason(reason)}
-                        className={`flex items-center rounded-xl border px-4 py-3.5 text-sm font-medium transition-all ${selectedReason === reason
-                          ? "border-primary bg-primary/5 text-primary ring-2 ring-primary/20"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                          }`}
+                        className={`flex items-center rounded-xl border px-4 py-3.5 text-sm font-medium transition-all ${
+                          selectedReason === reason
+                            ? "border-primary bg-primary/5 text-primary ring-2 ring-primary/20"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
                       >
                         <div
-                          className={`mr-3 flex h-4 w-4 items-center justify-center rounded-full border-2 transition-all ${selectedReason === reason
-                            ? "border-primary bg-primary"
-                            : "border-slate-200 bg-white"
-                            }`}
+                          className={`mr-3 flex h-4 w-4 items-center justify-center rounded-full border-2 transition-all ${
+                            selectedReason === reason
+                              ? "border-primary bg-primary"
+                              : "border-slate-200 bg-white"
+                          }`}
                         >
                           {selectedReason === reason && (
                             <div className="h-1.5 w-1.5 rounded-full bg-white" />

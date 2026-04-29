@@ -95,7 +95,10 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
           label: `${plan.slots} LICENSE${plan.slots > 1 ? "S" : ""}`,
           save: `${savePercent}%`,
           saveAmount: `$${(discountAmount / 100).toFixed(0)}`,
-          price: currentFinalPrice === 0 ? "Free" : `$${(currentFinalPrice / 100).toFixed(0)}`,
+          price:
+            currentFinalPrice === 0
+              ? "Free"
+              : `$${(currentFinalPrice / 100).toFixed(0)}`,
           originalPrice: `$${(currentRegularPrice / 100).toFixed(0)}`,
           badge: `${plan.slots} License${plan.slots > 1 ? "s" : ""}`,
           unitPrice: `$${(unitPrice / 100).toFixed(2)}`,

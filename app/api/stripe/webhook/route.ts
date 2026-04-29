@@ -453,8 +453,8 @@ async function fulfillOrder({
           (billingCycle === "lifetime"
             ? null
             : new Date(
-              Date.now() + (billingCycle === "yearly" ? 365 : 30) * 86400000
-            )),
+                Date.now() + (billingCycle === "yearly" ? 365 : 30) * 86400000
+              )),
         stripeSubscriptionId: stripeSubscriptionId || null,
       })
       .onConflictDoUpdate({
@@ -472,8 +472,8 @@ async function fulfillOrder({
             (billingCycle === "lifetime"
               ? null
               : new Date(
-                Date.now() + (billingCycle === "yearly" ? 365 : 30) * 86400000
-              )),
+                  Date.now() + (billingCycle === "yearly" ? 365 : 30) * 86400000
+                )),
           stripeSubscriptionId: stripeSubscriptionId || null,
           updatedAt: new Date(),
         },
@@ -556,9 +556,7 @@ async function fulfillOrder({
     )
 
     emailJobToEnqueue = {
-      template: licenseId
-        ? "conversion-confirmation"
-        : "order-confirmation",
+      template: licenseId ? "conversion-confirmation" : "order-confirmation",
       to: normalizedEmail,
       props: {
         contactName: name || userRecord.name || normalizedEmail.split("@")[0],
@@ -709,7 +707,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (session.amount_total !== null && session.amount_total > plan.finalPrice) {
     throw new Error(
       `[webhook] Security Alert: Amount exceeds plan price for session ${session.id}. ` +
-      `Max expected ${plan.finalPrice}, received ${session.amount_total}. fulfillment aborted.`
+        `Max expected ${plan.finalPrice}, received ${session.amount_total}. fulfillment aborted.`
     )
   }
 
@@ -746,10 +744,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       : undefined,
     nextRenewalDate:
       expandedSession.subscription &&
-        typeof expandedSession.subscription !== "string"
+      typeof expandedSession.subscription !== "string"
         ? new Date(
-          (expandedSession.subscription as any).current_period_end * 1000
-        )
+            (expandedSession.subscription as any).current_period_end * 1000
+          )
         : null,
     stripeSubscriptionId:
       typeof expandedSession.subscription === "string"
@@ -763,16 +761,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       typeof expandedSession.invoice === "string"
         ? null
         : (expandedSession.invoice as Stripe.Invoice)?.hosted_invoice_url ||
-        null,
+          null,
     stripePaymentMethodId:
       expandedSession.setup_intent &&
-        typeof expandedSession.setup_intent !== "string"
+      typeof expandedSession.setup_intent !== "string"
         ? ((expandedSession.setup_intent as Stripe.SetupIntent)
-          .payment_method as string)
-        : expandedSession.payment_intent &&
-          typeof expandedSession.payment_intent !== "string"
-          ? ((expandedSession.payment_intent as Stripe.PaymentIntent)
             .payment_method as string)
+        : expandedSession.payment_intent &&
+            typeof expandedSession.payment_intent !== "string"
+          ? ((expandedSession.payment_intent as Stripe.PaymentIntent)
+              .payment_method as string)
           : null,
     promoCode: promoCode as string,
   })
@@ -1493,7 +1491,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   if (!license && metadata.plan_id) {
     console.warn(
       `[webhook] New subscription ${subscription.id} created but license not found. ` +
-      `Plan: ${metadata.plan_id}. Awaiting checkout.session.completed...`
+        `Plan: ${metadata.plan_id}. Awaiting checkout.session.completed...`
     )
   }
 }

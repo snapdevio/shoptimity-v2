@@ -53,7 +53,9 @@ export default async function CheckoutPage({
   const session = await getAppSession()
 
   if (!session) {
-    redirect(`/login?redirect=/checkout?planId=${planId}${isYearly ? "&isyearly=true" : ""}`)
+    redirect(
+      `/login?redirect=/checkout?planId=${planId}${isYearly ? "&isyearly=true" : ""}`
+    )
   }
 
   if (!initialPlan) {

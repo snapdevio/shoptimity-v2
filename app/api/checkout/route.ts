@@ -127,71 +127,71 @@ async function createCheckoutSession(props: {
     metadata,
     ...(isTrial
       ? {
-        mode: "setup",
-        currency: plan.currency || "usd",
-        setup_intent_data: {
-          metadata,
-        },
-        custom_text: {
-          submit: {
-            message: `You're starting a ${plan.trialDays}-day free trial for the ${plan.name} plan. Your card will NOT be charged today. You will be automatically charged $${(finalAmount / 100).toFixed(2)} after ${plan.trialDays} days unless you cancel.`,
+          mode: "setup",
+          currency: plan.currency || "usd",
+          setup_intent_data: {
+            metadata,
           },
-        },
-      }
+          custom_text: {
+            submit: {
+              message: `You're starting a ${plan.trialDays}-day free trial for the ${plan.name} plan. Your card will NOT be charged today. You will be automatically charged $${(finalAmount / 100).toFixed(2)} after ${plan.trialDays} days unless you cancel.`,
+            },
+          },
+        }
       : isSubscription
         ? {
-          mode: "subscription",
-          line_items: [
-            {
-              price_data: {
-                currency: plan.currency || "usd",
-                product_data: {
-                  name: `${plan.name} (${isYearlyPlan ? "Yearly" : "Monthly"})`,
-                  description: `${isYearlyPlan ? "Yearly" : "Monthly"} subscription for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
+            mode: "subscription",
+            line_items: [
+              {
+                price_data: {
+                  currency: plan.currency || "usd",
+                  product_data: {
+                    name: `${plan.name} (${isYearlyPlan ? "Yearly" : "Monthly"})`,
+                    description: `${isYearlyPlan ? "Yearly" : "Monthly"} subscription for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
+                  },
+                  unit_amount: finalAmount,
+                  recurring: {
+                    interval: isYearlyPlan ? "year" : "month",
+                  },
                 },
-                unit_amount: finalAmount,
-                recurring: {
-                  interval: isYearlyPlan ? "year" : "month",
-                },
+                quantity: 1,
               },
-              quantity: 1,
+            ],
+            subscription_data: {
+              metadata,
+              ...(stripePaymentMethodId
+                ? { default_payment_method: stripePaymentMethodId }
+                : {}),
             },
-          ],
-          subscription_data: {
-            metadata,
-            ...(stripePaymentMethodId
-              ? { default_payment_method: stripePaymentMethodId }
-              : {}),
-          },
-          ...(promoCode
-            ? { discounts: [{ promotion_code: promoCode }] }
-            : { allow_promotion_codes: true }),
-        }
+            ...(promoCode
+              ? { discounts: [{ promotion_code: promoCode }] }
+              : { allow_promotion_codes: true }),
+          }
         : {
-          mode: "payment",
-          line_items: [
-            {
-              price_data: {
-                currency: plan.currency || "usd",
-                product_data: {
-                  name: `${plan.name} (Lifetime ${plan.slots > 1 ? "Licenses" : "License"})`,
-                  description: `Lifetime access for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
+            mode: "payment",
+            line_items: [
+              {
+                price_data: {
+                  currency: plan.currency || "usd",
+                  product_data: {
+                    name: `${plan.name} (Lifetime ${plan.slots > 1 ? "Licenses" : "License"})`,
+                    description: `Lifetime access for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
+                  },
+                  unit_amount: finalAmount,
                 },
-                unit_amount: finalAmount,
+                quantity: 1,
               },
-              quantity: 1,
+            ],
+            payment_intent_data: {
+              metadata: {
+                ...metadata,
+                email: userEmail || "",
+              },
             },
-          ],
-          payment_intent_data: {
-            metadata: {
-              ...metadata,
-              email: userEmail || "",
-            },
-          },
-          ...(promoCode
-            ? { discounts: [{ promotion_code: promoCode }] }
-            : { allow_promotion_codes: true }),
-        }),
+            ...(promoCode
+              ? { discounts: [{ promotion_code: promoCode }] }
+              : { allow_promotion_codes: true }),
+          }),
     success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl}/pricing`,
   })
@@ -236,9 +236,16 @@ export async function GET(request: NextRequest) {
   }
 
   // Calculate base price before coupons
-  const baseMonthly = plan.mode === "yearly" 
-    ? (await db.select().from(plans).where(and(eq(plans.name, plan.name), eq(plans.mode, "monthly"))).limit(1))[0]?.finalPrice || plan.finalPrice
-    : plan.finalPrice
+  const baseMonthly =
+    plan.mode === "yearly"
+      ? (
+          await db
+            .select()
+            .from(plans)
+            .where(and(eq(plans.name, plan.name), eq(plans.mode, "monthly")))
+            .limit(1)
+        )[0]?.finalPrice || plan.finalPrice
+      : plan.finalPrice
 
   let finalAmount = isYearly ? baseMonthly * 12 : plan.finalPrice
 
@@ -297,7 +304,9 @@ export async function GET(request: NextRequest) {
       appUrl,
       isYearlyPlan: isYearly,
       finalAmount,
-      promoCode: isYearly ? (plan.yearlyDiscountCouponCode || undefined) : (plan.couponCode || undefined),
+      promoCode: isYearly
+        ? plan.yearlyDiscountCouponCode || undefined
+        : plan.couponCode || undefined,
     })
 
     // await createAuditLog(
@@ -381,9 +390,16 @@ export async function POST(request: NextRequest) {
   }
 
   // Calculate base price before coupons
-  const baseMonthly = plan.mode === "yearly" 
-    ? (await db.select().from(plans).where(and(eq(plans.name, plan.name), eq(plans.mode, "monthly"))).limit(1))[0]?.finalPrice || plan.finalPrice
-    : plan.finalPrice
+  const baseMonthly =
+    plan.mode === "yearly"
+      ? (
+          await db
+            .select()
+            .from(plans)
+            .where(and(eq(plans.name, plan.name), eq(plans.mode, "monthly")))
+            .limit(1)
+        )[0]?.finalPrice || plan.finalPrice
+      : plan.finalPrice
 
   let finalAmount = isYearly ? baseMonthly * 12 : plan.finalPrice
 

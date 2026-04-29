@@ -84,7 +84,6 @@ function CheckoutInner({
   const [isYearly, setIsYearly] = useState(
     initialIsYearly || initialPlan.mode === "yearly"
   )
-  const [isDiscountOpen, setIsDiscountOpen] = useState(false)
   const [couponCode, setCouponCode] = useState("")
   const [appliedCoupon, setAppliedCoupon] = useState<{
     id: string
@@ -92,6 +91,7 @@ function CheckoutInner({
     percentOff?: number | null
     amountOff?: number | null
   } | null>(null)
+  const [isDiscountOpen, setIsDiscountOpen] = useState(false)
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false)
   const [couponError, setCouponError] = useState<string | null>(null)
 
@@ -107,7 +107,9 @@ function CheckoutInner({
   // Address states (Consolidated)
   // Handle Auto-applying Coupons from Plan
   useEffect(() => {
-    const targetCoupon = isYearly ? currentPlan.yearlyDiscountCouponCode : currentPlan.couponCode
+    const targetCoupon = isYearly
+      ? currentPlan.yearlyDiscountCouponCode
+      : currentPlan.couponCode
 
     if (targetCoupon && !appliedCoupon && !isValidatingCoupon) {
       console.log(`Auto-applying coupon from plan: ${targetCoupon}`)
@@ -125,6 +127,7 @@ function CheckoutInner({
               percentOff: res.percentOff,
               amountOff: res.amountOff,
             })
+            setIsDiscountOpen(true)
           }
         } catch (err) {
           console.error("Auto-apply failed", err)
@@ -135,7 +138,12 @@ function CheckoutInner({
 
       autoApply()
     }
-  }, [currentPlan.id, isYearly, currentPlan.couponCode, currentPlan.yearlyDiscountCouponCode])
+  }, [
+    currentPlan.id,
+    isYearly,
+    currentPlan.couponCode,
+    currentPlan.yearlyDiscountCouponCode,
+  ])
 
   const [billingData, setBillingData] = useState({
     line1: "",
@@ -227,7 +235,15 @@ function CheckoutInner({
   }, [isYearly, monthlyPlan, yearlyPlan])
 
   const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return
+    const trimmedCode = couponCode.trim()
+    if (!trimmedCode) return
+
+    // Prevent yearly-only coupons on monthly plans
+    if (!isYearly && currentPlan.yearlyDiscountCouponCode === trimmedCode) {
+      setCouponError("This code is only valid for yearly plans")
+      return
+    }
+
     setIsValidatingCoupon(true)
     setCouponError(null)
     try {
@@ -262,13 +278,11 @@ function CheckoutInner({
       original = (basePrice * 12) / 100
       effectiveMonthly = original / 12
       label = "Yearly Savings"
-    } else if (currentPlan.regularPrice > currentPlan.finalPrice) {
-      // Show difference between regular and final as a launch discount if applicable
-      original = currentPlan.regularPrice / 100
-      label = "Launch Discount"
     }
 
-    const finalBeforeCoupon = isYearly ? (basePrice * 12) / 100 : currentPlan.finalPrice / 100
+    const finalBeforeCoupon = isYearly
+      ? (basePrice * 12) / 100
+      : currentPlan.finalPrice / 100
     let couponSavings = 0
     if (appliedCoupon) {
       if (appliedCoupon.percentOff) {
@@ -280,7 +294,8 @@ function CheckoutInner({
 
     const final = Math.max(0, finalBeforeCoupon - couponSavings)
     const baseSavings = original - finalBeforeCoupon
-    const percent = original > 0 ? Math.round((baseSavings / original) * 100) : 0
+    const percent =
+      original > 0 ? Math.round((baseSavings / original) * 100) : 0
 
     return {
       original,
@@ -367,6 +382,11 @@ function CheckoutInner({
 
   const handleBillingChange = (yearly: boolean) => {
     setIsYearly(yearly)
+    // Reset coupon when switching billing cycles
+    setAppliedCoupon(null)
+    setCouponCode("")
+    setCouponError(null)
+
     const targetPlan = yearly ? yearlyPlan || monthlyPlan : monthlyPlan
     if (targetPlan) {
       const params = new URLSearchParams(searchParams.toString())
@@ -848,10 +868,16 @@ function CheckoutInner({
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <span className="text-[15px] text-gray-600">
-                {isFreePlan ? "Plan price" : isYearly ? "Effective monthly price" : "Plan price"}
+                {isFreePlan
+                  ? "Plan price"
+                  : isYearly
+                    ? "Effective monthly price"
+                    : "Plan price"}
               </span>
               <span className="text-[15px] font-bold text-base-content">
-                {isFreePlan ? "Free" : `$${price.effectiveMonthly.toFixed(2)} / month`}
+                {isFreePlan
+                  ? "Free"
+                  : `$${price.effectiveMonthly.toFixed(2)} / month`}
               </span>
             </div>
             {isYearly && !isFreePlan && (
@@ -880,7 +906,7 @@ function CheckoutInner({
                 </span>
               </div>
             )}
-            <div className="flex items-center justify-between ">
+            <div className="flex items-center justify-between">
               <span className="text-[15px] text-gray-600">Billing cycle</span>
               <span className="text-[15px] font-bold text-base-content capitalize">
                 {isFreePlan ? "Forever" : isYearly ? "Yearly" : "Monthly"}
@@ -889,7 +915,8 @@ function CheckoutInner({
             {price.couponSavings > 0 && (
               <div className="flex items-center justify-between text-gray-800">
                 <span className="text-[15px] font-medium">
-                  Discount Code <span className="text-[10px]">({appliedCoupon?.name})</span>
+                  Discount Code{" "}
+                  <span className="text-[10px]">({appliedCoupon?.name})</span>
                 </span>
                 <span className="text-[15px] font-bold">
                   -${price.couponSavings.toFixed(2)}
@@ -929,17 +956,17 @@ function CheckoutInner({
                             ? "border-orange-200 bg-orange-50 text-orange-700"
                             : "border-gray-200 bg-[#f9fbf9] focus:border-primary",
                         (appliedCoupon || isValidatingCoupon) &&
-                        "cursor-not-allowed"
+                          "cursor-not-allowed"
                       )}
                     />
                     <button
                       onClick={
                         appliedCoupon
                           ? () => {
-                            setAppliedCoupon(null)
-                            setCouponCode("")
-                            setCouponError(null)
-                          }
+                              setAppliedCoupon(null)
+                              setCouponCode("")
+                              setCouponError(null)
+                            }
                           : handleApplyCoupon
                       }
                       disabled={
@@ -947,10 +974,10 @@ function CheckoutInner({
                         isValidatingCoupon
                       }
                       className={cn(
-                        "rounded-full px-6 py-2 text-[14px] font-bold text-white transition-all bg-orange-600 hover:bg-orange-700",
+                        "rounded-full bg-orange-600 px-6 py-2 text-[14px] font-bold text-white transition-all hover:bg-orange-700",
                         ((!appliedCoupon && couponCode.trim().length < 2) ||
                           isValidatingCoupon) &&
-                        "cursor-not-allowed opacity-50"
+                          "cursor-not-allowed opacity-50"
                       )}
                     >
                       {isValidatingCoupon ? (
@@ -964,7 +991,7 @@ function CheckoutInner({
                   </div>
 
                   {couponError && (
-                    <p className="mt-2 ml-1 text-[13px] font-medium text-red-500 animate-in fade-in slide-in-from-top-1">
+                    <p className="mt-2 ml-1 animate-in text-[13px] font-medium text-red-500 fade-in slide-in-from-top-1">
                       {couponError}
                     </p>
                   )}
@@ -1004,12 +1031,11 @@ function CheckoutInner({
                   </strong>
                   .{" "}
                   {appliedCoupon && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[12px] font-bold text-emerald-600 animate-in zoom-in-95">
+                    <span className="inline-flex animate-in items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[12px] font-bold text-emerald-600 zoom-in-95">
                       <Check className="h-3 w-3" />
                       {appliedCoupon.percentOff
                         ? `${appliedCoupon.percentOff}% off applied to future payment`
-                        : `$${(appliedCoupon.amountOff! / 100).toFixed(2)} off applied to future payment`
-                      }
+                        : `$${(appliedCoupon.amountOff! / 100).toFixed(2)} off applied to future payment`}
                     </span>
                   )}
                 </>

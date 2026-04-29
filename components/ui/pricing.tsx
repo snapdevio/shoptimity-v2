@@ -170,10 +170,11 @@ export const PricingSectionModern = memo(
             return (
               <div key={plan.name} className="h-full">
                 <Card
-                  className={`relative h-full border border-neutral-200 ${plan.popular
-                    ? "bg-orange-50 shadow-lg ring-2 shadow-orange-100 ring-orange-500"
-                    : "bg-white"
-                    }`}
+                  className={`relative h-full border border-neutral-200 ${
+                    plan.popular
+                      ? "bg-orange-50 shadow-lg ring-2 shadow-orange-100 ring-orange-500"
+                      : "bg-white"
+                  }`}
                 >
                   {plan.planBadge && (
                     <div className="absolute -top-3 left-1/2 z-20 -translate-x-1/2">
@@ -188,17 +189,20 @@ export const PricingSectionModern = memo(
                         {plan.name} Plan
                       </h3>
                       {plan.badge && (
-                        <div className="flex flex-col items-end gap-2 shrink-0">
+                        <div className="flex shrink-0 flex-col items-end gap-2">
                           <span className="rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white md:px-3 md:py-1.5">
                             {plan.badge}
                           </span>
                         </div>
                       )}
-                      {billingCycle === "yearly" && plan.price > 0 && (plan.price * 12 - plan.yearlyPrice) > 0 && (
-                        <div className="shrink-0 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-bold text-emerald-600 uppercase tracking-wider">
-                          Save ${Math.round(plan.price * 12 - plan.yearlyPrice)}
-                        </div>
-                      )}
+                      {billingCycle === "yearly" &&
+                        plan.price > 0 &&
+                        plan.price * 12 - plan.yearlyPrice > 0 && (
+                          <div className="shrink-0 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-bold tracking-wider text-emerald-600 uppercase">
+                            Save $
+                            {Math.round(plan.price * 12 - plan.yearlyPrice)}
+                          </div>
+                        )}
                     </div>
 
                     <p className="mt-2 text-sm leading-relaxed text-gray-500 md:text-base">
@@ -206,8 +210,7 @@ export const PricingSectionModern = memo(
                     </p>
 
                     <div className="flex flex-col gap-1">
-                      <div className="flex items-baseline flex-wrap gap-1">
-
+                      <div className="flex flex-wrap items-baseline gap-1">
                         {plan.originalPrice !== undefined &&
                           plan.originalPrice > displayPrice && (
                             <span className="mr-2 text-xl font-medium text-neutral-400 line-through md:text-2xl">
@@ -246,7 +249,7 @@ export const PricingSectionModern = memo(
                       }
                       disabled={plan.isCurrent || !!loadingPlanName}
                       className={cn(
-                        "mb-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-orange-400 bg-linear-to-t from-orange-500 to-orange-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed sm:text-lg lg:text-xl whitespace-nowrap",
+                        "mb-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-orange-400 bg-linear-to-t from-orange-500 to-orange-600 px-4 py-3.5 text-base font-bold whitespace-nowrap text-white shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed sm:text-lg lg:text-xl",
                         isLoading && "opacity-90"
                       )}
                     >
