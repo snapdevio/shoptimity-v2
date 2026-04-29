@@ -4,7 +4,6 @@ import React from "react"
 import { ArrowRight } from "lucide-react"
 import Link from "next/link"
 import CTABadges from "../CTABadges"
-import { useBasePrice } from "@/hooks/use-base-price"
 
 interface ComparisonHeroProps {
   competitorName: string
@@ -19,8 +18,6 @@ const ComparisonHero: React.FC<ComparisonHeroProps> = ({
   subheadline,
   imageSrc,
 }) => {
-  const { trialDays } = useBasePrice()
-
   return (
     <section className="relative overflow-hidden bg-white py-10 sm:pt-16 sm:pb-20 md:py-28">
       {/* ClickUp-style subtle halo background */}
@@ -67,7 +64,7 @@ const ComparisonHero: React.FC<ComparisonHeroProps> = ({
                   <ArrowRight className="transition-transform group-hover:translate-x-1" />
                 </Link>
                 <div className="mx-auto mt-2">
-                  <CTABadges trialDays={trialDays} />
+                  <CTABadges />
                 </div>
               </div>
             </div>

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react"
 import { getActiveTemplates } from "@/actions/admin-templates"
-import { useBasePrice } from "@/hooks/use-base-price"
 import CTABadges from "./CTABadges"
 
 interface DemoItem {
@@ -68,7 +67,6 @@ const DemoCard: React.FC<DemoItem> = ({
 
 const ReadyDemos: React.FC<ReadyDemosProps> = () => {
   const [demos, setDemos] = useState<DemoItem[]>([])
-  const { basePrice, trialDays } = useBasePrice()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -158,10 +156,7 @@ const ReadyDemos: React.FC<ReadyDemosProps> = () => {
                 >
                   Get Shoptimity Now
                 </button>
-                <CTABadges
-                  trialDays={trialDays}
-                  className="items-center justify-center sm:justify-start"
-                />
+                <CTABadges className="items-center justify-center sm:justify-start" />
               </div>
               <img
                 className="w-[116px] sm:mt-4"

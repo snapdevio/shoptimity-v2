@@ -48,7 +48,7 @@ const problemSolutionData = [
     problem: "Expensive Monthly App Fees",
     solutionTitle: "All-In-One Solution",
     solutionDesc:
-      "Get 80+ sections and blocks built-in. Eliminate 10+ monthly app subscriptions and save hundreds every month.",
+      "Get 100+ sections and blocks built-in. Eliminate 10+ monthly app subscriptions and save hundreds every month.",
   },
   {
     problem: "No Pre-Lander Support",

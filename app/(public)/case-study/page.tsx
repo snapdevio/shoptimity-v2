@@ -140,13 +140,14 @@ export default function CaseStudiesPage() {
               <div className="mt-10 flex flex-wrap justify-center gap-4">
                 <Link
                   href="/plans"
-                  className="rounded-full bg-orange-600 px-8 py-4 font-semibold text-white transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-600/20"
+                  className="group flex items-center rounded-full bg-orange-600 px-8 py-4 font-semibold text-white transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-600/20"
                 >
-                  Start your free trial
+                  Get Shoptimity Now
+                  <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                 </Link>
                 <Link
                   href="/contact"
-                  className="rounded-full border border-gray-300 bg-white px-8 py-4 font-semibold text-gray-950 transition-all hover:bg-gray-50"
+                  className="flex items-center rounded-full border border-gray-300 bg-white px-8 py-4 font-semibold text-gray-950 transition-all hover:bg-gray-50"
                 >
                   Contact Us
                 </Link>

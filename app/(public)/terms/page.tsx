@@ -61,8 +61,8 @@ export default function TermsPage() {
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-6 text-muted-foreground">
               <li>
-                Each license slot may be assigned to one Shopify store domain at
-                a time.
+                The license can be assigned to one Shopify store domain at a
+                time.
               </li>
               <li>
                 Licenses are valid for the duration of your active subscription

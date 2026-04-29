@@ -1,6 +1,5 @@
 "use client"
 import React from "react"
-import { useBasePrice } from "@/hooks/use-base-price"
 import CTABadges from "./CTABadges"
 
 import {
@@ -22,7 +21,6 @@ interface Widget {
 }
 
 const WidgetsMarquee: React.FC = () => {
-  const { basePrice, trialDays } = useBasePrice()
   const row1: Widget[] = [
     {
       title: "Swatches",
@@ -118,10 +116,7 @@ const WidgetsMarquee: React.FC = () => {
           >
             Get Shoptimity Now
           </button>
-          <CTABadges
-            trialDays={trialDays}
-            className="items-center justify-center"
-          />
+          <CTABadges className="items-center justify-center" />
         </div>
       </div>
     </section>

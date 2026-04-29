@@ -39,7 +39,7 @@ export default function Loading() {
                 <div className="h-5 w-24 animate-pulse rounded bg-orange-100" />
               </div>
               {/* Image */}
-              <div className="aspect-[4/3] w-full animate-pulse bg-gray-100 lg:w-1/2" />
+              <div className="aspect-4/3 w-full animate-pulse bg-gray-100 lg:w-1/2" />
             </div>
 
             {/* Regular Posts Grid Skeleton */}

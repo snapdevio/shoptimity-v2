@@ -15,7 +15,7 @@ export default async function BlogPage({
   const currentPage = parseInt(params.page || "1")
   const POSTS_PER_PAGE = 13
 
-  const articles = await getShopifyArticles("theme")
+  const articles = await getShopifyArticles("shoptimity-vtwo")
 
   const allPosts =
     articles.length > 0

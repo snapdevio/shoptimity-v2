@@ -11,12 +11,12 @@ export default async function BlogDetailPage({
 }) {
   const { slug } = await params
   // Try app blog first, then fallback to theme blog
-  let article = await getShopifyArticleBySlug(slug, "app")
-  let section: "theme" | "app" = "app"
+  let article = await getShopifyArticleBySlug(slug, "shoptimity-vtwo")
+  let section: "shoptimity-vtwo" | "app" = "shoptimity-vtwo"
 
   if (!article) {
-    article = await getShopifyArticleBySlug(slug, "theme")
-    section = "theme"
+    article = await getShopifyArticleBySlug(slug, "app")
+    section = "app"
   }
 
   if (!article) {

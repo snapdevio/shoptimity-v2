@@ -120,39 +120,31 @@ Every detail was crafted to create confidence for pet owners—and make shopping
     • Showcased natural ingredients and wellness benefits with engaging visuals.
     • Simplified product details to highlight key nutritional advantages.
     • Added usage recommendations and feeding guides for easy reference.
-
-
-
 Every element was designed to help pet owners feel confident in every choice.
 
 2. Homepage Structure
     • Designed a refreshed homepage that highlights natural ingredients and health benefits.
     • Featured best sellers and new collections prominently.
     • Removed distractions to keep the focus on health and trust.
-
     ![Pet Product Layout](/assets/pet-web.webp)
-
 The result is a first impression that feels warm, reliable, and easy to connect with.
 
 3. Mobile Optimization
     • Optimized layouts for smooth mobile browsing.
     • Streamlined navigation for faster product discovery.
     • Faster loading to keep pages snappy and responsive.
-
 The mobile journey became fast, intuitive, and effortless.
 
 4. Flexible Page Creation
     • Added new collections and seasonal pages quickly and easily.
     • Maintained a consistent, premium feel across all pages.
     • Reduced dependence on developers for routine updates.
-
 This made it simple to grow and adapt the store over time.
 
 5. Performance & Support
     • Improved stability for a seamless shopping experience.
     • Ensured consistency across devices and browsers.
     • Offered continuous support for ongoing improvements.
-
 The store now delivers a smooth, trusted, and seamless shopping experience.`,
     results: [
       "5x increase in overall online orders",
@@ -227,12 +219,12 @@ This made it easy to evolve the brand while staying visually consistent.
 The store now delivers a smooth, reliable, and premium experience at every touchpoint.`,
     results: [
       "300% increase in international sales",
-      "Support for 15+ local currencies",
+      "25% increase in cart conversion",
       "Significant drop in international cart abandonment",
     ],
     stats: [
       { value: "300%", label: "Global Sales", color: "text-emerald-500" },
-      { value: "15+", label: "Currencies", color: "text-orange-500" },
+      { value: "25%", label: "Cart Conversion", color: "text-orange-500" },
       { value: "-45%", label: "Cart Abandonment", color: "text-blue-600" },
     ],
     testimonial:

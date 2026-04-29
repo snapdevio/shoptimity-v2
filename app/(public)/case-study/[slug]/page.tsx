@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, CheckCircle2, Quote } from "lucide-react"
+import { ArrowLeft, ArrowRight, CheckCircle2, Quote } from "lucide-react"
 import { caseStudies } from "../data"
 import { formatTypography } from "@/lib/typography"
 import { Badge } from "@/components/ui/badge"
@@ -92,7 +92,7 @@ export default async function CaseStudyPage({
             >
               {study.category}
             </Badge>
-            <span>Client: {study.client}</span>
+            {/* <span>Client: {study.client}</span> */}
           </div>
 
           <h1 className="mt-6 font-heading text-3xl font-medium tracking-tight text-black sm:text-4xl lg:text-5xl dark:text-white">
@@ -125,7 +125,7 @@ export default async function CaseStudyPage({
             </section>
 
             {/* Testimonial block */}
-            <blockquote className="relative my-12 rounded-3xl bg-muted/50 p-8 sm:p-10">
+            {/* <blockquote className="relative my-12 rounded-3xl bg-muted/50 p-8 sm:p-10">
               <Quote className="absolute top-8 right-8 h-12 w-12 text-primary/20" />
               <p className="relative z-10 text-xl leading-relaxed font-medium text-foreground italic sm:text-2xl">
                 "{study.testimonial}"
@@ -133,7 +133,7 @@ export default async function CaseStudyPage({
               <footer className="mt-6 font-semibold text-primary">
                 — {study.testimonialAuthor}
               </footer>
-            </blockquote>
+            </blockquote> */}
           </div>
 
           {/* Sidebar (Results) */}
@@ -170,13 +170,14 @@ export default async function CaseStudyPage({
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link
               href="/plans"
-              className="rounded-full bg-orange-600 px-8 py-4 font-semibold text-white transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-600/20"
+              className="group flex items-center rounded-full bg-orange-600 px-8 py-4 font-semibold text-white transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-600/20"
             >
-              Start your free trial
+              Get Shoptimity Now
+              <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
             <Link
               href="/contact"
-              className="rounded-full border border-gray-300 bg-white px-8 py-4 font-semibold text-gray-950 transition-all hover:bg-gray-50"
+              className="flex items-center rounded-full border border-gray-300 bg-white px-8 py-4 font-semibold text-gray-950 transition-all hover:bg-gray-50"
             >
               Contact Us
             </Link>

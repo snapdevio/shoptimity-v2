@@ -10,9 +10,9 @@ export default async function BlogDetailPage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  // Try theme blog first, then fallback to app blog
-  let article = await getShopifyArticleBySlug(slug, "theme")
-  let section: "theme" | "app" = "theme"
+  // Try shoptimity-vtwo blog first, then fallback to app blog
+  let article = await getShopifyArticleBySlug(slug, "shoptimity-vtwo")
+  let section: "shoptimity-vtwo" | "app" = "shoptimity-vtwo"
 
   if (!article) {
     article = await getShopifyArticleBySlug(slug, "app")
