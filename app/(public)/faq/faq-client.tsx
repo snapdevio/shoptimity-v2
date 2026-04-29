@@ -31,7 +31,7 @@ const FAQItem: React.FC<FAQItemProps> = ({
     <div className="faq-item overflow-hidden rounded-2xl border border-border bg-base-300 transition-all duration-300 hover:shadow-lg">
       <button
         onClick={onToggle}
-        className="group flex w-full items-center justify-between p-6 text-left focus:outline-none md:p-8"
+        className="group flex w-full cursor-pointer items-center justify-between p-6 text-left focus:outline-none md:p-8"
       >
         <span
           className={`font-sans text-[16px] font-medium text-base-content transition-colors duration-300 md:text-xl ${
@@ -90,7 +90,7 @@ export function FAQClient() {
         {
           question: "How does Shoptimity help me eliminate monthly app costs?",
           answer:
-            "Shoptimity is engineered with over 80+ built-in blocks and conversion features—like countdown timers, sticky add-to-cart, and product swatches—that normally require ten or more separate apps. Instead of paying multiple recurring subscriptions, Shoptimity provides everything in one streamlined platform, saving you hundreds of dollars each month and significantly improving your loading speed.",
+            "Shoptimity is engineered with over 100+ built-in blocks and conversion features—like countdown timers, sticky add-to-cart, and product swatches—that normally require ten or more separate apps. Instead of paying multiple recurring subscriptions, Shoptimity provides everything in one streamlined platform, saving you hundreds of dollars each month and significantly improving your loading speed.",
         },
       ],
     },
@@ -100,7 +100,7 @@ export function FAQClient() {
         {
           question: "Can I use Shoptimity on multiple stores?",
           answer:
-            "Each license is valid for one Shopify store only. Both our Free and Pro plans include 1 license slot. If you want to use Shoptimity on additional stores, you can easily purchase or upgrade to add more license slots.",
+            "Each license is valid for one Shopify store only. Both our Free and Pro plans include 1 license slot per account. If you want to use Shoptimity on additional stores, you’ll need to create a separate account for each store and purchase a license accordingly.",
         },
         {
           question: "Does the theme include updates?",
@@ -117,9 +117,8 @@ export function FAQClient() {
               </div>
 
               <div>
-                <strong>Free Plan:</strong> Includes access to our help
-                resources and email support for setup guidance, feature usage,
-                and basic troubleshooting.
+                <strong>Free Plan:</strong> Includes email support for setup
+                guidance, feature usage, and basic troubleshooting.
               </div>
 
               <div>
@@ -148,7 +147,7 @@ export function FAQClient() {
         {
           question: "How do I cancel my subscription?",
           answer:
-            "You can cancel your subscription at any time directly through your Shoptimity dashboard. Simply navigate to the Licenses page, locate the subscription you wish to cancel, and click the Manage Subscription button. Access to premium features will remain active until the end of your current billing period.",
+            "You can cancel your subscription at any time directly through your Shoptimity dashboard. Simply navigate to the Billing page and click the Cancel Plan button. Access to premium features will remain active until the end of your current billing period.",
         },
         {
           question:

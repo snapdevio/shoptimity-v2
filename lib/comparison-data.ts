@@ -126,7 +126,7 @@ export const comparisonData: Record<string, CompetitorData> = {
       {
         category: "TEMPLATES & DESIGN",
         name: "Niche Templates",
-        shoptimity: "10+ Industry-Specific",
+        shoptimity: "10 Industry-Specific",
         competitor: "Limited / Generic",
         description:
           "Shoptimity provides layouts custom-built for fashion, beauty, home, and more.",
@@ -159,11 +159,11 @@ export const comparisonData: Record<string, CompetitorData> = {
     pros: [
       "All features in one subscription",
       "Superior mobile conversion rate",
-      "All templates included for free",
-      "Native advertorial builders",
+      "Fully customizable sections and layouts",
+      "No third-party apps required",
     ],
     cons: [
-      "Key features locked behind 'Pro' tier",
+      "Key features locked behind Paid tiers",
       "Less diversity in niche designs",
       "Requires extra app subscriptions",
     ],
@@ -171,7 +171,7 @@ export const comparisonData: Record<string, CompetitorData> = {
       {
         title: "Performance That Doesn't Cut Corners",
         description:
-          "While Shrine focuses on minimalism, Shoptimity focuses on Conversion. We don't just make your site fast; we make it sell. Our Pro plan includes advanced features that Shrine locks behind their 'Pro' tier.",
+          "While Shrine focuses on minimalism, Shoptimity focuses on Conversion. We don't just make your site fast; we make it sell. Our Pro plan includes advanced features that Shrine locks behind their paid tiers.",
         imageSrc:
           "https://license.shoptimity.com/assets/comparisons/shrine-x-shoptimity-1.webp",
       },
@@ -209,7 +209,7 @@ export const comparisonData: Record<string, CompetitorData> = {
         shoptimity: "Fast (1-Click Demos)",
         competitor: "Complex (Steep Curve)",
         description:
-          "Shoptimity's pre-built niche templates get you live in hours, not days.",
+          "Shoptimity's pre-built niche templates get you live in minutes, not days.",
       },
       {
         category: "CONVERSION & APPS",
@@ -217,7 +217,7 @@ export const comparisonData: Record<string, CompetitorData> = {
         shoptimity: "20+ Built-in Tools",
         competitor: "Standard Elements",
         description:
-          "Everything from sticky charts to countdowns is included and tested for speed.",
+          "Everything from sticky carts to countdowns is included and tested for speed.",
       },
       {
         category: "PERFORMANCE & SUPPORT",
@@ -231,7 +231,7 @@ export const comparisonData: Record<string, CompetitorData> = {
         category: "PERFORMANCE & SUPPORT",
         name: "Updates & Community",
         shoptimity: "Ongoing Updates",
-        competitor: "Standard Support",
+        competitor: "Less Frequent Updates",
         description: "Access our active community of 1,000+ brand owners.",
       },
     ],
@@ -296,7 +296,7 @@ export const comparisonData: Record<string, CompetitorData> = {
         shoptimity: "20+ Built-in Tools",
         competitor: "Standard Elements",
         description:
-          "Everything from sticky charts to countdowns is included and tested for speed.",
+          "Everything from sticky carts to countdowns is included and tested for speed.",
       },
       {
         category: "PERFORMANCE & SUPPORT",
@@ -308,11 +308,11 @@ export const comparisonData: Record<string, CompetitorData> = {
       },
       {
         category: "PERFORMANCE & SUPPORT",
-        name: "Developer Resources",
-        shoptimity: "Extensive Documentation",
-        competitor: "Standard Docs",
+        name: "Speed & Performance",
+        shoptimity: "Built for Speed",
+        competitor: "Standard Theme",
         description:
-          "Empower your team with comprehensive guides, videos, and a thriving community.",
+          "Every pixel is optimized for speed and conversion. Ecomelevate's multipurpose nature can lead to slower mobile performance.",
       },
     ],
     pros: [
@@ -322,7 +322,7 @@ export const comparisonData: Record<string, CompetitorData> = {
       "Comprehensive resources and support",
     ],
     cons: [
-      "Competitor requires third-party apps for basic logic",
+      "Requires third-party apps for basic logic",
       "Less flexible design structure",
       "Basic upselling capabilities",
     ],
@@ -386,6 +386,14 @@ export const comparisonData: Record<string, CompetitorData> = {
         description:
           "Shoptimity is designed strictly mobile-first to capture the modern shopping audience.",
       },
+      {
+        category: "CORE FEATURES",
+        name: "Theme Updates",
+        shoptimity: "Ongoing Updates",
+        competitor: "Less Frequent Updates",
+        description:
+          "Shoptimity receives ongoing updates with new features and improvements, while Prestige is updated less frequently.",
+      },
     ],
     pros: [
       "Maintains premium brand aesthetics",
@@ -394,7 +402,7 @@ export const comparisonData: Record<string, CompetitorData> = {
       "Mobile-first conversion design",
     ],
     cons: [
-      "Competitor requires apps for basic conversions",
+      "Requires apps for basic conversions",
       "Prestige lacks built-in direct response features",
       "Slower iteration for landing pages",
     ],

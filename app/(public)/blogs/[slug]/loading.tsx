@@ -4,15 +4,15 @@ export default function Loading() {
       {/* Header Skeleton */}
       <header className="relative overflow-hidden pt-16 pb-10 md:pt-24">
         {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-pink-50/30 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-br from-orange-50/50 via-pink-50/30 to-transparent" />
 
         <div className="relative container mx-auto max-w-6xl px-4">
           <div className="mb-8 h-10 w-40 animate-pulse rounded-full border border-orange-200 bg-slate-50" />
 
           {/* Tags & Meta Skeleton */}
           <div className="mb-6 flex flex-wrap items-center gap-3">
-            <div className="h-7 w-24 animate-pulse rounded-full bg-gradient-to-r from-orange-200 to-pink-200" />
-            <div className="h-7 w-20 animate-pulse rounded-full bg-gradient-to-r from-orange-200 to-pink-200" />
+            <div className="h-7 w-24 animate-pulse rounded-full bg-linear-to-r from-orange-200 to-pink-200" />
+            <div className="h-7 w-20 animate-pulse rounded-full bg-linear-to-r from-orange-200 to-pink-200" />
             <div className="hidden h-4 w-px bg-gray-200 sm:inline" />
             <div className="h-5 w-32 animate-pulse rounded bg-gray-100" />
             <div className="hidden h-4 w-px bg-gray-200 sm:inline" />
@@ -78,7 +78,7 @@ export default function Loading() {
 
           {/* View All Button Skeleton */}
           <div className="mt-14 flex justify-center">
-            <div className="h-14 w-48 animate-pulse rounded-full bg-gradient-to-r from-orange-200 to-pink-200" />
+            <div className="h-14 w-48 animate-pulse rounded-full bg-linear-to-r from-orange-200 to-pink-200" />
           </div>
         </div>
       </section>

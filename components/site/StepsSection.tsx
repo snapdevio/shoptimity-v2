@@ -31,7 +31,7 @@ const StepsSection: React.FC = () => {
     {
       id: "03",
       title: "Split Test & Scale",
-      desc: "Run ads and split test with our stack of 80+ blocks and sections!",
+      desc: "Run ads and split test with our stack of 100+ blocks and sections!",
       video: "/assets/store-to-brand-step-three.mp4",
       bg: "bg-[#FFF8F2]",
       iconColor: "text-[#FF602E]",

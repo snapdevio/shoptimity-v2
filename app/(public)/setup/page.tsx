@@ -28,7 +28,7 @@ const steps = [
     icon: CreditCard,
     title: "Choose a Plan",
     description:
-      "Browse our curated collection of premium plans. Whether you're a single-store owner or a multi-store merchant, we have a license tier that fits your scale. Each plan comes with a set number of domain activation slots.",
+      "Browse our premium plan designed for focused growth. Each account includes a single license slot, which can be used for one Shopify store domain at a time. This ensures optimal performance and dedicated usage for your store.",
     image: "/assets/setup/step-1.png",
   },
   {
@@ -42,14 +42,14 @@ const steps = [
     icon: LogIn,
     title: "Access Your Dashboard",
     description:
-      "Check your inbox for a secure magic link. No passwords to remember — just one click to enter your management dashboard, where you can control all your theme licenses and assets.",
+      "Sign in using Google, Microsoft, or your email and password. Once logged in, you can manage your theme licenses and assets from a single dashboard.",
     image: "/assets/setup/step-3.png",
   },
   {
     icon: Globe,
     title: "Add Your Store Domains",
     description:
-      "Enter the Shopify .myshopify.com domains for the stores you wish to license. Our system will automatically assign a license slot to each domain for immediate activation.",
+      "Enter your Shopify .myshopify.com domain to assign your license. Each account supports one active domain per license slot.",
     image: "/assets/setup/step-4.png",
   },
   {

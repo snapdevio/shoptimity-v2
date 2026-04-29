@@ -3,7 +3,11 @@
 import React from "react"
 
 const LandingPageTicker: React.FC = () => {
-  const baseItems = ["Try Shoptimity Free Now", "No Hidden Charges"]
+  const baseItems = [
+    "Try Shoptimity Free Now",
+    "3 Days Free Trial",
+    "No Hidden Charges",
+  ]
   const items = Array(8).fill(baseItems).flat()
 
   const scrollToPricing = () => {

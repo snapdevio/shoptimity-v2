@@ -102,7 +102,7 @@ const FAQ: React.FC = () => {
     {
       question: "How does Shoptimity help me eliminate monthly app costs?",
       answer:
-        "Shoptimity includes 80+ built-in blocks and conversion features that normally require ten or more separate apps. Instead of paying multiple recurring subscriptions, Shoptimity provides everything in one streamlined platform, saving you hundreds of dollars each month and improving speed.",
+        "Shoptimity includes 100+ built-in blocks and conversion features that normally require ten or more separate apps. Instead of paying multiple recurring subscriptions, Shoptimity provides everything in one streamlined platform, saving you hundreds of dollars each month and improving speed.",
     },
     {
       question: "What kind of support is included?",

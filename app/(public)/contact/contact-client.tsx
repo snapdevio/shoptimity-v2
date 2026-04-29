@@ -390,12 +390,12 @@ export function ContactClient() {
                   </li>
                   <li>
                     <strong className="text-foreground">
-                      Can I use Shoptimity on multiple stores?
+                      Why Choose Shoptimity?
                     </strong>
                     <br />
-                    This depends on the license you purchase. Each standard
-                    license is valid for a single Shopify store, with bundles
-                    available for multiple brands.
+                    Shoptimity helps eliminating the need for external monthly
+                    subscription apps. Our solution saves users thousands of
+                    dollars annually.
                   </li>
                 </ul>
               </CardContent>

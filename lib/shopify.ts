@@ -35,7 +35,7 @@ const SHOPIFY_GRAPHQL_URL = `https://${process.env.SHOPIFY_STORE_URL}/admin/api/
 const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN
 
 // Blog handle filters for different sections
-const THEME_HANDLES = ["theme"] // Theme blogs
+const THEME_HANDLES = ["shoptimity-vtwo"] // Theme blogs
 const APP_HANDLES = ["app"] // App blogs
 
 const BLOGS_QUERY = `
@@ -71,8 +71,8 @@ const BLOGS_QUERY = `
 `
 
 const ARTICLE_BY_HANDLE_QUERY = `
-  query GetArticleByHandle($handle: String!) {
-    articles(first: 1, query: $handle) {
+  query GetArticleByHandle($query: String!) {
+    articles(first: 1, query: $query) {
       edges {
         node {
           handle
@@ -93,13 +93,16 @@ const ARTICLE_BY_HANDLE_QUERY = `
   }
 `
 
-export async function getShopifyArticles(section: "theme" | "app" = "theme") {
+export async function getShopifyArticles(
+  section: "shoptimity-vtwo" | "app" = "shoptimity-vtwo"
+) {
   if (!process.env.SHOPIFY_STORE_URL || !process.env.SHOPIFY_ACCESS_TOKEN) {
     console.warn("Shopify credentials missing. Falling back to empty array.")
     return []
   }
 
-  const allowedHandles = section === "theme" ? THEME_HANDLES : APP_HANDLES
+  const allowedHandles =
+    section === "shoptimity-vtwo" ? THEME_HANDLES : APP_HANDLES
 
   try {
     const response = await fetch(SHOPIFY_GRAPHQL_URL, {
@@ -165,7 +168,7 @@ export async function getShopifyArticles(section: "theme" | "app" = "theme") {
 
 export async function getShopifyArticleBySlug(
   slug: string,
-  section: "theme" | "app" = "theme"
+  section: "shoptimity-vtwo" | "app" = "shoptimity-vtwo"
 ) {
   if (!process.env.SHOPIFY_STORE_URL || !process.env.SHOPIFY_ACCESS_TOKEN) {
     console.warn("Shopify credentials missing.")
@@ -173,9 +176,21 @@ export async function getShopifyArticleBySlug(
   }
 
   // Select blog handles based on section
-  const allowedHandles = section === "theme" ? THEME_HANDLES : APP_HANDLES
+  const allowedHandles =
+    section === "shoptimity-vtwo" ? THEME_HANDLES : APP_HANDLES
 
   try {
+    // 1. Try to find the article in the already fetched articles for this section
+    // This is very reliable because it uses the same data as the listing page
+    const articles = await getShopifyArticles(section)
+    const foundArticle = articles.find((a) => a.handle === slug)
+
+    if (foundArticle) {
+      return foundArticle
+    }
+
+    // 2. Fallback: Search for the article specifically if not found in the first 50
+    // Use quotes to ensure exact handle match
     const response = await fetch(SHOPIFY_GRAPHQL_URL, {
       method: "POST",
       headers: {
@@ -184,7 +199,7 @@ export async function getShopifyArticleBySlug(
       },
       body: JSON.stringify({
         query: ARTICLE_BY_HANDLE_QUERY,
-        variables: { handle: `handle:${slug}` },
+        variables: { query: `handle:"${slug}"` },
       }),
       next: { revalidate: 3600 },
     })
