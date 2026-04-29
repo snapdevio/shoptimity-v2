@@ -5,6 +5,7 @@ import { licenses, plans } from "@/db/schema"
 import { and, eq, or } from "drizzle-orm"
 import { CancelClient } from "./cancel-client"
 import { getSettings } from "@/actions/admin-settings"
+import { getStripe, resolveCouponDetails } from "@/lib/stripe"
 
 export default async function CancelPlanPage() {
   const session = await getAppSession()
@@ -60,18 +61,69 @@ export default async function CancelPlanPage() {
 
   const plan = activeLicense.plan
 
-  // Use plan-specific settings only
-  const discountPercent =
+  const couponCode =
+    activeLicense.billingCycle === "yearly"
+      ? plan?.yearlyCancelCouponCode
+      : plan?.monthlyCancelCouponCode
+
+  // Stripe's coupon is the source of truth for what will actually be applied.
+  // The plan record's `monthlyCancelDiscount` / `yearlyCancelDiscount` and
+  // `*CancelDuration` columns can drift from the coupon's real terms (e.g.
+  // admin saved 50% on the plan but linked a 30%-off coupon in Stripe). If
+  // we promised the DB number on the offer screen, the user would later see
+  // the smaller Stripe-applied discount on /billing and feel cheated. So we
+  // resolve the coupon up front and use ITS percent_off / duration_in_months
+  // for everything the user sees, falling back to the DB plan only when the
+  // coupon can't be looked up.
+  const stripe = getStripe()
+  const couponDetails = await resolveCouponDetails(stripe, couponCode)
+
+  const planDiscountPercent =
     activeLicense.billingCycle === "yearly"
       ? (plan?.yearlyCancelDiscount ?? 0)
       : (plan?.monthlyCancelDiscount ?? 0)
 
-  const discountDuration =
+  const planDiscountDuration =
     activeLicense.billingCycle === "yearly"
       ? (plan?.yearlyCancelDuration ?? 1)
       : (plan?.monthlyCancelDuration ?? 3)
 
+  const discountPercent =
+    couponDetails?.percentOff != null
+      ? Math.round(couponDetails.percentOff)
+      : planDiscountPercent
+
+  // Coupon `duration_in_months` is always in months. Convert to the cycle
+  // unit the offer copy uses (`years` for yearly billing, `months` for
+  // monthly). `forever` and `once` coupons don't carry a month count, so
+  // we approximate from the plan's stored duration in those cases.
+  let discountDuration = planDiscountDuration
+  if (couponDetails) {
+    if (couponDetails.durationType === "repeating" && couponDetails.durationInMonths) {
+      discountDuration =
+        activeLicense.billingCycle === "yearly"
+          ? Math.max(1, Math.ceil(couponDetails.durationInMonths / 12))
+          : couponDetails.durationInMonths
+    } else if (couponDetails.durationType === "once") {
+      discountDuration = 1
+    }
+    // `forever` keeps the plan's value (UI also reads durationType to render
+    // "every renewal" copy when needed; a numeric value is still required
+    // by the existing client interface).
+  }
+
+  // Retention offer is only meaningful for real Stripe subscriptions
+  // (`sub_*`). Trial licenses store a `pm_*` / `seti_*` placeholder in
+  // stripeSubscriptionId until the metadata-worker converts them — calling
+  // `stripe.subscriptions.update(pm_…)` would 404, and there's no recurring
+  // charge to discount yet anyway. Trial users still see the cancel-reasons
+  // step; they just skip the "stay for X% off" offer.
+  const hasRealSubscription =
+    !!activeLicense.stripeSubscriptionId &&
+    activeLicense.stripeSubscriptionId.startsWith("sub_")
+
   const showDiscountOffer =
+    hasRealSubscription &&
     plan?.cancelApplyDiscount &&
     !activeLicense.retentionDiscountUsed &&
     discountPercent > 0
@@ -84,11 +136,6 @@ export default async function CancelPlanPage() {
   if (activeLicense.billingCycle === "yearly" && plan?.mode === "monthly") {
     price = price * 12
   }
-
-  const couponCode =
-    activeLicense.billingCycle === "yearly"
-      ? plan?.yearlyCancelCouponCode
-      : plan?.monthlyCancelCouponCode
 
   return (
     <CancelClient

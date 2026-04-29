@@ -58,7 +58,7 @@ export default async function TemplatesPage() {
 
       {!hasActiveLicense && (
         <Card className="relative overflow-hidden border-orange-200 bg-orange-50/50 dark:border-orange-950/20 dark:bg-orange-950/10">
-          <div className="pointer-events-none absolute top-0 right-0 h-32 w-32 translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-200/20 blur-[40px] dark:bg-orange-500/10" />
+          <div className="pointer-events-none absolute top-0 right-0 h-32 w-32 translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-200/20 blur-2xl dark:bg-orange-500/10" />
           <div className="flex flex-col items-center gap-4 px-6 sm:flex-row sm:justify-between">
             <div className="flex items-center gap-4">
               <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-orange-100 ring-1 ring-orange-200 dark:bg-orange-500/10 dark:ring-orange-500/20">
@@ -78,7 +78,7 @@ export default async function TemplatesPage() {
               href="/plans"
               className={cn(
                 buttonVariants({ size: "sm" }),
-                "bg-orange-600 text-white hover:bg-orange-700 sm:w-auto"
+                "cursor-pointer bg-orange-600 text-white hover:bg-orange-700 sm:w-auto"
               )}
             >
               Unlock Access &rarr;

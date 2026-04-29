@@ -17,6 +17,7 @@ interface PricingClientProps {
   activePlanMode?: string
   activeBillingCycle?: string
   hasStripeSubscription?: boolean
+  hasUsedTrial?: boolean
 }
 
 function FeatureRow({
@@ -88,6 +89,7 @@ export function PlansClient({
   activePlanMode,
   activeBillingCycle,
   hasStripeSubscription = false,
+  hasUsedTrial = false,
 }: PricingClientProps) {
   const router = useRouter()
   const [billingCycle, setBillingCycle] = useState<
@@ -472,6 +474,7 @@ export function PlansClient({
         availableCycles={availableCycles}
         maxYearlyDiscount={maxYearlyDiscount}
         loadingPlanName={loadingPlanName}
+        hasUsedTrial={hasUsedTrial}
       />
 
       <div className="mx-auto max-w-6xl px-4 py-10 md:py-16">

@@ -148,7 +148,7 @@ const ConversionFeatures: React.FC<ConversionFeaturesProps> = ({
         </div>
 
         {/* Right Content: Floating Mockups */}
-        <div className="relative hidden min-h-[500px] w-full lg:block lg:w-1/2">
+        <div className="relative hidden min-h-125 w-full lg:block lg:w-1/2">
           <div className="pointer-events-none absolute top-1/2 left-1/2 h-full w-full -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-500/20 blur-[130px]"></div>
 
           <div className="relative flex h-full w-full max-w-[600px] items-center justify-center pt-12">

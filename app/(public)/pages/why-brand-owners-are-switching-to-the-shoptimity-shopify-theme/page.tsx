@@ -479,12 +479,12 @@ const LandingPage = () => {
             <div className="animate-row-left flex whitespace-nowrap">
               <img
                 src="/assets/universal-layout.webp"
-                className="h-[400px] w-auto max-w-none md:h-[600px]"
+                className="h-100 w-auto max-w-none md:h-150"
                 alt="Store Layouts Showcase"
               />
               <img
                 src="/assets/universal-layout.webp"
-                className="h-[400px] w-auto max-w-none md:h-[600px]"
+                className="h-100 w-auto max-w-none md:h-150"
                 alt="Store Layouts Showcase"
                 aria-hidden="true"
               />

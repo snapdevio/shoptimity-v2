@@ -37,3 +37,22 @@ export function formatDateRelative(date: Date | string | number) {
   if (isNaN(d.getTime())) return "Invalid Date"
   return formatDistanceToNow(d, { addSuffix: true })
 }
+
+/**
+ * Calendar-day remaining count to a future date, used for trial end labels.
+ * Compares date-only (local midnight) so "tomorrow" reads as 1 day even if
+ * the timestamp is a few hours away.
+ */
+export function formatDaysRemaining(date: Date | string | number) {
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return "Invalid Date"
+
+  const startOfDay = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const days = Math.ceil((startOfDay(d) - startOfDay(new Date())) / 86400000)
+
+  if (days < 0) return "Ended"
+  if (days === 0) return "Ends today"
+  if (days === 1) return "1 day left"
+  return `Ends ${days} days left`
+}

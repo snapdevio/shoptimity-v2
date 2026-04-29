@@ -31,6 +31,7 @@ const nextConfig = {
     "127.0.0.1:3000",
     "*.ngrok-free.dev",
     "*.ngrok.io",
+    "*.shopify.xx.kg"
   ],
 
   images: {

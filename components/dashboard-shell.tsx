@@ -68,12 +68,12 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 border-b bg-base-100/90 px-4 py-4 backdrop-blur-md sm:px-6 md:px-10 lg:px-[100px]">
+      <header className="sticky top-0 z-50 border-b bg-base-100/90 px-4 py-4 backdrop-blur-md sm:px-6 md:px-10 lg:px-25">
         <div className="relative mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-10">
             <Link
               href="/"
-              className="flex items-center gap-2 transition-opacity hover:opacity-80"
+              className="flex cursor-pointer items-center gap-2 transition-opacity hover:opacity-80"
             >
               <img
                 src={`${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT || ""}/assets/logo.svg`}
@@ -91,7 +91,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                   key={tab.href}
                   href={tab.href}
                   className={cn(
-                    "flex items-center rounded-md px-4 py-2 text-sm font-medium transition-all hover:bg-muted/50",
+                    "flex cursor-pointer items-center rounded-md px-4 py-2 text-sm font-medium transition-all hover:bg-muted/50",
                     isActive
                       ? "bg-muted text-primary"
                       : "text-muted-foreground hover:text-foreground"
@@ -175,7 +175,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
             <Drawer.Root direction="right">
               <Drawer.Trigger asChild className="md:hidden">
                 <button
-                  className="p-1 text-base-content-muted hover:text-base-content focus:outline-none sm:p-2"
+                  className="cursor-pointer p-1 text-base-content-muted hover:text-base-content focus:outline-none sm:p-2"
                   aria-label="Open Menu"
                 >
                   <Menu className="h-6 w-6" />
@@ -196,7 +196,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                       <Drawer.Close asChild>
                         <Link
                           href="/"
-                          className="flex items-center gap-2 transition-opacity hover:opacity-80"
+                          className="flex cursor-pointer items-center gap-2 transition-opacity hover:opacity-80"
                         >
                           <img
                             src={`${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT || ""}/assets/logo.svg`}
@@ -206,7 +206,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                         </Link>
                       </Drawer.Close>
                       <Drawer.Close asChild>
-                        <button className="rounded-full p-2 text-base-content-muted transition-colors hover:bg-base-200 hover:text-base-content">
+                        <button className="cursor-pointer rounded-full p-2 text-base-content-muted transition-colors hover:bg-base-200 hover:text-base-content">
                           <X className="h-6 w-6" />
                         </button>
                       </Drawer.Close>
@@ -218,7 +218,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                           <Link
                             href={tab.href}
                             className={cn(
-                              "border-b border-base-100 pb-4 text-xl font-medium transition-colors",
+                              "cursor-pointer border-b border-base-100 pb-4 text-xl font-medium transition-colors",
                               pathname.startsWith(tab.href)
                                 ? "text-primary"
                                 : "text-base-content-muted hover:text-primary"
@@ -240,7 +240,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                     <div className="mt-auto border-t p-6">
                       <button
                         onClick={() => setShowMobileProfile(!showMobileProfile)}
-                        className="mb-4 flex w-full items-center justify-between rounded-lg p-2 transition-colors hover:bg-muted"
+                        className="mb-4 flex w-full cursor-pointer items-center justify-between rounded-lg p-2 transition-colors hover:bg-muted"
                       >
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10 border">
@@ -270,7 +270,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                           <Drawer.Close asChild>
                             <Link
                               href="/profile"
-                              className="flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted"
                             >
                               <UserIcon className="size-4 text-muted-foreground" />
                               Manage Profile
@@ -279,7 +279,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                           <Drawer.Close asChild>
                             <Link
                               href="/profile/change-password"
-                              className="flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted"
                             >
                               <LockIcon className="size-4 text-muted-foreground" />
                               Change Password
@@ -289,7 +289,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                             <Drawer.Close asChild>
                               <Link
                                 href="/admin"
-                                className="flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted"
                               >
                                 <ShieldIcon className="size-4 text-muted-foreground" />
                                 Admin
@@ -299,7 +299,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                           <Drawer.Close asChild>
                             <button
                               onClick={handleLogout}
-                              className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+                              className="mt-2 flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
                             >
                               <LogOutIcon className="size-4" />
                               Logout

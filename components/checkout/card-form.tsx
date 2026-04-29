@@ -114,7 +114,7 @@ export function CardForm({ clientSecret, onSuccess, onCancel }: CardFormProps) {
           type="button"
           onClick={handleSubmit}
           disabled={isProcessing || !stripe}
-          className="flex flex-1 items-center justify-center rounded-full bg-base-content py-2.5 text-[14px] font-bold text-white shadow-sm transition-all hover:bg-black active:scale-95 disabled:opacity-50"
+          className="flex flex-1 cursor-pointer items-center justify-center rounded-full bg-base-content py-2.5 text-[14px] font-bold text-white shadow-sm transition-all hover:bg-black active:scale-95 disabled:opacity-50"
         >
           {isProcessing ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -126,7 +126,7 @@ export function CardForm({ clientSecret, onSuccess, onCancel }: CardFormProps) {
           type="button"
           onClick={onCancel}
           disabled={isProcessing}
-          className="rounded-full border border-gray-200 bg-white px-6 py-2.5 text-[14px] font-bold text-gray-600 transition-all hover:bg-gray-50 active:scale-95 disabled:opacity-50"
+          className="cursor-pointer rounded-full border border-gray-200 bg-white px-6 py-2.5 text-[14px] font-bold text-gray-600 transition-all hover:bg-gray-50 active:scale-95 disabled:opacity-50"
         >
           Cancel
         </button>

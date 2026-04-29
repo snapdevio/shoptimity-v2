@@ -226,6 +226,8 @@ async function createCheckoutSession(props: {
     promoCode,
   } = props
 
+  console.log("[createCheckoutSession] Props:", JSON.stringify(props, null, 2))
+
   // Direct Check: Use all domains if they fit in 300 chars, otherwise fallback to first 3
   const domainsJson = domains ? JSON.stringify(domains) : ""
   const domainsMetadata =
@@ -242,9 +244,13 @@ async function createCheckoutSession(props: {
     is_yearly: isYearlyPlan ? "true" : "false",
     is_lifetime: plan.mode === "lifetime" ? "true" : "false",
     final_amount: String(finalAmount),
-    type: isTrial
-      ? "trial_setup"
-      : plan.mode === "monthly" || plan.mode === "yearly"
+    // Trials are real Stripe subscriptions in the new flow, so they
+    // route through the same `fulfillOrder` webhook path. Keeping
+    // `is_trial: "true"` is enough for the webhook to set trial state
+    // on the license — the legacy `trial_setup` type is only used for
+    // pre-existing setup-mode sessions still in flight.
+    type:
+      plan.mode === "monthly" || plan.mode === "yearly" || isTrial
         ? "subscription"
         : "lifetime_purchase",
     address_line1: address?.line1 || "",
@@ -262,6 +268,12 @@ async function createCheckoutSession(props: {
   // Resolve promo code to either promotion_code ID or coupon ID
   const discount = await resolvePromoCode(stripe, promoCode)
 
+  // Trial signups are now real Stripe subscriptions with
+  // `trial_period_days`, so the only difference between trial and paid
+  // is the trial-period setting. Both use mode=subscription. Setup-mode
+  // is gone — it left a `pm_*` placeholder that the rest of the app
+  // had to special-case (cancel, upgrade, retention discount all
+  // tripped on it).
   return await stripe.checkout.sessions.create({
     customer: stripeCustomerId || undefined,
     customer_email: stripeCustomerId ? undefined : userEmail || undefined,
@@ -269,73 +281,70 @@ async function createCheckoutSession(props: {
       ? { customer_creation: "always" }
       : {}),
     metadata,
-    ...(isTrial
+    ...(isSubscription || isTrial
       ? {
-          mode: "setup",
-          currency: plan.currency || "usd",
-          setup_intent_data: {
+          mode: "subscription",
+          line_items: [
+            {
+              price_data: {
+                currency: plan.currency || "usd",
+                product_data: {
+                  name: `${plan.name} (${isYearlyPlan ? "Yearly" : "Monthly"})`,
+                  description: `${isYearlyPlan ? "Yearly" : "Monthly"} subscription for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
+                },
+                unit_amount: finalAmount,
+                recurring: {
+                  interval: isYearlyPlan ? "year" : "month",
+                },
+              },
+              quantity: 1,
+            },
+          ],
+          subscription_data: {
             metadata,
+            ...(isTrial ? { trial_period_days: plan.trialDays } : {}),
+            ...(stripePaymentMethodId
+              ? { default_payment_method: stripePaymentMethodId }
+              : {}),
           },
-          custom_text: {
-            submit: {
-              message: `You're starting a ${plan.trialDays}-day free trial for the ${plan.name} plan. Your card will NOT be charged today. You will be automatically charged $${(finalAmount / 100).toFixed(2)} after ${plan.trialDays} days unless you cancel.`,
-            },
-          },
+          ...(discount
+            ? { discounts: [discount] }
+            : { allow_promotion_codes: true }),
+          ...(isTrial
+            ? {
+                custom_text: {
+                  submit: {
+                    message: `You're starting a ${plan.trialDays}-day free trial for the ${plan.name} plan. Your card will NOT be charged today. You will be automatically charged $${(finalAmount / 100).toFixed(2)} after ${plan.trialDays} days unless you cancel.`,
+                  },
+                },
+              }
+            : {}),
         }
-      : isSubscription
-        ? {
-            mode: "subscription",
-            line_items: [
-              {
-                price_data: {
-                  currency: plan.currency || "usd",
-                  product_data: {
-                    name: `${plan.name} (${isYearlyPlan ? "Yearly" : "Monthly"})`,
-                    description: `${isYearlyPlan ? "Yearly" : "Monthly"} subscription for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
-                  },
-                  unit_amount: finalAmount,
-                  recurring: {
-                    interval: isYearlyPlan ? "year" : "month",
-                  },
+      : {
+          mode: "payment",
+          line_items: [
+            {
+              price_data: {
+                currency: plan.currency || "usd",
+                product_data: {
+                  name: `${plan.name} (Lifetime ${plan.slots > 1 ? "Licenses" : "License"})`,
+                  description: `Lifetime access for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
                 },
-                quantity: 1,
+                unit_amount: finalAmount,
               },
-            ],
-            subscription_data: {
-              metadata,
-              ...(stripePaymentMethodId
-                ? { default_payment_method: stripePaymentMethodId }
-                : {}),
+              quantity: 1,
             },
-            ...(discount
-              ? { discounts: [discount] }
-              : { allow_promotion_codes: true }),
-          }
-        : {
-            mode: "payment",
-            line_items: [
-              {
-                price_data: {
-                  currency: plan.currency || "usd",
-                  product_data: {
-                    name: `${plan.name} (Lifetime ${plan.slots > 1 ? "Licenses" : "License"})`,
-                    description: `Lifetime access for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
-                  },
-                  unit_amount: finalAmount,
-                },
-                quantity: 1,
-              },
-            ],
-            payment_intent_data: {
-              metadata: {
-                ...metadata,
-                email: userEmail || "",
-              },
+          ],
+          payment_intent_data: {
+            metadata: {
+              ...metadata,
+              email: userEmail || "",
             },
-            ...(discount
-              ? { discounts: [discount] }
-              : { allow_promotion_codes: true }),
-          }),
+          },
+          ...(discount
+            ? { discounts: [discount] }
+            : { allow_promotion_codes: true }),
+        }),
     success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl}/pricing`,
   })
@@ -414,20 +423,20 @@ export async function GET(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://shoptimity.com"
   const stripe = getStripe()
 
-  // Check trial eligibility if logged in
+  // Check trial eligibility if logged in. The per-user `hasUsedTrial`
+  // flag is the source of truth — checking the licenses row alone is
+  // bypassable because cancellation overwrites the row to the free
+  // plan, leaving no record of the prior trial.
   let isTrialEligible = plan.trialDays > 0
 
   if (session && isTrialEligible) {
-    const existingLicenses = await db
-      .select({ id: licenses.id, isTrial: licenses.isTrial })
-      .from(licenses)
-      .where(
-        and(eq(licenses.userId, session.userId), eq(licenses.planId, planId))
-      )
+    const [userTrialState] = await db
+      .select({ hasUsedTrial: users.hasUsedTrial })
+      .from(users)
+      .where(eq(users.id, session.userId))
       .limit(1)
 
-    if (existingLicenses.length > 0) {
-      // User already had/has a license for this plan
+    if (userTrialState?.hasUsedTrial) {
       isTrialEligible = false
     }
   }
@@ -558,26 +567,18 @@ export async function POST(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://shoptimity.com"
   const stripe = getStripe()
 
-  // Find user by email if possible to check trial history
+  // Find user by email if possible to check trial history. The per-user
+  // `hasUsedTrial` flag is the source of truth (a cancelled trial leaves
+  // no recoverable license row to gate on).
   let isTrialEligible = plan.trialDays > 0
   const [existingUser] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, hasUsedTrial: users.hasUsedTrial })
     .from(users)
     .where(eq(users.email, email))
     .limit(1)
 
-  if (existingUser && isTrialEligible) {
-    const existingLicenses = await db
-      .select({ id: licenses.id })
-      .from(licenses)
-      .where(
-        and(eq(licenses.userId, existingUser.id), eq(licenses.planId, planId))
-      )
-      .limit(1)
-
-    if (existingLicenses.length > 0) {
-      isTrialEligible = false
-    }
+  if (existingUser?.hasUsedTrial) {
+    isTrialEligible = false
   }
 
   // Resolve session + stripeCustomerId up front
@@ -657,9 +658,12 @@ export async function POST(request: NextRequest) {
       is_yearly: isYearly ? "true" : "false",
       is_lifetime: plan.mode === "lifetime" ? "true" : "false",
       final_amount: String(finalAmount),
-      type: isTrial
-        ? "trial_setup"
-        : plan.mode === "monthly" || plan.mode === "yearly"
+      // Trials are real Stripe subscriptions in the new flow — same
+      // type as paid subs. `is_trial: "true"` carries the trial-state
+      // signal for downstream code; the legacy `trial_setup` value is
+      // only relevant for old setup-mode sessions.
+      type:
+        plan.mode === "monthly" || plan.mode === "yearly" || isTrial
           ? "subscription"
           : "lifetime_purchase",
       // Address Metadata
@@ -675,9 +679,47 @@ export async function POST(request: NextRequest) {
 
     // Direct Payment Flow (if saved card and customer exist)
     if (stripePaymentMethodId && stripeCustomerId) {
-      // 1. Handle Trial Case (No immediate charge)
+      // 1. Handle Trial Case — create a real Stripe subscription with
+      //    `trial_period_days` so Stripe handles the auto-charge at trial
+      //    end (no cron needed). The subscription's `sub_*` ID is what we
+      //    store in `licenses.stripeSubscriptionId`, so the upgrade,
+      //    cancel, and retention-discount flows all just work without
+      //    the special-case `pm_*` placeholder handling.
       if (isTrial) {
         const normalizedEmail = email.toLowerCase().trim()
+
+        const productId = await getOrCreateProduct(stripe, plan.name)
+        const discount = await resolvePromoCode(stripe, promoCode)
+
+        // Stripe creates this in `trialing` status — no charge today.
+        // The first invoice fires at `trial_end` and the webhook
+        // (`invoice.payment_succeeded` / `customer.subscription.updated`)
+        // will flip the license to active.
+        const subscription = await stripe.subscriptions.create({
+          customer: stripeCustomerId,
+          items: [
+            {
+              price_data: {
+                currency: plan.currency || "usd",
+                product: productId,
+                unit_amount: finalAmount,
+                recurring: {
+                  interval: isYearly ? "year" : "month",
+                },
+              },
+            },
+          ],
+          default_payment_method: stripePaymentMethodId,
+          trial_period_days: plan.trialDays,
+          // Coupons attach cleanly here — they apply to the first invoice
+          // (post-trial), matching the "$X charged when trial ends" UX.
+          ...(discount ? { discounts: [discount as any] } : {}),
+          metadata,
+        })
+
+        const trialEndsAt = subscription.trial_end
+          ? new Date(subscription.trial_end * 1000)
+          : new Date(Date.now() + plan.trialDays * 86400000)
 
         await db.transaction(async (tx) => {
           // Find or create user
@@ -696,19 +738,32 @@ export async function POST(request: NextRequest) {
                 email: normalizedEmail,
                 emailVerified: true,
                 stripeCustomerId: stripeCustomerId,
+                hasUsedTrial: true,
               })
               .returning()
+          } else {
+            // Lock the per-user trial gate. Idempotent — re-runs of the
+            // same trial signup just rewrite the same `true` value.
+            await tx
+              .update(users)
+              .set({ hasUsedTrial: true, updatedAt: new Date() })
+              .where(eq(users.id, user.id))
           }
 
-          // Create trialing payment record
+          // Create trialing payment record. `stripeSessionId` must be
+          // unique — using the subscription ID is stable and lets us
+          // reconcile with the webhook later.
           const [payment] = await tx
             .insert(payments)
             .values({
               userId: user.id,
-              stripeSessionId: `direct_trial_${Date.now()}`,
+              stripeSessionId: `trial_sub_${subscription.id}`,
               stripeCustomerId: stripeCustomerId,
+              stripeSubscriptionId: subscription.id,
+              planId: plan.id,
               amount: finalAmount,
               currency: plan.currency || "usd",
+              appliedPromoCode: promoCode || null,
               status: "trialing",
             })
             .returning()
@@ -727,7 +782,7 @@ export async function POST(request: NextRequest) {
             })
             .returning()
 
-          // Create license
+          // Create license — now backed by the real Stripe subscription.
           await tx
             .insert(licenses)
             .values({
@@ -739,8 +794,9 @@ export async function POST(request: NextRequest) {
               isTrial: true,
               isLifetime: plan.mode === "lifetime",
               billingCycle: isYearly ? "yearly" : (plan.mode as any),
-              trialEndsAt: new Date(Date.now() + plan.trialDays * 86400000),
-              stripeSubscriptionId: stripePaymentMethodId, // Store the payment method for the worker
+              trialEndsAt,
+              nextRenewalDate: trialEndsAt,
+              stripeSubscriptionId: subscription.id,
             })
             .onConflictDoUpdate({
               target: licenses.userId,
@@ -752,8 +808,10 @@ export async function POST(request: NextRequest) {
                 isTrial: true,
                 isLifetime: plan.mode === "lifetime",
                 billingCycle: isYearly ? "yearly" : (plan.mode as any),
-                trialEndsAt: new Date(Date.now() + plan.trialDays * 86400000),
-                stripeSubscriptionId: stripePaymentMethodId,
+                trialEndsAt,
+                nextRenewalDate: trialEndsAt,
+                stripeSubscriptionId: subscription.id,
+                cancelAtPeriodEnd: false,
                 updatedAt: new Date(),
               },
             })
@@ -763,7 +821,12 @@ export async function POST(request: NextRequest) {
             "checkout.direct_trial_activated",
             "license",
             plan.id,
-            { email: normalizedEmail, planId: plan.id },
+            {
+              email: normalizedEmail,
+              planId: plan.id,
+              subscriptionId: subscription.id,
+              trialEnd: subscription.trial_end,
+            },
             tx
           )
         })

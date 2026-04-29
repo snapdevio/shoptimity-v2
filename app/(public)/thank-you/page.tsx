@@ -122,7 +122,7 @@ export default async function ThankYouPage({
                 You can now start managing your Shopify domains.{" "}
                 <Link
                   href="/login"
-                  className="font-semibold text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary"
+                  className="cursor-pointer font-semibold text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary"
                 >
                   Click here
                 </Link>
@@ -246,12 +246,18 @@ export default async function ThankYouPage({
         </Card>
 
         <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-          <Link href="/login" className={cn(buttonVariants())}>
+          <Link
+            href="/login"
+            className={cn(buttonVariants(), "cursor-pointer")}
+          >
             Go to Login
           </Link>
           <Link
             href="/setup"
-            className={cn(buttonVariants({ variant: "outline" }))}
+            className={cn(
+              "cursor-pointer",
+              buttonVariants({ variant: "outline" })
+            )}
           >
             View Setup Guide
           </Link>

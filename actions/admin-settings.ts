@@ -7,9 +7,6 @@ import { revalidatePath } from "next/cache"
 import { getAppSession } from "@/lib/auth-session"
 
 async function requireAdmin() {
-  if (process.env.NODE_ENV === "development") {
-    return { userId: "dev-user", role: "admin", email: "admin@localhost" }
-  }
   const session = await getAppSession()
   if (!session || session.role !== "admin") {
     throw new Error("Forbidden")

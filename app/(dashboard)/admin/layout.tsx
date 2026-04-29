@@ -15,10 +15,8 @@ export default async function AdminLayout({
 
   const user = session?.user as UserWithRole | undefined
 
-  if (process.env.NODE_ENV !== "development") {
-    if (!session || user?.role !== "admin") {
-      redirect("/licenses")
-    }
+  if (!session || user?.role !== "admin") {
+    redirect("/licenses")
   }
 
   return (

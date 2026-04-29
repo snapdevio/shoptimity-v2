@@ -113,8 +113,8 @@ async function createTestCustomer(email: string, name: string) {
  * Creates a demo 25% discount coupon and promotion code
  */
 async function createDemoCoupon() {
-  const couponId = "SAVE20"
-  const promoCodeText = "WELCOME20"
+  const couponId = "SAVE30"
+  const promoCodeText = "WELCOME30"
 
   console.log(
     `Creating premium demo coupon '${couponId}' and promotion code '${promoCodeText}'...`
@@ -129,9 +129,9 @@ async function createDemoCoupon() {
 
     const coupon = await stripe.coupons.create({
       id: couponId,
-      percent_off: 20,
+      percent_off: 30,
       duration: "once",
-      name: "20% Off First Purchase",
+      name: "30% Off First Purchase",
       max_redemptions: 100,
       redeem_by: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60, // 30 days
     })

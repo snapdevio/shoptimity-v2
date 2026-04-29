@@ -11,10 +11,8 @@ import {
   domains,
   users,
   payments,
-  planFeatures,
-  features,
 } from "../db/schema"
-import { eq, and, isNull, lt, isNotNull, sql } from "drizzle-orm"
+import { eq, and, isNull, lt, gt, isNotNull, sql } from "drizzle-orm"
 import { getStripe } from "../lib/stripe"
 import { enqueueEmailJob } from "../lib/queue"
 import { createAuditLog } from "../lib/audit"
@@ -43,23 +41,6 @@ interface TrialExpiredResult {
   licensesExpired: number
   licensesFailed: number
   domainsUpdated: number
-  errors: Array<{ licenseId: string; error: string }>
-}
-
-interface TrialConversionResult {
-  success: boolean
-  trialsProcessed: number
-  paidConversions: number
-  failedConversions: number
-  downgradedToFree: number
-  errors: Array<{ licenseId: string; error: string }>
-}
-
-interface CancelledDowngradeResult {
-  success: boolean
-  licensesProcessed: number
-  downgradedToFree: number
-  failed: number
   errors: Array<{ licenseId: string; error: string }>
 }
 
@@ -220,235 +201,7 @@ async function deleteMetadata(domainName: string) {
       Key: key,
     })
   )
-
   // console.log(`[metadata-worker] Deleted metadata for domain: ${domainName}`)
-}
-
-async function processTrialToLifetimeConversion(): Promise<TrialConversionResult> {
-  const stripe = getStripe()
-  const now = new Date()
-  const result: TrialConversionResult = {
-    success: true,
-    trialsProcessed: 0,
-    paidConversions: 0,
-    failedConversions: 0,
-    downgradedToFree: 0,
-    errors: [],
-  }
-
-  try {
-    // Find all active trial licenses that have expired
-    const expiredTrials = await db
-      .select({
-        id: licenses.id,
-        userId: licenses.userId,
-        planId: licenses.planId,
-        setupIntentId: licenses.stripeSubscriptionId,
-      })
-      .from(licenses)
-      .where(
-        and(
-          eq(licenses.isTrial, true),
-          eq(licenses.status, "trialing"),
-          lt(licenses.trialEndsAt!, now)
-        )
-      )
-
-    if (expiredTrials.length === 0) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("[metadata-worker] No expired trials to process")
-      }
-      return result
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      console.log(
-        `[metadata-worker] Processing ${expiredTrials.length} expired trials...`
-      )
-    }
-
-    // Find free plan for downgrading
-    const [freePlan] = await db
-      .select()
-      .from(plans)
-      .where(eq(plans.mode, "free"))
-      .limit(1)
-
-    for (const trial of expiredTrials) {
-      result.trialsProcessed++
-
-      try {
-        if (!trial.setupIntentId) {
-          throw new Error("No setup intent ID found")
-        }
-
-        let paymentMethodId: string | null = null
-        let stripeCustomerId: string | null = null
-
-        try {
-          if (trial.setupIntentId.startsWith("seti_")) {
-            // SetupIntent ID - retrieve payment method from it
-            const setupIntent = await stripe.setupIntents.retrieve(
-              trial.setupIntentId
-            )
-            paymentMethodId = (setupIntent.payment_method as string) || null
-            stripeCustomerId = (setupIntent.customer as string) || null
-          } else if (trial.setupIntentId.startsWith("pm_")) {
-            // Direct PaymentMethod ID
-            paymentMethodId = trial.setupIntentId
-          }
-        } catch (stripErr: any) {
-          // Setup intent might be finalized/expired, skip payment processing
-          console.warn(
-            `[metadata-worker] Could not retrieve setup intent ${trial.setupIntentId}:`,
-            stripErr.message
-          )
-          paymentMethodId = null
-        }
-
-        // Try payment if we have a valid payment method
-        let paymentSucceeded = false
-        if (paymentMethodId && stripeCustomerId) {
-          try {
-            const [pendingPayment] = await db
-              .select({
-                amount: payments.amount,
-                currency: payments.currency,
-              })
-              .from(payments)
-              .where(
-                and(
-                  eq(payments.userId, trial.userId),
-                  eq(payments.status, "trialing")
-                )
-              )
-              .limit(1)
-
-            if (pendingPayment) {
-              const [plan] = await db
-                .select()
-                .from(plans)
-                .where(eq(plans.id, trial.planId))
-                .limit(1)
-
-              if (plan) {
-                // Attempt payment
-                await stripe.paymentIntents.create({
-                  amount: pendingPayment.amount,
-                  currency: pendingPayment.currency || "usd",
-                  customer: stripeCustomerId,
-                  payment_method: paymentMethodId,
-                  confirm: true,
-                  off_session: true,
-                  description: `Auto-conversion from Trial: ${plan.name}`,
-                  metadata: {
-                    license_id: trial.id,
-                    plan_id: plan.id,
-                    conversion: "trial_to_paid",
-                    license_quantity: "1",
-                  },
-                })
-
-                paymentSucceeded = true
-                result.paidConversions++
-                if (process.env.NODE_ENV === "development") {
-                  console.log(
-                    `[metadata-worker] Auto-charged trial license ${trial.id}`
-                  )
-                }
-              }
-            }
-          } catch (paymentErr: any) {
-            console.warn(
-              `[metadata-worker] Payment attempt failed for trial ${trial.id}:`,
-              paymentErr.message
-            )
-            // Fall through to free plan downgrade
-          }
-        }
-
-        // If payment failed or unavailable, downgrade to free plan
-        if (!paymentSucceeded && freePlan) {
-          await db.transaction(async (tx) => {
-            await tx
-              .update(licenses)
-              .set({
-                planId: freePlan.id,
-                status: "active",
-                totalSlots: freePlan.slots,
-                isTrial: false,
-                isLifetime: false,
-                billingCycle: freePlan.mode as any,
-                trialEndsAt: null,
-                stripeSubscriptionId: null,
-                updatedAt: new Date(),
-              })
-              .where(eq(licenses.id, trial.id))
-
-            // Log the downgrade
-            await createAuditLog(
-              null,
-              "license.trial_expired_downgraded_to_free",
-              "license",
-              trial.id,
-              {
-                previousPlanId: trial.planId,
-                newPlanId: freePlan.id,
-                paymentAttempted: !paymentSucceeded,
-              }
-            )
-          })
-
-          result.downgradedToFree++
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              `[metadata-worker] Trial ${trial.id} downgraded to free plan`
-            )
-          }
-        }
-      } catch (err: any) {
-        result.success = false
-        result.failedConversions++
-
-        const errorMsg = err instanceof Error ? err.message : String(err)
-        result.errors.push({
-          licenseId: trial.id,
-          error: errorMsg,
-        })
-
-        console.error(
-          `[metadata-worker] Failed to process trial ${trial.id}:`,
-          errorMsg
-        )
-
-        // Mark as past_due if something went seriously wrong
-        try {
-          await db
-            .update(licenses)
-            .set({ status: "past_due", updatedAt: new Date() })
-            .where(eq(licenses.id, trial.id))
-        } catch (updateErr) {
-          console.error(
-            `[metadata-worker] Failed to mark trial as past_due:`,
-            updateErr
-          )
-        }
-      }
-    }
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[metadata-worker] Trial processing complete:`, {
-        trialsProcessed: result.trialsProcessed,
-        paidConversions: result.paidConversions,
-        downgradedToFree: result.downgradedToFree,
-        failedConversions: result.failedConversions,
-      })
-    }
-    return result
-  } catch (err: any) {
-    console.error("[metadata-worker] Fatal error in trial conversion:", err)
-    result.success = false
-    return result
-  }
 }
 
 async function syncExpiredTrials(): Promise<TrialExpiredResult> {
@@ -731,171 +484,6 @@ async function syncTrialReminders(): Promise<{
   }
 }
 
-async function processExpiredCancelledSubscriptions(): Promise<CancelledDowngradeResult> {
-  const now = new Date()
-  const result: CancelledDowngradeResult = {
-    success: true,
-    licensesProcessed: 0,
-    downgradedToFree: 0,
-    failed: 0,
-    errors: [],
-  }
-
-  try {
-    // Find paid licenses whose owner cancelled (cancel_at_period_end = true)
-    // AND whose paid period has now ended. These should drop to the free
-    // plan. The Stripe `customer.subscription.deleted` webhook normally
-    // handles this, but the cron is a safety net for missed/failed webhooks.
-    const expiredCancelled = await db
-      .select()
-      .from(licenses)
-      .where(
-        and(
-          eq(licenses.cancelAtPeriodEnd, true),
-          eq(licenses.isTrial, false),
-          eq(licenses.isLifetime, false),
-          isNotNull(licenses.nextRenewalDate),
-          lt(licenses.nextRenewalDate!, now),
-          sql`${licenses.status} IN ('active', 'past_due')`
-        )
-      )
-
-    if (expiredCancelled.length === 0) {
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          "[metadata-worker] No expired cancelled subscriptions to downgrade"
-        )
-      }
-      return result
-    }
-
-    const [freePlan] = await db
-      .select()
-      .from(plans)
-      .where(eq(plans.mode, "free"))
-      .limit(1)
-
-    if (!freePlan) {
-      result.success = false
-      result.errors.push({
-        licenseId: "n/a",
-        error: "No free plan exists in DB; cannot downgrade",
-      })
-      console.error("[metadata-worker] No free plan found — cannot downgrade")
-      return result
-    }
-
-    const stripe = getStripe()
-
-    for (const license of expiredCancelled) {
-      result.licensesProcessed++
-
-      try {
-        // Make sure the Stripe subscription is actually terminated. If the
-        // webhook ran already this is a no-op; otherwise we cancel now so we
-        // don't bill the customer again.
-        if (license.stripeSubscriptionId) {
-          try {
-            const sub = await stripe.subscriptions.retrieve(
-              license.stripeSubscriptionId
-            )
-            if (sub.status !== "canceled") {
-              await stripe.subscriptions.cancel(license.stripeSubscriptionId)
-            }
-          } catch (stripeErr: any) {
-            // Subscription already gone is fine — nothing to do.
-            if (stripeErr?.code !== "resource_missing") {
-              console.warn(
-                `[metadata-worker] Stripe cancel failed for ${license.stripeSubscriptionId}:`,
-                stripeErr?.message || stripeErr
-              )
-            }
-          }
-        }
-
-        await db.transaction(async (tx) => {
-          await tx
-            .update(licenses)
-            .set({
-              planId: freePlan.id,
-              totalSlots: freePlan.slots,
-              status: "active",
-              isTrial: false,
-              isLifetime: false,
-              billingCycle: "monthly",
-              trialEndsAt: null,
-              nextRenewalDate: null,
-              stripeSubscriptionId: null,
-              cancelAtPeriodEnd: false,
-              updatedAt: new Date(),
-            })
-            .where(eq(licenses.id, license.id))
-
-          await createAuditLog(
-            license.userId,
-            "license.cancelled_downgraded_to_free",
-            "license",
-            license.id,
-            {
-              userId: license.userId,
-              previousPlanId: license.planId,
-              newPlanId: freePlan.id,
-              cancelledAt: license.nextRenewalDate,
-              source: "cron",
-            },
-            tx
-          )
-        })
-
-        // Refresh R2 metadata for this license's domains so the new (free)
-        // plan name and slot count are reflected immediately.
-        const licenseDomains = await db
-          .select()
-          .from(domains)
-          .where(
-            and(eq(domains.licenseId, license.id), isNull(domains.deletedAt))
-          )
-
-        for (const dom of licenseDomains) {
-          try {
-            await upsertMetadata(dom.domainName, license.userId)
-          } catch (err) {
-            console.error(
-              `[metadata-worker] Failed to refresh metadata for ${dom.domainName} after free downgrade:`,
-              err
-            )
-          }
-        }
-
-        result.downgradedToFree++
-        if (process.env.NODE_ENV === "development") {
-          console.log(
-            `[metadata-worker] License ${license.id} downgraded to free plan (period ended)`
-          )
-        }
-      } catch (err: any) {
-        result.success = false
-        result.failed++
-        const errorMsg = err instanceof Error ? err.message : String(err)
-        result.errors.push({ licenseId: license.id, error: errorMsg })
-        console.error(
-          `[metadata-worker] Failed to downgrade license ${license.id} to free:`,
-          errorMsg
-        )
-      }
-    }
-
-    return result
-  } catch (err: any) {
-    console.error(
-      "[metadata-worker] Fatal error in expired-cancelled downgrade:",
-      err
-    )
-    result.success = false
-    return result
-  }
-}
-
 export async function registerMetadataWorker(boss: PgBoss): Promise<void> {
   // Create and register the metadata export queue
   await boss.createQueue(QUEUE_NAME)
@@ -945,18 +533,11 @@ export async function registerMetadataWorker(boss: PgBoss): Promise<void> {
     // console.log("[metadata-worker] ========================================")
 
     try {
-      // Process 1: Trial-to-lifetime conversion and free plan downgrade
-      const conversionResult = await processTrialToLifetimeConversion()
-
       // Process 2: Sync R2 metadata for expired trials
       const expiredResult = await syncExpiredTrials()
 
       // Process 3: Send trial ending reminders
       const reminderResult = await syncTrialReminders()
-
-      // Process 4: Downgrade paid licenses whose cancellation period has
-      // elapsed but Stripe's webhook hasn't moved them to free yet.
-      const cancelledResult = await processExpiredCancelledSubscriptions()
 
       const duration = Date.now() - startTime
       if (process.env.NODE_ENV === "development") {
@@ -967,12 +548,6 @@ export async function registerMetadataWorker(boss: PgBoss): Promise<void> {
         console.log(
           "[metadata-worker] ----------------------------------------"
         )
-        console.log("Trial Conversion Summary:", {
-          trialsProcessed: conversionResult.trialsProcessed,
-          paidConversions: conversionResult.paidConversions,
-          downgradedToFree: conversionResult.downgradedToFree,
-          failedConversions: conversionResult.failedConversions,
-        })
         console.log("Expired Trial Sync Summary:", {
           licensesExpired: expiredResult.licensesExpired,
           domainsUpdated: expiredResult.domainsUpdated,
@@ -983,11 +558,6 @@ export async function registerMetadataWorker(boss: PgBoss): Promise<void> {
           remindersSkipped: reminderResult.remindersSkipped,
           errors: reminderResult.errors.length,
         })
-        console.log("Expired-Cancelled Downgrade Summary:", {
-          licensesProcessed: cancelledResult.licensesProcessed,
-          downgradedToFree: cancelledResult.downgradedToFree,
-          failed: cancelledResult.failed,
-        })
         console.log(`Duration: ${duration}ms`)
         console.log(
           "[metadata-worker] ========================================"
@@ -995,9 +565,7 @@ export async function registerMetadataWorker(boss: PgBoss): Promise<void> {
       }
       // Log overall result to audit trail
       if (
-        conversionResult.success &&
-        expiredResult.success &&
-        cancelledResult.success
+        expiredResult.success
       ) {
         await createAuditLog(
           null,
@@ -1005,12 +573,9 @@ export async function registerMetadataWorker(boss: PgBoss): Promise<void> {
           "metadata_worker",
           "cron-job",
           {
-            conversions: conversionResult.paidConversions,
-            downgrades: conversionResult.downgradedToFree,
             expiredMarked: expiredResult.licensesExpired,
             domainsUpdated: expiredResult.domainsUpdated,
             remindersSent: reminderResult.remindersSent,
-            cancelledDowngrades: cancelledResult.downgradedToFree,
             duration,
           }
         )
@@ -1022,10 +587,8 @@ export async function registerMetadataWorker(boss: PgBoss): Promise<void> {
           "metadata_worker",
           "cron-job",
           {
-            conversionErrors: conversionResult.errors,
             expiredErrors: expiredResult.errors,
             reminderErrors: reminderResult.errors,
-            cancelledErrors: cancelledResult.errors,
           }
         )
       }

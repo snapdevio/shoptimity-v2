@@ -26,7 +26,7 @@ const renderWithBlackNumbers = (text: string | string[]) => {
       return (
         <div
           key={i}
-          className="relative h-[400px] w-full overflow-hidden rounded-2xl shadow-sm sm:h-[414px]"
+          className="relative h-100 w-full overflow-hidden rounded-2xl shadow-sm sm:h-103.5"
         >
           <Image src={src} alt={alt} fill className="object-cover" />
         </div>
@@ -66,7 +66,7 @@ export default async function CaseStudyPage({
   return (
     <article className="bg-background pb-20">
       {/* Hero Image & Header */}
-      <div className="relative h-[60vh] min-h-[500px] w-full">
+      <div className="relative h-[60vh] min-h-125 w-full">
         <Image
           src={study.image}
           alt={study.title}
@@ -79,7 +79,7 @@ export default async function CaseStudyPage({
         <div className="relative container mx-auto flex h-full flex-col justify-end px-4 pb-16 sm:px-6 lg:px-8">
           <Link
             href="/case-study"
-            className="mb-8 inline-flex w-fit items-center gap-2 rounded-full bg-background/20 px-4 py-2 text-sm font-medium text-black backdrop-blur-md transition-colors hover:bg-background/40"
+            className="mb-8 inline-flex w-fit cursor-pointer items-center gap-2 rounded-full bg-background/20 px-4 py-2 text-sm font-medium text-black backdrop-blur-md transition-colors hover:bg-background/40"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Case Studies
@@ -170,14 +170,14 @@ export default async function CaseStudyPage({
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link
               href="/plans"
-              className="group flex items-center rounded-full bg-orange-600 px-8 py-4 font-semibold text-white transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-600/20"
+              className="group flex cursor-pointer items-center rounded-full bg-orange-600 px-8 py-4 font-semibold text-white transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-600/20"
             >
               Get Shoptimity Now
               <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
             <Link
               href="/contact"
-              className="flex items-center rounded-full border border-gray-300 bg-white px-8 py-4 font-semibold text-gray-950 transition-all hover:bg-gray-50"
+              className="flex cursor-pointer items-center rounded-full border border-gray-300 bg-white px-8 py-4 font-semibold text-gray-950 transition-all hover:bg-gray-50"
             >
               Contact Us
             </Link>

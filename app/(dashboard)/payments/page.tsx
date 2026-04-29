@@ -214,7 +214,7 @@ export default async function PaymentsPage({
                             href={payment.stripeInvoiceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 font-heading text-xs font-medium text-primary hover:underline"
+                            className="flex cursor-pointer items-center gap-1.5 font-heading text-xs font-medium text-primary hover:underline"
                             title="View Invoice"
                           >
                             <FileText className="size-3.5" />

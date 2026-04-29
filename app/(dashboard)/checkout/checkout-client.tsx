@@ -709,7 +709,7 @@ function CheckoutInner({
                     <button
                       onClick={handleAddNewCard}
                       disabled={isInitializingSetup}
-                      className="inline-flex items-center gap-2 rounded-full bg-base-content px-6 py-2.5 text-[14px] font-bold text-white transition-all hover:bg-black active:scale-95 disabled:opacity-50"
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-base-content px-6 py-2.5 text-[14px] font-bold text-white transition-all hover:bg-black active:scale-95 disabled:opacity-50"
                     >
                       {isInitializingSetup && (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -999,7 +999,7 @@ function CheckoutInner({
                         isValidatingCoupon
                       }
                       className={cn(
-                        "rounded-full bg-orange-600 px-6 py-2 text-[14px] font-bold text-white transition-all hover:bg-orange-700",
+                        "cursor-pointer rounded-full bg-orange-600 px-6 py-2 text-[14px] font-bold text-white transition-all hover:bg-orange-700",
                         ((!appliedCoupon && couponCode.trim().length < 2) ||
                           isValidatingCoupon) &&
                           "cursor-not-allowed opacity-50"

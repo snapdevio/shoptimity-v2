@@ -45,31 +45,59 @@ export async function POST(request: NextRequest) {
   if (process.env.NODE_ENV === "development") {
     console.log(`${Date.now()} event webhook Main=>`, JSON.stringify(event))
   }
-  // Idempotency check
-  const existing = await db
-    .select({ id: webhookEvents.id, processed: webhookEvents.processed })
-    .from(webhookEvents)
-    .where(eq(webhookEvents.eventId, event.id))
-    .limit(1)
 
-  if (existing.length > 0 && existing[0].processed) {
-    return NextResponse.json({ received: true, duplicate: true })
+  // Defense-in-depth event-age check. Stripe SDK already enforces a ~5min
+  // signature timestamp tolerance in `constructEvent`, but a misconfigured
+  // tolerance, leaked signing key, or replayed event still inside that
+  // window could deliver stale events. Reject anything older than 10min.
+  const eventAgeSeconds = Math.floor(Date.now() / 1000) - event.created
+  if (eventAgeSeconds > 600) {
+    console.warn(
+      `[stripe-webhook] Rejecting stale event ${event.id} (${event.type}), age=${eventAgeSeconds}s`
+    )
+    return NextResponse.json({ error: "Event too old" }, { status: 400 })
   }
-  // console.log("event webhook existing=>", JSON.stringify(existing))
-  // Insert or update webhook event record (idempotency support)
+
+  // Atomic claim via the unique `eventId` constraint. Two concurrent
+  // deliveries of the same event can't both insert; the loser falls
+  // through to the existence check below. Without ON CONFLICT, both
+  // racers pass the prior SELECT and both proceed to processing.
+  const [claimed] = await db
+    .insert(webhookEvents)
+    .values({
+      eventId: event.id,
+      type: event.type,
+      processed: false,
+    })
+    .onConflictDoNothing({ target: webhookEvents.eventId })
+    .returning({ id: webhookEvents.id })
+
   let webhookRecordId: string
-  if (existing.length > 0) {
-    webhookRecordId = existing[0].id
+  if (claimed) {
+    webhookRecordId = claimed.id
   } else {
-    const [record] = await db
-      .insert(webhookEvents)
-      .values({
-        eventId: event.id,
-        type: event.type,
-        processed: false,
+    // Lost the race or this is a retry of a previously-attempted event.
+    // If the prior attempt succeeded, treat as duplicate. If it failed
+    // (processed=false, processingError set), allow this attempt to retry.
+    const [existing] = await db
+      .select({
+        id: webhookEvents.id,
+        processed: webhookEvents.processed,
       })
-      .returning()
-    webhookRecordId = record.id
+      .from(webhookEvents)
+      .where(eq(webhookEvents.eventId, event.id))
+      .limit(1)
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Webhook record missing" },
+        { status: 500 }
+      )
+    }
+    if (existing.processed) {
+      return NextResponse.json({ received: true, duplicate: true })
+    }
+    webhookRecordId = existing.id
   }
   try {
     switch (event.type) {
@@ -195,12 +223,19 @@ async function fulfillTrialSetup({
           email: normalizedEmail,
           emailVerified: true,
           stripeCustomerId: stripeCustomerId,
+          hasUsedTrial: true,
         })
         .returning()
-    } else if (!user.stripeCustomerId) {
+    } else {
+      // Lock the per-user trial gate (and backfill stripeCustomerId if
+      // missing) so a future cancel + re-signup can't re-claim a trial.
       await tx
         .update(users)
-        .set({ stripeCustomerId })
+        .set({
+          hasUsedTrial: true,
+          ...(user.stripeCustomerId ? {} : { stripeCustomerId }),
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, user.id))
     }
 
@@ -767,6 +802,34 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       ? session.payment_intent
       : session.payment_intent?.id || null
 
+  // For trial subscriptions, prefer Stripe's authoritative `trial_end`
+  // over `Date.now() + trialDays`. This avoids server-clock drift and
+  // matches what Stripe will use to fire the first invoice.
+  const subscriptionObj =
+    expandedSession.subscription &&
+    typeof expandedSession.subscription !== "string"
+      ? (expandedSession.subscription as Stripe.Subscription)
+      : null
+
+  const stripeTrialEnd = subscriptionObj?.trial_end
+    ? new Date(subscriptionObj.trial_end * 1000)
+    : null
+
+  // Lock the per-user trial gate so cancel + re-signup can't re-trial.
+  if (isTrial) {
+    const [existingUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, customerEmail.toLowerCase().trim()))
+      .limit(1)
+    if (existingUser) {
+      await db
+        .update(users)
+        .set({ hasUsedTrial: true, updatedAt: new Date() })
+        .where(eq(users.id, existingUser.id))
+    }
+  }
+
   await fulfillOrder({
     email: customerEmail,
     name: contactName || session.customer_details?.name || undefined,
@@ -782,16 +845,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     amount: session.amount_total || 0,
     currency: session.currency || "usd",
     isTrial: isTrial,
-    trialEndsAt: isTrial
-      ? new Date(Date.now() + plan.trialDays * 86400000)
-      : undefined,
-    nextRenewalDate:
-      expandedSession.subscription &&
-      typeof expandedSession.subscription !== "string"
-        ? new Date(
-            (expandedSession.subscription as any).current_period_end * 1000
-          )
-        : null,
+    trialEndsAt:
+      stripeTrialEnd ||
+      (isTrial ? new Date(Date.now() + plan.trialDays * 86400000) : undefined),
+    nextRenewalDate: subscriptionObj
+      ? stripeTrialEnd ||
+        new Date((subscriptionObj as any).current_period_end * 1000)
+      : null,
     stripeSubscriptionId:
       typeof expandedSession.subscription === "string"
         ? expandedSession.subscription
@@ -1123,10 +1183,16 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     if (subscriptionId)
       conditions.push(eq(payments.stripeSubscriptionId, subscriptionId))
 
+    // Sync amount + currency from the invoice too. When a trial converts
+    // (or after an in-trial upgrade), the original `trialing` payment row
+    // may have a stale amount; this brings it in line with what was
+    // actually charged.
     await db
       .update(payments)
       .set({
         status: invoice.status || "paid",
+        amount: invoice.amount_paid || invoice.amount_due,
+        currency: invoice.currency,
         stripeInvoiceId: invoice.id,
         stripeInvoiceUrl: invoice.hosted_invoice_url,
         updatedAt: new Date(),
@@ -1237,53 +1303,38 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   if (!license.isTrial) return
 
-  // Trial payment succeeded! Convert to lifetime if amount is > 0
+  // Trial payment succeeded — the trial just converted into a paid
+  // subscription. Clear the trial flags. The earlier `if (license)` block
+  // already updated status + nextRenewalDate from the invoice, and the
+  // payments-row sync block above marked the row paid.
   if (invoice.amount_paid > 0) {
-    await db.transaction(async (tx) => {
-      // 1. Mark license as no longer trial and set as Lifetime
-      await tx
+    await db
+      .update(licenses)
+      .set({
+        isTrial: false,
+        trialEndsAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(licenses.id, license.id))
+
+    // Lifetime trial only: a lifetime product is one-time, so once the
+    // trial pays out we cancel the recurring subscription. Monthly/yearly
+    // trials must KEEP the subscription alive — cancelling it here was a
+    // bug that left users with a ghost license and no future billing.
+    if (license.billingCycle === "lifetime") {
+      await db
         .update(licenses)
-        .set({
-          status: "active",
-          isTrial: false,
-          isLifetime: true,
-          trialEndsAt: null,
-          updatedAt: new Date(),
-        })
+        .set({ isLifetime: true, updatedAt: new Date() })
         .where(eq(licenses.id, license.id))
 
-      // 2. Mark payment as paid and store invoice info
-      // Fix: lookup the payment record via the order
-      if (license.sourceOrderId) {
-        const [order] = await tx
-          .select({ paymentId: orders.paymentId })
-          .from(orders)
-          .where(eq(orders.id, license.sourceOrderId))
-          .limit(1)
-
-        if (order?.paymentId) {
-          await tx
-            .update(payments)
-            .set({
-              status: "paid",
-              stripeInvoiceId: invoice.id || null,
-              stripeInvoiceUrl: invoice.hosted_invoice_url || null,
-              stripePaymentIntentId: pi || null,
-              updatedAt: new Date(),
-            })
-            .where(eq(payments.id, order.paymentId))
-        }
-      }
-
-      // 3. Cancel the subscription so they aren't charged again (Lifetime requirement)
       const stripe = getStripe()
       await stripe.subscriptions.cancel(subscriptionId).catch((err) => {
         console.error(
-          `[webhook] Failed to cancel subscription ${subscriptionId}:`,
+          `[webhook] Failed to cancel lifetime trial subscription ${subscriptionId}:`,
           err
         )
       })
-    })
+    }
   }
 
   // Trigger R2 update for all domains on this license
@@ -1302,13 +1353,16 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   await createAuditLog(
     license.userId,
-    "license.trial_to_lifetime",
+    license.billingCycle === "lifetime"
+      ? "license.trial_to_lifetime"
+      : "license.trial_converted",
     "license",
     license.id,
     {
       userId: license.userId,
       subscriptionId,
       invoiceId: invoice.id,
+      billingCycle: license.billingCycle,
     }
   )
 }

@@ -160,7 +160,7 @@ function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
 
   if (isSessionLoading) {
     return (
-      <div className="flex h-[400px] items-center justify-center">
+      <div className="flex h-100 items-center justify-center">
         <div className="flex flex-col items-center gap-2">
           <Spinner className="size-8" />
           <p className="text-sm text-muted-foreground">Checking session...</p>
@@ -187,7 +187,12 @@ function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
           if (inbox) {
             return (
               <Button asChild className="w-full rounded-xl" size="lg">
-                <a href={inbox.url} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={inbox.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="cursor-pointer"
+                >
                   Go to {inbox.name}
                 </a>
               </Button>
@@ -200,6 +205,7 @@ function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
                   href="https://mail.google.com"
                   target="_blank"
                   rel="noopener noreferrer"
+                  className="cursor-pointer"
                 >
                   Open Gmail
                 </a>
@@ -262,7 +268,7 @@ function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
                   <FieldLabel htmlFor="password">Password</FieldLabel>
                   <Link
                     href="/forgot-password"
-                    className="ml-auto text-sm underline-offset-2 hover:text-primary hover:underline"
+                    className="ml-auto cursor-pointer text-sm underline-offset-2 hover:text-primary hover:underline"
                   >
                     Forgot your password?
                   </Link>
@@ -384,7 +390,7 @@ function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
                 Don&apos;t have an account?{" "}
                 <Link
                   href="/register"
-                  className="font-bold text-primary underline-offset-4 hover:underline"
+                  className="cursor-pointer font-bold text-primary underline-offset-4 hover:underline"
                 >
                   Sign up
                 </Link>
@@ -405,14 +411,14 @@ function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
         By clicking continue, you agree to our{" "}
         <Link
           href="/terms"
-          className="underline underline-offset-4 transition-colors hover:text-primary"
+          className="cursor-pointer underline underline-offset-4 transition-colors hover:text-primary"
         >
           Terms of Service
         </Link>{" "}
         and{" "}
         <Link
           href="/privacy-policy"
-          className="underline underline-offset-4 transition-colors hover:text-primary"
+          className="cursor-pointer underline underline-offset-4 transition-colors hover:text-primary"
         >
           Privacy Policy
         </Link>
@@ -429,7 +435,7 @@ export function LoginClient() {
         <Suspense
           fallback={
             <Card className="overflow-hidden border-none p-0 shadow-2xl">
-              <CardContent className="flex h-[500px] items-center justify-center bg-card">
+              <CardContent className="flex h-125 items-center justify-center bg-card">
                 <Spinner className="size-8" />
               </CardContent>
             </Card>

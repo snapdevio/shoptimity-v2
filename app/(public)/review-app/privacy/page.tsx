@@ -186,7 +186,7 @@ export default function ReviewAppPrivacyPage() {
               </p>
               <Link
                 href="/contact"
-                className="inline-flex items-center justify-center rounded-full bg-[#1a1a1a] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-black/10 transition-all hover:scale-105 active:scale-95"
+                className="inline-flex cursor-pointer items-center justify-center rounded-full bg-[#1a1a1a] px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-black/10 transition-all hover:scale-105 active:scale-95"
               >
                 Contact Privacy Team
               </Link>
@@ -201,13 +201,13 @@ export default function ReviewAppPrivacyPage() {
           <div className="mt-4 flex justify-center gap-6">
             <Link
               href="/terms"
-              className="transition-colors hover:text-[#ff602e]"
+              className="cursor-pointer transition-colors hover:text-[#ff602e]"
             >
               Terms of Service
             </Link>
             <Link
               href="/privacy-policy"
-              className="transition-colors hover:text-[#ff6fb5]"
+              className="cursor-pointer transition-colors hover:text-secondary"
             >
               Main Privacy Policy
             </Link>

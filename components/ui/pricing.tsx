@@ -111,6 +111,7 @@ export const PricingSectionModern = memo(
     availableCycles = ["monthly", "yearly"],
     maxYearlyDiscount,
     loadingPlanName,
+    hasUsedTrial = false,
   }: {
     plans: PricingPlan[]
     onAction?: (planId: string, isYearly: boolean) => void
@@ -120,6 +121,7 @@ export const PricingSectionModern = memo(
     availableCycles?: string[]
     maxYearlyDiscount?: number
     loadingPlanName?: string | null
+    hasUsedTrial?: boolean
   }) => {
     const pricingRef = useRef<HTMLDivElement>(null)
 
@@ -278,7 +280,9 @@ export const PricingSectionModern = memo(
                       <span className="truncate">
                         {plan.isCurrent
                           ? "Current Plan"
-                          : plan.trialDays && plan.trialDays > 0
+                          : !hasUsedTrial &&
+                              plan.trialDays &&
+                              plan.trialDays > 0
                             ? `Start ${plan.trialDays}-Day Free Trial`
                             : plan.buttonText}
                       </span>

@@ -18,6 +18,12 @@ export const user = pgTable("user", {
   postalCode: text("postal_code"),
   country: text("country"),
   company: text("company"),
+  // Per-user trial gate: set to true the first time a trial license is
+  // created for this user, never reset. Cancelling a trial and trying to
+  // re-trial (same plan or different) checks this flag instead of the
+  // license row, which would otherwise have been overwritten on the
+  // free-plan downgrade.
+  hasUsedTrial: boolean("has_used_trial").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })

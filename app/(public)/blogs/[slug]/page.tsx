@@ -48,7 +48,7 @@ export default async function BlogDetailPage({
         <div className="relative container mx-auto max-w-6xl px-4">
           <Link
             href="/blogs"
-            className="group mb-8 inline-flex items-center gap-2 rounded-full border border-orange-300 bg-slate-50 px-5 py-2.5 text-sm font-medium text-gray-600 shadow-sm backdrop-blur-sm transition-all hover:border-[#ff602e]/40 hover:bg-white hover:text-[#ff602e] hover:shadow-md"
+            className="group mb-8 inline-flex cursor-pointer items-center gap-2 rounded-full border border-orange-300 bg-slate-50 px-5 py-2.5 text-sm font-medium text-gray-600 shadow-sm backdrop-blur-sm transition-all hover:border-[#ff602e]/40 hover:bg-white hover:text-[#ff602e] hover:shadow-md"
           >
             <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
             Back to Blogs
@@ -143,7 +143,7 @@ export default async function BlogDetailPage({
                 <Link
                   key={post.handle}
                   href={`/blogs/${post.handle}`}
-                  className="group flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-gray-100 bg-white shadow-lg shadow-gray-200/30 transition-all duration-500 hover:-translate-y-1 hover:shadow-xl"
+                  className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-[1.5rem] border border-gray-100 bg-white shadow-lg shadow-gray-200/30 transition-all duration-500 hover:-translate-y-1 hover:shadow-xl"
                 >
                   <div className="relative aspect-video overflow-hidden">
                     <img
@@ -195,7 +195,7 @@ export default async function BlogDetailPage({
             <div className="mt-14 text-center">
               <Link
                 href="/blogs"
-                className="group inline-flex items-center gap-3 rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-8 py-4 font-bold text-white shadow-lg shadow-orange-200 transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                className="group inline-flex cursor-pointer items-center gap-3 rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-8 py-4 font-bold text-white shadow-lg shadow-orange-200 transition-all hover:-translate-y-0.5 hover:shadow-xl"
               >
                 View All Articles
                 <ArrowRight className="size-5 transition-transform group-hover:translate-x-2" />

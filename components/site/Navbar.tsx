@@ -30,12 +30,12 @@ const Navbar: React.FC<{ isLoggedIn?: boolean }> = ({
   ]
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-base-100/90 px-4 py-4 backdrop-blur-md sm:px-6 md:px-10 lg:px-[100px]">
+    <header className="sticky top-0 z-50 border-b bg-base-100/90 px-4 py-4 backdrop-blur-md sm:px-6 md:px-10 lg:px-25">
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="flex items-center gap-2">
           <Link
             href="/"
-            className="flex items-center gap-2 transition-opacity hover:opacity-80"
+            className="flex cursor-pointer items-center gap-2 transition-opacity hover:opacity-80"
           >
             <img
               src={`${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT || ""}/assets/logo.svg`}
@@ -55,7 +55,7 @@ const Navbar: React.FC<{ isLoggedIn?: boolean }> = ({
               key={link.name}
               href={link.href}
               className={cn(
-                "text-sm font-medium transition-colors hover:text-primary",
+                "cursor-pointer text-sm font-medium transition-colors hover:text-primary",
                 pathname === link.href
                   ? "border-b-2 border-primary pb-0.5 text-primary"
                   : "text-base-content-muted"
@@ -70,6 +70,7 @@ const Navbar: React.FC<{ isLoggedIn?: boolean }> = ({
           <Link
             href={authButtonHref}
             className={cn(
+              "cursor-pointer",
               buttonVariants({ variant: "default", size: "lg" }),
               "rounded-full px-4 font-semibold transition-all hover:-translate-y-0.5 hover:shadow-lg md:px-8"
             )}
@@ -81,7 +82,7 @@ const Navbar: React.FC<{ isLoggedIn?: boolean }> = ({
           <Drawer.Root direction="right">
             <Drawer.Trigger asChild className="md:hidden">
               <button
-                className="p-1 text-base-content-muted hover:text-base-content focus:outline-none sm:p-2"
+                className="cursor-pointer p-1 text-base-content-muted hover:text-base-content focus:outline-none sm:p-2"
                 aria-label="Open Menu"
               >
                 <Menu className="h-6 w-6" />
@@ -100,7 +101,7 @@ const Navbar: React.FC<{ isLoggedIn?: boolean }> = ({
                     <Drawer.Close asChild>
                       <Link
                         href="/"
-                        className="flex items-center gap-2 transition-opacity hover:opacity-80"
+                        className="flex cursor-pointer items-center gap-2 transition-opacity hover:opacity-80"
                       >
                         <img
                           src={`${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT || ""}/assets/logo.svg`}
@@ -113,7 +114,7 @@ const Navbar: React.FC<{ isLoggedIn?: boolean }> = ({
                       </Link>
                     </Drawer.Close>
                     <Drawer.Close asChild>
-                      <button className="rounded-full p-2 text-base-content-muted transition-colors hover:bg-base-200 hover:text-base-content">
+                      <button className="cursor-pointer rounded-full p-2 text-base-content-muted transition-colors hover:bg-base-200 hover:text-base-content">
                         <X className="h-6 w-6" />
                       </button>
                     </Drawer.Close>
@@ -125,7 +126,7 @@ const Navbar: React.FC<{ isLoggedIn?: boolean }> = ({
                         <Link
                           href={link.href}
                           className={cn(
-                            "border-b border-base-100 pb-4 text-xl font-medium transition-colors",
+                            "cursor-pointer border-b border-base-100 pb-4 text-xl font-medium transition-colors",
                             pathname === link.href
                               ? "text-primary"
                               : "text-base-content-muted hover:text-primary"
@@ -147,6 +148,7 @@ const Navbar: React.FC<{ isLoggedIn?: boolean }> = ({
                       <Link
                         href={authButtonHref}
                         className={cn(
+                          "cursor-pointer",
                           buttonVariants({ variant: "outline", size: "lg" }),
                           "w-full rounded-full font-semibold"
                         )}

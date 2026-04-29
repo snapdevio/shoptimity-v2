@@ -48,8 +48,8 @@ export default function NewPricingPage() {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       {/* Background Decorative Elements */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-[10%] -left-[10%] h-[40%] w-[40%] rounded-full bg-orange-100/50 blur-[120px]" />
-        <div className="absolute top-[20%] -right-[10%] h-[35%] w-[35%] rounded-full bg-pink-50/50 blur-[100px]" />
+        <div className="absolute top-[-10%] left-[-10%] h-[40%] w-[40%] rounded-full bg-orange-100/50 blur-[120px]" />
+        <div className="absolute top-[20%] right-[-10%] h-[35%] w-[35%] rounded-full bg-pink-50/50 blur-[100px]" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-6 py-20 lg:py-32">
@@ -83,7 +83,7 @@ export default function NewPricingPage() {
                   billingCycle === "monthly" ? "yearly" : "monthly"
                 )
               }
-              className="relative h-8 w-16 rounded-full bg-slate-200 p-1 transition-colors hover:bg-slate-300"
+              className="relative h-8 w-16 cursor-pointer rounded-full bg-slate-200 p-1 transition-colors hover:bg-slate-300"
             >
               <div
                 className={cn(
@@ -125,7 +125,7 @@ export default function NewPricingPage() {
               <span className="font-medium text-slate-400">/forever</span>
             </div>
 
-            <button className="mb-8 w-full rounded-2xl border-2 border-slate-200 px-6 py-4 font-bold transition-all hover:bg-slate-50">
+            <button className="mb-8 w-full cursor-pointer rounded-2xl border-2 border-slate-200 px-6 py-4 font-bold transition-all hover:bg-slate-50">
               Get Started For Free
             </button>
 
@@ -191,7 +191,7 @@ export default function NewPricingPage() {
               </p>
             )}
 
-            <button className="mb-8 w-full rounded-2xl bg-orange-500 px-6 py-4 font-bold text-white transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30 active:scale-[0.98]">
+            <button className="mb-8 w-full cursor-pointer rounded-2xl bg-orange-500 px-6 py-4 font-bold text-white transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30 active:scale-[0.98]">
               Upgrade Now
             </button>
 
@@ -496,7 +496,7 @@ function ComparisonAccordion({
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-slate-50 md:p-6"
+        className="flex w-full cursor-pointer items-center justify-between p-4 text-left transition-colors hover:bg-slate-50 md:p-6"
       >
         <div>
           <h3 className="text-lg font-bold text-slate-900 md:text-xl">

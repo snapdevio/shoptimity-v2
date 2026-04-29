@@ -55,7 +55,7 @@ import {
 } from "@/actions/domains"
 import { cancelLicenseSubscription } from "@/actions/licenses"
 import { normalizeDomain, validateDomain } from "@/lib/domains"
-import { formatDate, formatDateRelative } from "@/lib/format"
+import { formatDate, formatDaysRemaining } from "@/lib/format"
 import { toast } from "sonner"
 
 interface Domain {
@@ -158,7 +158,7 @@ function NoLicensesView() {
 
             <Link
               href="/plans"
-              className="mt-6 inline-block rounded-full bg-orange-600 p-4 px-8 text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-orange-500"
+              className="mt-6 inline-block cursor-pointer rounded-full bg-orange-600 p-4 px-8 text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-orange-500"
             >
               View our pricing
             </Link>
@@ -209,7 +209,9 @@ function MultipleLicensesView({
             additional stores and unlock premium features.
           </p>
           <Button asChild className="shadow-sm">
-            <Link href="/plans">Purchase Licenses &rarr;</Link>
+            <Link href="/plans" className="cursor-pointer">
+              Purchase Licenses &rarr;
+            </Link>
           </Button>
         </div>
       </Card>
@@ -294,7 +296,7 @@ function SingleLicenseView({
                   </div>
                   {license.trialEndsAt && (
                     <span className="mt-1 text-[10px] font-medium text-muted-foreground">
-                      Ends {formatDateRelative(license.trialEndsAt)}
+                      {formatDaysRemaining(license.trialEndsAt)}
                     </span>
                   )}
                 </div>
@@ -355,7 +357,7 @@ function SingleLicenseView({
                       href={license.stripeInvoiceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                      className="flex cursor-pointer items-center gap-1 text-sm font-semibold text-primary hover:underline"
                     >
                       <ExternalLink className="size-3" />
                       View Receipt
@@ -379,7 +381,7 @@ function SingleLicenseView({
                     navigator.clipboard.writeText(license.id)
                     toast.success("License ID copied")
                   }}
-                  className="flex items-center gap-1 text-[10px] font-bold text-primary hover:opacity-80"
+                  className="flex cursor-pointer items-center gap-1 text-[10px] font-bold text-primary hover:opacity-80"
                 >
                   <Copy className="size-3" />
                   Copy
@@ -489,6 +491,7 @@ function SingleLicenseView({
                           href={`https://${domain.domainName}/admin`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          className="cursor-pointer"
                         >
                           <ExternalLink className="mr-2 size-4" />
                           Open Admin
@@ -517,7 +520,7 @@ function SingleLicenseView({
                     <button
                       disabled={!isActive}
                       className={cn(
-                        "group relative flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-primary/30 bg-primary/5 p-12 text-center transition-all hover:border-primary/50 hover:bg-primary/10 focus:ring-2 focus:ring-primary/20 focus:outline-none",
+                        "group relative flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-primary/30 bg-primary/5 p-12 text-center transition-all hover:border-primary/50 hover:bg-primary/10 focus:ring-2 focus:ring-primary/20 focus:outline-none",
                         !isActive && "cursor-not-allowed opacity-50 grayscale"
                       )}
                     >
@@ -605,7 +608,7 @@ function LicenseGuide() {
                   href={step.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-1 inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
+                  className="ml-1 inline-flex cursor-pointer items-center gap-0.5 font-medium text-primary hover:underline"
                 >
                   {step.linkText} <ExternalLink className="size-3" />
                 </a>
@@ -684,7 +687,7 @@ function LicenseCard({
                   </div>
                   {license.trialEndsAt && (
                     <span className="mx-auto text-[10px] font-medium whitespace-nowrap text-muted-foreground">
-                      Ends {formatDateRelative(license.trialEndsAt)}
+                      {formatDaysRemaining(license.trialEndsAt)}
                     </span>
                   )}
                 </div>
@@ -794,7 +797,7 @@ function DomainRow({
               href={`https://${domain.domainName}/admin`}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-bold text-foreground hover:text-primary hover:underline"
+              className="cursor-pointer font-bold text-foreground hover:text-primary hover:underline"
             >
               {domain.domainName}
             </a>
@@ -1083,7 +1086,7 @@ function AddDomainDialog({
                       href="https://admin.shopify.com"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-bold text-primary transition-colors hover:underline"
+                      className="cursor-pointer font-bold text-primary transition-colors hover:underline"
                     >
                       Shopify Settings
                     </a>{" "}
@@ -1341,7 +1344,7 @@ function EditDomainDialog({ domain }: { domain: Domain }) {
                       href="https://admin.shopify.com"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-bold text-primary transition-colors hover:underline"
+                      className="cursor-pointer font-bold text-primary transition-colors hover:underline"
                     >
                       Shopify Settings
                     </a>{" "}

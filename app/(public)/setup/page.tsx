@@ -141,7 +141,7 @@ export default function SetupPage() {
                   <div className="pt-4">
                     <Link
                       href={index === 0 ? "/plans" : "/contact"}
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
+                      className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
                     >
                       {index === 0 ? "Browse Plans" : "Learn More"}
                       <ArrowRight className="size-4" />
@@ -190,13 +190,13 @@ export default function SetupPage() {
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link
               href="/plans"
-              className="rounded-xl bg-white px-8 py-4 font-bold text-primary shadow-xl transition-all hover:bg-base-100 hover:shadow-2xl"
+              className="cursor-pointer rounded-xl bg-white px-8 py-4 font-bold text-primary shadow-xl transition-all hover:bg-base-100 hover:shadow-2xl"
             >
               Choose Your Plan
             </Link>
             <Link
               href="/contact"
-              className="rounded-xl border-2 border-white/20 px-8 py-4 font-bold text-white transition-all hover:bg-white/5"
+              className="cursor-pointer rounded-xl border-2 border-white/20 px-8 py-4 font-bold text-white transition-all hover:bg-white/5"
             >
               Talk to Our Experts
             </Link>

@@ -104,7 +104,7 @@ export default async function BlogShowcasePage({
           {featuredPost && (
             <Link
               href={`/review-app/blog/${featuredPost.id}`}
-              className="group relative mb-10 flex flex-col overflow-hidden rounded-[2.5rem] border border-gray-100/50 bg-white shadow-2xl shadow-gray-200/60"
+              className="group relative mb-10 flex cursor-pointer flex-col overflow-hidden rounded-[2.5rem] border border-gray-100/50 bg-white shadow-2xl shadow-gray-200/60"
             >
               <div className="relative aspect-3/2 w-full overflow-hidden">
                 <img
@@ -167,7 +167,7 @@ export default async function BlogShowcasePage({
                 <Link
                   key={post.id}
                   href={`/review-app/blog/${post.id}`}
-                  className="group flex h-full flex-col overflow-hidden rounded-[2rem] border border-gray-50 bg-white shadow-md transition-all duration-300 hover:shadow-xl"
+                  className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-[2rem] border border-gray-50 bg-white shadow-md transition-all duration-300 hover:shadow-xl"
                 >
                   <div className="relative aspect-3/2 overflow-hidden">
                     <img
@@ -227,7 +227,7 @@ export default async function BlogShowcasePage({
               </p>
               <Link
                 href="/review-app/blog"
-                className="rounded-full bg-brand-orange px-8 py-3 text-sm font-bold text-white shadow-lg shadow-brand-orange/20 transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                className="cursor-pointer rounded-full bg-brand-orange px-8 py-3 text-sm font-bold text-white shadow-lg shadow-brand-orange/20 transition-all hover:-translate-y-0.5 hover:shadow-xl"
               >
                 Browse All Articles
               </Link>

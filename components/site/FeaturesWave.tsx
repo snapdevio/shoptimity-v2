@@ -3,7 +3,7 @@ import React from "react"
 const FeaturesWave: React.FC = () => {
   return (
     <div className="flex min-h-[660px] w-full items-center justify-center bg-base-100 p-4">
-      <section className="scroll-animate relative flex h-[500px] w-full max-w-[1240px] flex-col items-center justify-center gap-0 overflow-visible rounded-[20px] bg-base-200">
+      <section className="scroll-animate relative flex h-125 w-full max-w-[1240px] flex-col items-center justify-center gap-0 overflow-visible rounded-[20px] bg-base-200">
         <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[20px] opacity-40">
           <img
             src="/assets/wave.webp"

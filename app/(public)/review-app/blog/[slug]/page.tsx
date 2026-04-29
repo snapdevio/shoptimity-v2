@@ -41,7 +41,7 @@ export default async function BlogDetailPage({
         <div className="container mx-auto max-w-6xl px-4">
           <Link
             href="/review-app/blog"
-            className="group mb-8 inline-flex items-center gap-2 text-muted-foreground transition-colors hover:text-brand-orange"
+            className="group mb-8 inline-flex cursor-pointer items-center gap-2 text-muted-foreground transition-colors hover:text-brand-orange"
           >
             <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
             Back to Blogs
@@ -96,7 +96,7 @@ export default async function BlogDetailPage({
                 <Link
                   key={post.handle}
                   href={`/review-app/blog/${post.handle}`}
-                  className="group flex h-full flex-col overflow-hidden rounded-[2rem] border border-gray-50 bg-white shadow-md transition-all duration-300 hover:shadow-xl"
+                  className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-[2rem] border border-gray-50 bg-white shadow-md transition-all duration-300 hover:shadow-xl"
                 >
                   <div className="relative aspect-3/2 overflow-hidden">
                     <img

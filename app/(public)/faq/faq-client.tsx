@@ -42,12 +42,12 @@ const FAQItem: React.FC<FAQItemProps> = ({
         </span>
         <div className="relative h-6 w-6 shrink-0">
           <span
-            className={`absolute top-1/2 left-0 h-[2px] w-full translate-y-[-50%] rounded-full bg-base-content transition-colors duration-300 ${
+            className={`absolute top-1/2 left-0 h-0.5 w-full translate-y-[-50%] rounded-full bg-base-content transition-colors duration-300 ${
               isOpen ? "bg-primary" : "group-hover:bg-primary"
             }`}
           ></span>
           <span
-            className={`absolute top-0 left-1/2 h-full w-[2px] translate-x-[-50%] rounded-full bg-base-content transition-all duration-300 ${
+            className={`absolute top-0 left-1/2 h-full w-0.5 translate-x-[-50%] rounded-full bg-base-content transition-all duration-300 ${
               isOpen
                 ? "scale-y-0 rotate-90 transform bg-primary opacity-0"
                 : "group-hover:bg-primary"
@@ -129,13 +129,16 @@ export function FAQClient() {
 
               <div>
                 You can reach us via live chat, through our{" "}
-                <Link href="/contact" className="text-primary hover:underline">
+                <Link
+                  href="/contact"
+                  className="cursor-pointer text-primary hover:underline"
+                >
                   contact page
                 </Link>
                 , or via{" "}
                 <a
                   href="mailto:support@shoptimity.com"
-                  className="text-primary hover:underline"
+                  className="cursor-pointer text-primary hover:underline"
                 >
                   email
                 </a>
@@ -181,7 +184,7 @@ export function FAQClient() {
     <div className="min-h-screen bg-base-100">
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-20 pb-16 sm:pt-24 sm:pb-20">
-        <div className="absolute top-0 left-1/2 -z-10 h-[400px] w-[800px] -translate-x-1/2 bg-[radial-gradient(circle_at_center,var(--color-primary)_0%,transparent_70%)] opacity-[0.05]"></div>
+        <div className="absolute top-0 left-1/2 -z-10 h-100 w-200 -translate-x-1/2 bg-[radial-gradient(circle_at_center,var(--color-primary)_0%,transparent_70%)] opacity-[0.05]"></div>
 
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
           <h1 className="font-heading text-4xl font-bold tracking-tight text-base-content sm:text-5xl">
@@ -203,7 +206,7 @@ export function FAQClient() {
                 <h2 className="font-heading text-2xl font-bold text-base-content">
                   {category.category}
                 </h2>
-                <div className="h-[2px] flex-1 bg-border/50"></div>
+                <div className="h-0.5 flex-1 bg-border/50"></div>
               </div>
               <div className="space-y-4">
                 {category.items.map((item) => {
@@ -242,13 +245,13 @@ export function FAQClient() {
               <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <Link
                   href="/contact"
-                  className="inline-flex h-[56px] w-full items-center justify-center rounded-full bg-primary px-10 text-lg font-semibold text-white transition-all hover:scale-105 hover:shadow-xl sm:w-auto"
+                  className="inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-full bg-primary px-10 text-lg font-semibold text-white transition-all hover:scale-105 hover:shadow-xl sm:w-auto"
                 >
                   Get in Touch
                 </Link>
                 <Link
                   href="/plans"
-                  className="inline-flex h-[56px] w-full items-center justify-center rounded-full bg-white/10 px-10 text-lg font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 sm:w-auto"
+                  className="inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-full bg-white/10 px-10 text-lg font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 sm:w-auto"
                 >
                   View Pricing
                 </Link>

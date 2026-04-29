@@ -123,9 +123,9 @@ export function AdminTemplatesClient({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30 text-xs hover:bg-muted/30">
-              <TableHead className="w-[50px]">Pos</TableHead>
-              <TableHead className="w-[80px]">Image</TableHead>
-              <TableHead className="min-w-[180px]">Template</TableHead>
+              <TableHead className="w-12.5">Pos</TableHead>
+              <TableHead className="w-20">Image</TableHead>
+              <TableHead className="min-w-45">Template</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="hidden md:table-cell">Style</TableHead>
               <TableHead>Links</TableHead>
@@ -160,7 +160,7 @@ export function AdminTemplatesClient({
                   key={template.id}
                   className="group transition-colors hover:bg-muted/5"
                 >
-                  <TableCell className="w-[50px] font-mono text-[10px] text-muted-foreground">
+                  <TableCell className="w-12.5 font-mono text-[10px] text-muted-foreground">
                     #{template.position}
                   </TableCell>
                   <TableCell>
@@ -184,7 +184,7 @@ export function AdminTemplatesClient({
                         {template.title}
                       </span>
                       {template.description && (
-                        <span className="line-clamp-1 max-w-[200px] text-xs text-muted-foreground">
+                        <span className="line-clamp-1 max-w-50 text-xs text-muted-foreground">
                           {template.description}
                         </span>
                       )}
@@ -225,6 +225,7 @@ export function AdminTemplatesClient({
                             href={template.previewLink}
                             target="_blank"
                             rel="noopener noreferrer"
+                            className="cursor-pointer"
                           >
                             <ExternalLink className="size-3.5" />
                           </a>
@@ -242,6 +243,7 @@ export function AdminTemplatesClient({
                             href={template.downloadLink}
                             target="_blank"
                             rel="noopener noreferrer"
+                            className="cursor-pointer"
                           >
                             <Download className="size-3.5" />
                           </a>

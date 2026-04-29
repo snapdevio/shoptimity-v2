@@ -75,14 +75,14 @@ export default function PrivacyPolicyPage() {
                 Messages and inquiries you send through our{" "}
                 <Link
                   href="/contact"
-                  className="text-primary underline underline-offset-4 hover:text-primary/80"
+                  className="cursor-pointer text-primary underline underline-offset-4 hover:text-primary/80"
                 >
                   contact form
                 </Link>{" "}
                 or{" "}
                 <a
                   href="mailto:support@shoptimity.com"
-                  className="text-primary underline underline-offset-4 hover:text-primary/80"
+                  className="cursor-pointer text-primary underline underline-offset-4 hover:text-primary/80"
                 >
                   email
                 </a>
@@ -221,14 +221,14 @@ export default function PrivacyPolicyPage() {
               contact us through our live chat,{" "}
               <Link
                 href="/contact"
-                className="text-primary underline underline-offset-4 hover:text-primary/80"
+                className="cursor-pointer text-primary underline underline-offset-4 hover:text-primary/80"
               >
                 contact page
               </Link>{" "}
               or email us at{" "}
               <a
                 href="mailto:support@shoptimity.com"
-                className="text-primary underline underline-offset-4 hover:text-primary/80"
+                className="cursor-pointer text-primary underline underline-offset-4 hover:text-primary/80"
               >
                 support@shoptimity.com
               </a>

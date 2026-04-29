@@ -153,7 +153,10 @@ export function CheckoutForm({
           <p className="mt-4 text-muted-foreground">
             Please select a plan from our pricing page to continue.
           </p>
-          <Link href="/plans" className={cn(buttonVariants(), "mt-6")}>
+          <Link
+            href="/plans"
+            className={cn(buttonVariants(), "mt-6 cursor-pointer")}
+          >
             View Pricing
           </Link>
         </div>
@@ -168,7 +171,7 @@ export function CheckoutForm({
           href="/plans"
           className={cn(
             buttonVariants({ variant: "ghost", size: "sm" }),
-            "mb-6"
+            "mb-6 cursor-pointer"
           )}
         >
           <ArrowLeft data-icon="inline-start" />

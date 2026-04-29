@@ -7,7 +7,7 @@ import { getSettings } from "@/actions/admin-settings"
 import { PlansClient } from "./plans-client"
 import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"
-import { licenses, plans } from "@/db/schema"
+import { licenses, plans, users } from "@/db/schema"
 import { eq, and } from "drizzle-orm"
 
 export const metadata: Metadata = {
@@ -32,6 +32,7 @@ export default async function PlansPage() {
   let activePlanMode: string | undefined
   let activeBillingCycle: string | undefined
   let hasStripeSubscription = false
+  let hasUsedTrial = false
 
   if (session) {
     const [activeLicense] = await db
@@ -52,6 +53,14 @@ export default async function PlansPage() {
     activePlanMode = activeLicense?.planMode || undefined
     activeBillingCycle = activeLicense?.billingCycle || undefined
     hasStripeSubscription = !!activeLicense?.stripeSubscriptionId
+
+    const [userTrialState] = await db
+      .select({ hasUsedTrial: users.hasUsedTrial })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1)
+
+    hasUsedTrial = !!userTrialState?.hasUsedTrial
   }
 
   return (
@@ -63,6 +72,7 @@ export default async function PlansPage() {
       activePlanMode={activePlanMode}
       activeBillingCycle={activeBillingCycle}
       hasStripeSubscription={hasStripeSubscription}
+      hasUsedTrial={hasUsedTrial}
     />
   )
 }

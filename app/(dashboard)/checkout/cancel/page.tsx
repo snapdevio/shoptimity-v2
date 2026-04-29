@@ -45,7 +45,7 @@ export default function CheckoutCancelPage() {
         <div className="mt-10 flex flex-col gap-3">
           <button
             onClick={() => router.push("/plans")}
-            className="group flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-95"
+            className="group flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-95"
           >
             <RefreshCw className="h-4 w-4 transition-transform duration-500 group-hover:rotate-180" />
             Try again
@@ -54,12 +54,12 @@ export default function CheckoutCancelPage() {
           <div className="flex gap-3">
             <button
               onClick={() => router.push("/licenses")}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95"
+              className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95"
             >
               <ArrowLeft className="h-4 w-4" />
               Licenses
             </button>
-            <button className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95">
+            <button className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95">
               <MessageCircle className="h-4 w-4" />
               Support
             </button>
@@ -68,7 +68,7 @@ export default function CheckoutCancelPage() {
 
         <p className="mt-8 text-sm text-slate-400">
           Need help?{" "}
-          <button className="font-bold text-primary hover:underline">
+          <button className="cursor-pointer font-bold text-primary hover:underline">
             Contact our support team
           </button>
         </p>
