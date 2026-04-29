@@ -116,9 +116,7 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
 
       // Check for hasYearlyPlan flag
       const canBeYearly =
-        yearlyPlan ||
-        (monthlyPlan && monthlyPlan.hasYearlyPlan) ||
-        false
+        yearlyPlan || (monthlyPlan && monthlyPlan.hasYearlyPlan) || false
 
       const discountPercent =
         yearlyPlan?.yearlyDiscountPercentage ||
@@ -149,21 +147,21 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
         isFree,
         features: Array.isArray(basePlan?.features)
           ? (basePlan.features as string[]).map((f) => {
-            let name = f
-            if (f.toLowerCase().includes("industry templates")) {
-              const count = isPro
-                ? templateCount || 10
-                : Math.round((templateCount || 10) / 2)
-              name = `${count} Industry Templates`
-            }
-            return {
-              name,
-              included: true,
-              highlight:
-                f.toLowerCase().includes("templates") ||
-                (isPro && f.toLowerCase().includes("priority")),
-            }
-          })
+              let name = f
+              if (f.toLowerCase().includes("industry templates")) {
+                const count = isPro
+                  ? templateCount || 10
+                  : Math.round((templateCount || 10) / 2)
+                name = `${count} Industry Templates`
+              }
+              return {
+                name,
+                included: true,
+                highlight:
+                  f.toLowerCase().includes("templates") ||
+                  (isPro && f.toLowerCase().includes("priority")),
+              }
+            })
           : [],
       }
     })
@@ -180,10 +178,10 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
   const discount =
     currentPlan && currentPlan.monthlyPrice > 0
       ? Math.round(
-        ((currentPlan.monthlyPrice * 12 - currentPlan.yearlyPrice) /
-          (currentPlan.monthlyPrice * 12)) *
-        100
-      )
+          ((currentPlan.monthlyPrice * 12 - currentPlan.yearlyPrice) /
+            (currentPlan.monthlyPrice * 12)) *
+            100
+        )
       : 0
 
   const handleAction = async () => {
@@ -366,22 +364,20 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                         ) : (
                           "Free"
                         )}
-                        {isYearly && plan.monthlyPrice > 0 && plan.yearlyPrice > 0 && (
-                          <span className="ml-2 text-[14px] leading-none font-medium text-base-content-muted line-through">
-                            ${plan.monthlyPrice * 12}
-                          </span>
-                        )}
+                        {isYearly &&
+                          plan.monthlyPrice > 0 &&
+                          plan.yearlyPrice > 0 && (
+                            <span className="ml-2 text-[14px] leading-none font-medium text-base-content-muted line-through">
+                              ${plan.monthlyPrice * 12}
+                            </span>
+                          )}
                       </div>
                       <div className="mt-1 text-[12px] leading-none font-medium text-base-content-muted">
-                        {plan.monthlyPrice > 0 ? (
-                          isYearly && plan.yearlyPrice > 0 ? (
-                            "Billed annually"
-                          ) : (
-                            "Billed monthly"
-                          )
-                        ) : (
-                          "Forever"
-                        )}
+                        {plan.monthlyPrice > 0
+                          ? isYearly && plan.yearlyPrice > 0
+                            ? "Billed annually"
+                            : "Billed monthly"
+                          : "Forever"}
                       </div>
                     </div>
                   </button>

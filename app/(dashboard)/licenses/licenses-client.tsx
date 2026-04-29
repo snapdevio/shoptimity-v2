@@ -248,7 +248,7 @@ function SingleLicenseView({
                   {license.planMode ||
                     (license.isLifetime ? "lifetime" : "subscription")}
                 </Badge> */}
-                <h2 className=" ms-2 text-3xl font-bold tracking-tight text-foreground">
+                <h2 className="ms-2 text-3xl font-bold tracking-tight text-foreground">
                   {license.planName} Plan
                 </h2>
               </div>
@@ -318,9 +318,9 @@ function SingleLicenseView({
                 <p className="mt-1 text-sm font-semibold">
                   {license.amount
                     ? new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: license.currency || "USD",
-                    }).format(license.amount / 100)
+                        style: "currency",
+                        currency: license.currency || "USD",
+                      }).format(license.amount / 100)
                     : "Free"}
                 </p>
               </div>
@@ -676,11 +676,11 @@ function LicenseCard({
                   >
                     {(license.status === "active" ||
                       license.status === "trialing") && (
-                        <span className="relative flex h-1.5 w-1.5">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75"></span>
-                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                        </span>
-                      )}
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75"></span>
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                      </span>
+                    )}
                     {license.status === "canceled" ? "Canceled" : "Free Trial"}
                   </div>
                   {license.trialEndsAt && (

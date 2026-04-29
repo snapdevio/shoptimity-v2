@@ -218,10 +218,10 @@ export default function AdminSettingsPage() {
                   "cancel_offer_timeout",
                 ].includes(key)
             ).length === 0 && (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  No custom flags added yet.
-                </div>
-              )}
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No custom flags added yet.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

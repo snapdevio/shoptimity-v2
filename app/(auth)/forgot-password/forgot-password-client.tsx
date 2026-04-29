@@ -95,148 +95,165 @@ export function ForgotPasswordClient() {
     }
   }
 
-  if (success) {
-    return (
-      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">
-            <CheckCircleIcon className="size-8 text-primary" />
-          </div>
-          <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
-          <CardDescription className="text-base">
-            We've sent a password reset link to{" "}
-            <strong className="font-semibold text-foreground">{email}</strong>.
-            Please check your inbox and follow the instructions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-6 pt-0">
-          {(() => {
-            const inbox = getInboxDetails(email)
-            if (inbox) {
-              return (
-                <Button asChild className="w-full rounded-full" size="lg">
-                  <a
-                    href={inbox.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2"
-                  >
-                    <MailIcon className="size-5" />
-                    Go to {inbox.name}
-                  </a>
-                </Button>
-              )
-            }
-            // Fallback for custom domains
-            const searchTerm = encodeURIComponent(
-              "Reset your Shoptimity password"
-            )
-            return (
-              <div className="flex flex-col gap-3">
-                <Button
-                  asChild
-                  className="flex w-full items-center justify-center gap-2 rounded-full"
-                  size="lg"
-                >
-                  <a
-                    href={`https://mail.google.com/mail/u/0/#search/${searchTerm}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <MailIcon className="size-5" />
-                    Open in Gmail
-                  </a>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="flex w-full items-center justify-center gap-2 rounded-full"
-                  size="lg"
-                >
-                  <a
-                    href={`https://outlook.live.com/mail/0/search/results?q=${searchTerm}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <MailIcon className="size-5" />
-                    Open in Outlook
-                  </a>
-                </Button>
-              </div>
-            )
-          })()}
-        </CardContent>
-        <CardFooter className="justify-center border-t border-border/50 pt-6">
-          <Link
-            href="/login"
-            className="text-sm text-muted-foreground transition-colors hover:text-primary"
-          >
-            Back to login
-          </Link>
-        </CardFooter>
-      </Card>
-    )
-  }
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Reset your password</CardTitle>
-        <CardDescription>
-          Enter your email address and we'll send you a link to reset your
-          password.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircleIcon className="size-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+    <div className="flex min-h-svh flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Link href="/" className="inline-flex items-center gap-2">
+            <div className="relative h-10 w-auto">
+              <img
+                src={`${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT || ""}/assets/logo.svg`}
+                alt="Shoptimity Logo"
+                className="h-10 w-auto object-contain"
+              />
+            </div>
+          </Link>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Premium Conversion-Optimized Shopify Theme
+          </p>
+        </div>
 
-        <form onSubmit={handleRequestReset} className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="email">Email address</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              disabled={isLoading}
-            />
-          </div>
-          <Button type="submit" disabled={isLoading} className="w-full">
-            {isLoading ? (
-              <>
-                <Spinner className="mr-2" />
-                Sending link...
-              </>
-            ) : (
-              <>
-                <MailIcon className="mr-2 size-4" />
-                Send Reset Link
-              </>
-            )}
-          </Button>
-        </form>
-      </CardContent>
-      <CardFooter className="justify-center">
-        <Link
-          href="/login"
-          className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
-        >
-          <ArrowLeftIcon className="size-4" />
-          Back to login
-        </Link>
-      </CardFooter>
-    </Card>
-  )
-}
-      </div >
-    </div >
+        {success ? (
+          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">
+                <CheckCircleIcon className="size-8 text-primary" />
+              </div>
+              <CardTitle className="text-2xl font-bold">
+                Check your email
+              </CardTitle>
+              <CardDescription className="text-base">
+                We've sent a password reset link to{" "}
+                <strong className="font-semibold text-foreground">
+                  {email}
+                </strong>
+                . Please check your inbox and follow the instructions.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-6 pt-0">
+              {(() => {
+                const inbox = getInboxDetails(email)
+                if (inbox) {
+                  return (
+                    <Button asChild className="w-full rounded-full" size="lg">
+                      <a
+                        href={inbox.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2"
+                      >
+                        <MailIcon className="size-5" />
+                        Go to {inbox.name}
+                      </a>
+                    </Button>
+                  )
+                }
+                // Fallback for custom domains
+                const searchTerm = encodeURIComponent(
+                  "Reset your Shoptimity password"
+                )
+                return (
+                  <div className="flex flex-col gap-3">
+                    <Button
+                      asChild
+                      className="flex w-full items-center justify-center gap-2 rounded-full"
+                      size="lg"
+                    >
+                      <a
+                        href={`https://mail.google.com/mail/u/0/#search/${searchTerm}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <MailIcon className="size-5" />
+                        Open in Gmail
+                      </a>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="flex w-full items-center justify-center gap-2 rounded-full"
+                      size="lg"
+                    >
+                      <a
+                        href={`https://outlook.live.com/mail/0/search/results?q=${searchTerm}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <MailIcon className="size-5" />
+                        Open in Outlook
+                      </a>
+                    </Button>
+                  </div>
+                )
+              })()}
+            </CardContent>
+            <CardFooter className="justify-center border-t border-border/50 pt-6">
+              <Link
+                href="/login"
+                className="text-sm text-muted-foreground transition-colors hover:text-primary"
+              >
+                Back to login
+              </Link>
+            </CardFooter>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Reset your password</CardTitle>
+              <CardDescription>
+                Enter your email address and we'll send you a link to reset your
+                password.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircleIcon className="size-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <form onSubmit={handleRequestReset} className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button type="submit" disabled={isLoading} className="w-full">
+                  {isLoading ? (
+                    <>
+                      <Spinner className="mr-2" />
+                      Sending link...
+                    </>
+                  ) : (
+                    <>
+                      <MailIcon className="mr-2 size-4" />
+                      Send Reset Link
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+            <CardFooter className="justify-center">
+              <Link
+                href="/login"
+                className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
+              >
+                <ArrowLeftIcon className="size-4" />
+                Back to login
+              </Link>
+            </CardFooter>
+          </Card>
+        )}
+      </div>
+    </div>
   )
 }

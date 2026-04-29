@@ -117,7 +117,7 @@ export async function removeCard(paymentMethodId: string) {
         )) as any
         if (
           customer.invoice_settings?.default_payment_method ===
-          paymentMethodId ||
+            paymentMethodId ||
           !customer.invoice_settings?.default_payment_method
         ) {
           await stripe.customers.update(user.stripeCustomerId, {
@@ -357,11 +357,14 @@ export async function applyRetentionDiscount(
     const [license] = await db
       .select()
       .from(licenses)
-      .where(and(eq(licenses.id, licenseId), eq(licenses.userId, session.userId)))
+      .where(
+        and(eq(licenses.id, licenseId), eq(licenses.userId, session.userId))
+      )
       .limit(1)
 
     if (!license) return { error: "License not found" }
-    if (license.retentionDiscountUsed) return { error: "Retention discount already used for this license" }
+    if (license.retentionDiscountUsed)
+      return { error: "Retention discount already used for this license" }
 
     let couponId = ""
 
@@ -371,7 +374,9 @@ export async function applyRetentionDiscount(
         const stripeCoupon = await stripe.coupons.retrieve(couponCode)
         couponId = stripeCoupon.id
       } catch (e) {
-        console.warn(`Configured retention coupon ${couponCode} not found in Stripe, falling back to dynamic creation.`)
+        console.warn(
+          `Configured retention coupon ${couponCode} not found in Stripe, falling back to dynamic creation.`
+        )
       }
     }
 
@@ -395,16 +400,21 @@ export async function applyRetentionDiscount(
     })
 
     // 4. Update local DB
-    const nextPaymentDate = new Date(((subscription as any).current_period_end * 1000))
+    const nextPaymentDate = new Date(
+      (subscription as any).current_period_end * 1000
+    )
 
-    await db.update(licenses).set({
-      retentionDiscountUsed: true,
-      retentionDiscountEndsAt: new Date(
-        Date.now() + durationInMonths * 30 * 24 * 60 * 60 * 1000
-      ),
-      cancelAtPeriodEnd: false,
-      updatedAt: new Date(),
-    }).where(eq(licenses.id, licenseId))
+    await db
+      .update(licenses)
+      .set({
+        retentionDiscountUsed: true,
+        retentionDiscountEndsAt: new Date(
+          Date.now() + durationInMonths * 30 * 24 * 60 * 60 * 1000
+        ),
+        cancelAtPeriodEnd: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(licenses.id, licenseId))
 
     revalidatePath("/billing")
     revalidatePath("/billing/cancel")
@@ -417,8 +427,11 @@ export async function applyRetentionDiscount(
         year: "numeric",
       }),
       amountDue: subscription.items.data[0].price.unit_amount
-        ? Math.round(subscription.items.data[0].price.unit_amount * (1 - discountPercent / 100))
-        : 0
+        ? Math.round(
+            subscription.items.data[0].price.unit_amount *
+              (1 - discountPercent / 100)
+          )
+        : 0,
     }
   } catch (error) {
     console.error("[applyRetentionDiscount] Error:", error)
@@ -740,7 +753,10 @@ export async function downgradeToFreePlan(licenseId: string) {
 
     // Handle Non-Subscription IDs (Setup Intents, Payment Methods, etc.)
     // If it's not a proper subscription ID (sub_...), we just perform a local downgrade
-    if (subscriptionId.startsWith("seti_") || !subscriptionId.startsWith("sub_")) {
+    if (
+      subscriptionId.startsWith("seti_") ||
+      !subscriptionId.startsWith("sub_")
+    ) {
       const [freePlan] = await db
         .select()
         .from(plans)

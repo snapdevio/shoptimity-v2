@@ -93,10 +93,7 @@ export function PlansClient({
     const cycles = new Set<string>()
     dbPlans.forEach((p) => {
       if (p.mode === "monthly") cycles.add("monthly")
-      if (
-        p.mode === "yearly" ||
-        (p.mode === "monthly" && p.hasYearlyPlan)
-      )
+      if (p.mode === "yearly" || (p.mode === "monthly" && p.hasYearlyPlan))
         cycles.add("yearly")
       if (p.mode === "lifetime") cycles.add("lifetime")
     })
@@ -154,13 +151,16 @@ export function PlansClient({
       let price = (finalPlan?.finalPrice || 0) / 100
       let originalPrice = (finalPlan?.regularPrice || 0) / 100
       let yearlyPrice =
-        (group.yearly?.finalPrice ||
-          group.lifetime?.finalPrice ||
-          0) / 100
-      
+        (group.yearly?.finalPrice || group.lifetime?.finalPrice || 0) / 100
+
       // Fallback for monthly plans in yearly view
-      if (billingCycle === "yearly" && !group.yearly && !isVirtualYearly && group.monthly) {
-        yearlyPrice = (group.monthly.finalPrice / 100)
+      if (
+        billingCycle === "yearly" &&
+        !group.yearly &&
+        !isVirtualYearly &&
+        group.monthly
+      ) {
+        yearlyPrice = group.monthly.finalPrice / 100
       }
 
       if (isVirtualYearly) {
@@ -173,7 +173,11 @@ export function PlansClient({
       // Only show originalPrice if it's different from the display price
       const displayPrice = billingCycle === "yearly" ? yearlyPrice : price
       const finalOriginalPrice =
-        billingCycle === "yearly" ? originalPrice : (originalPrice > displayPrice ? originalPrice : undefined)
+        billingCycle === "yearly"
+          ? originalPrice
+          : originalPrice > displayPrice
+            ? originalPrice
+            : undefined
 
       let description =
         group.name === "Free"
@@ -223,13 +227,14 @@ export function PlansClient({
         price,
         yearlyPrice,
         originalPrice: finalOriginalPrice,
-        mode: displayPrice === 0
-          ? "forever"
-          : (billingCycle === "yearly" && (group.yearly || isVirtualYearly))
-            ? "year"
-            : billingCycle === "lifetime"
-              ? "one-time"
-              : "month",
+        mode:
+          displayPrice === 0
+            ? "forever"
+            : billingCycle === "yearly" && (group.yearly || isVirtualYearly)
+              ? "year"
+              : billingCycle === "lifetime"
+                ? "one-time"
+                : "month",
         buttonText: "Get Started",
         popular: isPopular,
         badge,

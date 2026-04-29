@@ -78,8 +78,8 @@ export default async function CancelPlanPage() {
 
   // Calculate the full price for the current billing cycle
   let price = plan?.finalPrice || 0
-  
-  // If the user is on a yearly cycle but the plan entry is monthly, 
+
+  // If the user is on a yearly cycle but the plan entry is monthly,
   // we calculate the yearly total (monthly price * 12)
   if (activeLicense.billingCycle === "yearly" && plan?.mode === "monthly") {
     price = price * 12

@@ -35,16 +35,21 @@ async function listCustomers(limit: number = 20) {
 
         const currentPeriodEnd = (sub as any).current_period_end
         if (currentPeriodEnd) {
-          console.log(`      Current Period End: ${new Date(currentPeriodEnd * 1000).toISOString()}`)
+          console.log(
+            `      Current Period End: ${new Date(currentPeriodEnd * 1000).toISOString()}`
+          )
         }
 
         for (const item of sub.items.data) {
-          const productId = typeof item.price.product === "string"
-            ? item.price.product
-            : (item.price.product as Stripe.Product).id
+          const productId =
+            typeof item.price.product === "string"
+              ? item.price.product
+              : (item.price.product as Stripe.Product).id
 
           const product = await stripe.products.retrieve(productId)
-          console.log(`      Product: ${product.name} (${(item.price.unit_amount! / 100).toFixed(2)} ${item.price.currency.toUpperCase()}/${item.price.recurring?.interval})`)
+          console.log(
+            `      Product: ${product.name} (${(item.price.unit_amount! / 100).toFixed(2)} ${item.price.currency.toUpperCase()}/${item.price.recurring?.interval})`
+          )
         }
       }
     }
@@ -72,11 +77,15 @@ async function deleteCustomersByEmail(email: string) {
   console.log(`Found ${customers.data.length} customers to remove.`)
   for (const customer of customers.data) {
     try {
-      console.log(`Deleting customer: ${customer.id} (${customer.name || 'No Name'})...`)
+      console.log(
+        `Deleting customer: ${customer.id} (${customer.name || "No Name"})...`
+      )
       await stripe.customers.del(customer.id)
       console.log(`Successfully deleted ${customer.id}`)
     } catch (error: any) {
-      console.error(`Failed to delete customer ${customer.id}: ${error.message}`)
+      console.error(
+        `Failed to delete customer ${customer.id}: ${error.message}`
+      )
     }
   }
 }
@@ -105,8 +114,10 @@ async function createTestCustomer(email: string, name: string) {
 async function createDemoCoupon() {
   const couponId = "SAVE20"
   const promoCodeText = "WELCOME20"
-  
-  console.log(`Creating premium demo coupon '${couponId}' and promotion code '${promoCodeText}'...`)
+
+  console.log(
+    `Creating premium demo coupon '${couponId}' and promotion code '${promoCodeText}'...`
+  )
 
   try {
     // Delete existing coupon if it exists to allow re-running the script
@@ -121,7 +132,7 @@ async function createDemoCoupon() {
       duration: "once",
       name: "20% Off First Purchase",
       max_redemptions: 100,
-      redeem_by: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days
+      redeem_by: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60, // 30 days
     })
     console.log(`- Coupon created: ${coupon.id}`)
 
@@ -159,18 +170,22 @@ async function main() {
       await deleteCustomersByEmail(param1)
       break
     case "create":
-      await createTestCustomer(param1 || "test@example.com", param2 || "Test User")
+      await createTestCustomer(
+        param1 || "test@example.com",
+        param2 || "Test User"
+      )
       break
     case "coupon":
       await createDemoCoupon()
       break
     default:
-      console.log("Unknown command. Use 'list', 'delete <email>', 'create <email> <name>', or 'coupon'.")
+      console.log(
+        "Unknown command. Use 'list', 'delete <email>', 'create <email> <name>', or 'coupon'."
+      )
   }
 }
 
 main().catch(console.error)
-
 
 // npx tsx --env-file=.env scripts/test-stripe-customers.ts list
 // npx tsx --env-file=.env scripts/test-stripe-customers.ts create admin@gmail.com "Test User"

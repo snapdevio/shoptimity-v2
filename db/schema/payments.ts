@@ -19,8 +19,8 @@ export const payments = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: text("user_id")
-    .notNull()
-    .references(() => users.id),
+      .notNull()
+      .references(() => users.id),
     planId: uuid("plan_id").references(() => plans.id),
     stripeSessionId: varchar("stripe_session_id", { length: 255 })
       .notNull()

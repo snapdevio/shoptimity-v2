@@ -144,7 +144,8 @@ export function PlanEditDialog({
           : "",
         position: (plan?.position || 0) as number,
         trialDays: (plan?.trialDays || 0) as number,
-        yearlyDiscountPercentage: (plan?.yearlyDiscountPercentage || 0) as number,
+        yearlyDiscountPercentage: (plan?.yearlyDiscountPercentage ||
+          0) as number,
         yearlyDiscountCouponCode: plan?.yearlyDiscountCouponCode || "",
         couponCode: plan?.couponCode || "",
         hasYearlyPlan: plan?.hasYearlyPlan ?? false,

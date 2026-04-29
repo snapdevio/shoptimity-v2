@@ -341,7 +341,9 @@ export function BillingClient({
                           {isPreviewing && (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           )}
-                          Upgrade to Yearly (Save {activeLicense?.plan?.yearlyDiscountPercentage || 20}%)
+                          Upgrade to Yearly (Save{" "}
+                          {activeLicense?.plan?.yearlyDiscountPercentage || 20}
+                          %)
                         </button>
                       )}
                     <button
@@ -369,13 +371,13 @@ export function BillingClient({
                     <p className="mt-1 text-sm font-bold text-slate-900">
                       {nextPaymentDate
                         ? new Date(nextPaymentDate * 1000).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          }
-                        )
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }
+                          )
                         : "N/A"}
                     </p>
                   </div>
@@ -389,7 +391,8 @@ export function BillingClient({
                         if (activeLicense.billingCycle === "yearly") {
                           const monthly = activeLicense.plan.finalPrice
                           const discount =
-                            (activeLicense.plan.yearlyDiscountPercentage || 0) / 100
+                            (activeLicense.plan.yearlyDiscountPercentage || 0) /
+                            100
                           return `$${((monthly * 12 * (1 - discount)) / 100).toFixed(2)}`
                         }
                         return `$${(activeLicense.plan.finalPrice / 100).toFixed(2)}`
@@ -406,7 +409,8 @@ export function BillingClient({
                         if (activeLicense.billingCycle === "yearly") {
                           const monthly = activeLicense.plan.finalPrice
                           const discount =
-                            (activeLicense.plan.yearlyDiscountPercentage || 0) / 100
+                            (activeLicense.plan.yearlyDiscountPercentage || 0) /
+                            100
                           const yearlyTotal = monthly * 12 * (1 - discount)
                           return `$${(yearlyTotal / 100).toFixed(2)}/yr`
                         }
@@ -419,9 +423,12 @@ export function BillingClient({
                       Billing Cycle
                     </p>
                     <p className="mt-1 text-sm font-bold text-slate-900 capitalize">
-                      {activeLicense?.plan?.finalPrice === 0 || activeLicense?.plan?.mode === "lifetime"
+                      {activeLicense?.plan?.finalPrice === 0 ||
+                      activeLicense?.plan?.mode === "lifetime"
                         ? "Forever"
-                        : (activeLicense?.billingCycle || activeLicense?.plan?.mode || "N/A")}
+                        : activeLicense?.billingCycle ||
+                          activeLicense?.plan?.mode ||
+                          "N/A"}
                     </p>
                   </div>
                   <div>
