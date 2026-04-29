@@ -156,7 +156,7 @@ export default async function PaymentsPage({
 
       {totalCount === 0 ? (
         <Card className="relative overflow-hidden border-border/50 bg-background/50 backdrop-blur-md">
-          <div className="pointer-events-none absolute top-0 right-0 h-[300px] w-[300px] translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-[80px]" />
+          <div className="pointer-events-none absolute top-0 right-0 h-75 w-75 translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-[80px]" />
           <CardContent className="relative z-10 flex flex-col items-center justify-center py-20 text-center">
             <div className="mb-6 flex size-16 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/20">
               <CreditCardIcon className="size-8 text-primary" />

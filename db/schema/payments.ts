@@ -30,6 +30,7 @@ export const payments = pgTable(
     }),
     stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
     stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+    stripeSetupIntentId: varchar("stripe_setup_intent_id", { length: 255 }),
     stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }),
     stripeInvoiceUrl: text("stripe_invoice_url"),
     amount: integer("amount").notNull(),

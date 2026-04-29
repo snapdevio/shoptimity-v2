@@ -21,18 +21,18 @@ export const auth = betterAuth({
   trustedOrigins: [
     "https://shoptimity.com",
     "http://localhost:3000",
-    "https://overstuff-landowner-overstuff.ngrok-free.dev",
-    "https://stepless-fendered-dominik.ngrok-free.dev",
+    "https://mannish-avert-uncommon.ngrok-free.dev",
   ],
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     },
-    // microsoft: {
-    //   clientId: process.env.MICROSOFT_CLIENT_ID || "",
-    //   clientSecret: process.env.MICROSOFT_CLIENT_SECRET || "",
-    // },
+    microsoft: {
+      clientId: process.env.MICROSOFT_CLIENT_ID || "",
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET || "",
+      tenantId: process.env.MICROSOFT_TENANT_ID || "common",
+    },
   },
   emailAndPassword: {
     enabled: true,

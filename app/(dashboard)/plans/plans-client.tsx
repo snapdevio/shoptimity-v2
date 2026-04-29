@@ -14,6 +14,9 @@ interface PricingClientProps {
   redirectPath?: string
   isPublic?: boolean
   activePlanId?: string
+  activePlanMode?: string
+  activeBillingCycle?: string
+  hasStripeSubscription?: boolean
 }
 
 function FeatureRow({
@@ -82,6 +85,9 @@ export function PlansClient({
   redirectPath = "/plans",
   isPublic = false,
   activePlanId,
+  activePlanMode,
+  activeBillingCycle,
+  hasStripeSubscription = false,
 }: PricingClientProps) {
   const router = useRouter()
   const [billingCycle, setBillingCycle] = useState<
@@ -221,6 +227,32 @@ export function PlansClient({
       const planBadge =
         finalPlan?.badge || (isPopular ? "Most Popular" : undefined)
 
+      // A plan card represents the same plan record AND the same billing
+      // cycle the user is actually on. For free/lifetime plans the cycle
+      // doesn't matter, but for paid plans we must compare both — otherwise
+      // a user on Pro Monthly would see "Current Plan" on the Pro Yearly tab
+      // when the plan uses inline `hasYearlyPlan` (same plan record).
+      // Exception: yearly subscribers viewing the monthly tab also see their
+      // tier as "Current Plan" — switching to monthly mid-cycle would spawn
+      // a brand-new Stripe subscription and waste their prepaid yearly time.
+      const planMatches = !!finalPlan && finalPlan.id === activePlanId
+      const cycleMatches =
+        finalPlan?.mode === "free" ||
+        finalPlan?.mode === "lifetime" ||
+        billingCycle === activeBillingCycle ||
+        (activeBillingCycle === "yearly" && billingCycle === "monthly")
+      const isCurrent = planMatches && cycleMatches
+
+      // When the user is on this same plan but a different cycle (e.g.
+      // monthly → viewing yearly), surface "Upgrade" instead of the default
+      // CTA so the action is clear. The yearly→monthly direction is handled
+      // above (treated as Current Plan), so only the monthly→yearly upgrade
+      // ever reaches this branch.
+      let buttonText = "Get Started"
+      if (planMatches && !cycleMatches) {
+        buttonText = "Upgrade to Yearly"
+      }
+
       return {
         name: group.name,
         description,
@@ -235,16 +267,16 @@ export function PlansClient({
               : billingCycle === "lifetime"
                 ? "one-time"
                 : "month",
-        buttonText: "Get Started",
+        buttonText,
         popular: isPopular,
         badge,
         includes: Array.isArray(tierFeatures) ? tierFeatures : [],
         planBadge: planBadge,
-        isCurrent: finalPlan?.id === activePlanId,
+        isCurrent,
         trialDays: finalPlan?.trialDays || 0,
       }
     })
-  }, [filteredGroups, billingCycle, activePlanId])
+  }, [filteredGroups, billingCycle, activePlanId, activeBillingCycle])
 
   const handleAction = useCallback(
     async (planName: string, isYearlyAction: boolean) => {
@@ -279,6 +311,54 @@ export function PlansClient({
           return
         }
 
+        // If the user is on a paid plan (monthly/yearly with a Stripe sub)
+        // and clicks the Free plan's button, do NOT activate Free or push
+        // them into a cancel flow — we don't want to nudge a paying user
+        // toward leaving. Just inform them and stay on the plans page.
+        const isFreePlan =
+          finalPlan.mode === "free" || finalPlan.finalPrice === 0
+        const isOnPaidPlan =
+          hasStripeSubscription && activePlanMode && activePlanMode !== "free"
+
+        if (isFreePlan && isOnPaidPlan) {
+          toast.info("Your paid plan is still active.")
+          return
+        }
+
+        // Same-plan cycle change for an existing subscriber: don't send
+        // them through /checkout (that creates a brand-new subscription).
+        // Route to /billing instead, which auto-opens the proration-aware
+        // upgrade modal and reuses the user's existing Stripe subscription
+        // (credits unused monthly time, charges only the difference).
+        const isUpgradeToYearly =
+          isOnPaidPlan &&
+          activePlanId === finalPlan.id &&
+          activeBillingCycle === "monthly" &&
+          (billingCycle === "yearly" || isVirtualYearly)
+
+        if (isUpgradeToYearly) {
+          router.push("/billing?action=upgrade-yearly")
+          return
+        }
+
+        // Defensive: a yearly subscriber should never reach /checkout for
+        // any monthly plan card — it would create a parallel subscription
+        // and discard their prepaid yearly time. The button is also
+        // disabled in the UI for the same-plan case, but this guards
+        // against stale client state.
+        const isYearlyCustomerPickingMonthly =
+          isOnPaidPlan &&
+          activeBillingCycle === "yearly" &&
+          billingCycle === "monthly"
+
+        if (isYearlyCustomerPickingMonthly) {
+          toast.info(
+            "You're already on the yearly plan. Manage your subscription from the billing page."
+          )
+          router.push("/billing")
+          return
+        }
+
         const url = new URL(`/checkout`, window.location.origin)
         url.searchParams.set("planId", finalPlan.id)
         if (billingCycle === "yearly" || isVirtualYearly) {
@@ -308,7 +388,17 @@ export function PlansClient({
         setLoadingPlanName(null)
       }
     },
-    [groupedPlans, billingCycle, redirectPath, isPublic, router]
+    [
+      groupedPlans,
+      billingCycle,
+      redirectPath,
+      isPublic,
+      router,
+      activePlanId,
+      activePlanMode,
+      activeBillingCycle,
+      hasStripeSubscription,
+    ]
   )
 
   const allTiersForTable = useMemo(() => {
@@ -335,10 +425,17 @@ export function PlansClient({
       {settings.enable_discount &&
         settings.coupon_code &&
         settings.discount_percent > 0 && (
-          <div className="-mx-4 -mt-4 mb-8 bg-primary px-4 py-3 text-center md:-mx-8 md:-mt-6">
+          <div className="-mx-4 mb-8 bg-primary px-4 py-3 text-center md:-mx-8">
             <p className="font-sans text-sm font-bold tracking-wide text-white">
               Exclusive Launch Sale: Use Code{" "}
-              <span className="cursor-pointer rounded border border-dashed border-white/30 bg-white/20 px-2 py-0.5 transition-all hover:bg-white/40 active:scale-95">
+              <span
+                onClick={() => {
+                  navigator.clipboard.writeText(settings.coupon_code)
+                  toast.success("Coupon code copied to clipboard!")
+                }}
+                title="Click to copy"
+                className="cursor-pointer rounded border border-dashed border-white/30 bg-white/20 px-2 py-0.5 transition-all hover:bg-white/40 active:scale-95"
+              >
                 {settings.coupon_code}
               </span>{" "}
               for an EXTRA {settings.discount_percent}% OFF!
@@ -369,7 +466,7 @@ export function PlansClient({
         </div>
 
         <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm md:rounded-[32px]">
-          <table className="w-full min-w-[600px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-150 table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="w-1/2 p-4 text-xs font-bold tracking-widest text-slate-400 uppercase md:p-6">

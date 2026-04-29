@@ -7,6 +7,117 @@ import { z } from "zod"
 import { createAuditLog } from "@/lib/audit"
 import { getAppSession } from "@/lib/auth-session"
 
+async function activateFreePlan(opts: {
+  stripe: Stripe
+  userId: string
+  email: string
+  contactName: string
+  plan: typeof plans.$inferSelect
+  stripeCustomerId?: string | null
+}) {
+  const { stripe, userId, email, contactName, plan } = opts
+  const normalizedEmail = email.toLowerCase().trim()
+
+  await db.transaction(async (tx) => {
+    // Resolve user (prefer authenticated session userId, fallback to email)
+    let [user] = userId
+      ? await tx.select().from(users).where(eq(users.id, userId)).limit(1)
+      : []
+
+    if (!user) {
+      ;[user] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.email, normalizedEmail))
+        .limit(1)
+    }
+
+    if (!user) {
+      ;[user] = await tx
+        .insert(users)
+        .values({
+          id: userId || crypto.randomUUID(),
+          name: contactName || normalizedEmail.split("@")[0],
+          email: normalizedEmail,
+          emailVerified: true,
+          stripeCustomerId: opts.stripeCustomerId || null,
+        })
+        .returning()
+    }
+
+    // Find existing license (preserve license.id and existing domains)
+    const [existingLicense] = await tx
+      .select()
+      .from(licenses)
+      .where(eq(licenses.userId, user.id))
+      .limit(1)
+
+    // If user is downgrading from a paid subscription, cancel it in Stripe
+    if (existingLicense?.stripeSubscriptionId) {
+      try {
+        await stripe.subscriptions.cancel(existingLicense.stripeSubscriptionId)
+      } catch (err) {
+        console.error(
+          "[checkout] Failed to cancel existing subscription on free downgrade:",
+          err
+        )
+      }
+    }
+
+    // Upsert license — does NOT touch domains, preserves license.id
+    await tx
+      .insert(licenses)
+      .values({
+        userId: user.id,
+        planId: plan.id,
+        totalSlots: plan.slots,
+        status: "active",
+        isTrial: false,
+        isLifetime: false,
+        billingCycle: "monthly",
+        stripeSubscriptionId: null,
+        stripeSetupIntentId: null,
+        trialEndsAt: null,
+        nextRenewalDate: null,
+        cancelAtPeriodEnd: false,
+      })
+      .onConflictDoUpdate({
+        target: licenses.userId,
+        set: {
+          planId: plan.id,
+          totalSlots: plan.slots,
+          status: "active",
+          isTrial: false,
+          isLifetime: false,
+          billingCycle: "monthly",
+          stripeSubscriptionId: null,
+          stripeSetupIntentId: null,
+          trialEndsAt: null,
+          nextRenewalDate: null,
+          cancelAtPeriodEnd: false,
+          updatedAt: new Date(),
+        },
+      })
+
+    await createAuditLog(
+      user.id,
+      existingLicense
+        ? "license.changed_to_free_plan"
+        : "license.free_plan_activated",
+      "license",
+      plan.id,
+      {
+        userId: user.id,
+        email: normalizedEmail,
+        planId: plan.id,
+        previousPlanId: existingLicense?.planId || null,
+        previousLicenseId: existingLicense?.id || null,
+      },
+      tx
+    )
+  })
+}
+
 const checkoutSchema = z.object({
   email: z
     .string()
@@ -43,6 +154,35 @@ async function getOrCreateProduct(stripe: Stripe, name: string) {
 
   const product = await stripe.products.create({ name })
   return product.id
+}
+
+async function resolvePromoCode(
+  stripe: Stripe,
+  promoCode: string | null | undefined
+) {
+  if (!promoCode) return undefined
+
+  if (promoCode.startsWith("promo_")) {
+    return { promotion_code: promoCode }
+  }
+
+  try {
+    const promos = await stripe.promotionCodes.list({
+      code: promoCode.trim(),
+      active: true,
+      limit: 1,
+    })
+
+    if (promos.data.length > 0) {
+      return { promotion_code: promos.data[0].id }
+    }
+
+    // Fallback to coupon
+    return { coupon: promoCode.trim() }
+  } catch (err) {
+    console.error("[resolvePromoCode] Error:", err)
+    return { coupon: promoCode.trim() }
+  }
 }
 
 async function createCheckoutSession(props: {
@@ -85,6 +225,7 @@ async function createCheckoutSession(props: {
     address,
     promoCode,
   } = props
+
   // Direct Check: Use all domains if they fit in 300 chars, otherwise fallback to first 3
   const domainsJson = domains ? JSON.stringify(domains) : ""
   const domainsMetadata =
@@ -117,6 +258,9 @@ async function createCheckoutSession(props: {
   }
 
   const isSubscription = plan.mode === "monthly" || plan.mode === "yearly"
+
+  // Resolve promo code to either promotion_code ID or coupon ID
+  const discount = await resolvePromoCode(stripe, promoCode)
 
   return await stripe.checkout.sessions.create({
     customer: stripeCustomerId || undefined,
@@ -163,8 +307,8 @@ async function createCheckoutSession(props: {
                 ? { default_payment_method: stripePaymentMethodId }
                 : {}),
             },
-            ...(promoCode
-              ? { discounts: [{ promotion_code: promoCode }] }
+            ...(discount
+              ? { discounts: [discount] }
               : { allow_promotion_codes: true }),
           }
         : {
@@ -188,8 +332,8 @@ async function createCheckoutSession(props: {
                 email: userEmail || "",
               },
             },
-            ...(promoCode
-              ? { discounts: [{ promotion_code: promoCode }] }
+            ...(discount
+              ? { discounts: [discount] }
               : { allow_promotion_codes: true }),
           }),
     success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
@@ -292,6 +436,26 @@ export async function GET(request: NextRequest) {
   const domains = domain ? [domain] : undefined
 
   try {
+    // Free plan — skip Stripe, fulfill directly and redirect to /licenses
+    if (plan.finalPrice === 0) {
+      const [user] = await db
+        .select({ stripeCustomerId: users.stripeCustomerId })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1)
+
+      await activateFreePlan({
+        stripe,
+        userId: session.userId,
+        email: userEmail || "",
+        contactName,
+        plan,
+        stripeCustomerId: user?.stripeCustomerId,
+      })
+
+      return NextResponse.redirect(new URL("/licenses", request.url))
+    }
+
     const isTrial = isTrialEligible
     const stripeSession = await createCheckoutSession({
       stripe,
@@ -308,18 +472,6 @@ export async function GET(request: NextRequest) {
         ? plan.yearlyDiscountCouponCode || undefined
         : plan.couponCode || undefined,
     })
-
-    // await createAuditLog(
-    //   session?.userId || null,
-    //   "checkout.direct_redirect",
-    //   "checkout",
-    //   stripeSession.id,
-    //   {
-    //     email: userEmail,
-    //     planId,
-    //     licenseQuantity: quantity,
-    //   }
-    // )
 
     return NextResponse.redirect(new URL(stripeSession.url!, request.url))
   } catch (err) {
@@ -428,6 +580,41 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Resolve session + stripeCustomerId up front
+  const session = await getAppSession()
+  let stripeCustomerId: string | undefined
+  if (session) {
+    const [user] = await db
+      .select({ stripeCustomerId: users.stripeCustomerId })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1)
+    stripeCustomerId = user?.stripeCustomerId || undefined
+  }
+
+  // Handle Free Plan Fulfillment FIRST — no Stripe calls required.
+  // Doing this before stripe.customers.update() avoids Stripe errors
+  // (e.g. test/live customer mismatches) blocking free activation.
+  if (plan.finalPrice === 0) {
+    try {
+      await activateFreePlan({
+        stripe,
+        userId: session?.userId || "",
+        email,
+        contactName,
+        plan,
+        stripeCustomerId,
+      })
+      return NextResponse.json({ success: true })
+    } catch (err) {
+      console.error("[checkout] Free plan activation failed:", err)
+      return NextResponse.json(
+        { error: "Failed to activate free plan" },
+        { status: 500 }
+      )
+    }
+  }
+
   try {
     let stripePaymentMethodId: string | undefined
     if (paymentCardId) {
@@ -435,98 +622,27 @@ export async function POST(request: NextRequest) {
       stripePaymentMethodId = paymentCardId
     }
 
-    // Get user for stripeCustomerId
-    const session = await getAppSession()
-    let stripeCustomerId: string | undefined
-    if (session) {
-      const [user] = await db
-        .select({ stripeCustomerId: users.stripeCustomerId })
-        .from(users)
-        .where(eq(users.id, session.userId))
-        .limit(1)
-      stripeCustomerId = user?.stripeCustomerId || undefined
-    }
-
     // Sync address to Stripe Customer if possible
     if (stripeCustomerId && address) {
-      await stripe.customers.update(stripeCustomerId, {
-        address: {
-          line1: address.line1,
-          line2: address.line2,
-          city: address.city,
-          state: address.state,
-          postal_code: address.postal_code,
-          country: address.country,
-        },
-        name: contactName,
-        metadata: {
-          company: address.company || "",
-        },
-      })
-    }
-
-    // Handle Free Plan Fulfillment (Price is 0)
-    if (plan.finalPrice === 0) {
-      const normalizedEmail = email.toLowerCase().trim()
-
-      await db.transaction(async (tx) => {
-        // Find or create user
-        let [user] = await tx
-          .select()
-          .from(users)
-          .where(eq(users.email, normalizedEmail))
-          .limit(1)
-
-        if (!user) {
-          ;[user] = await tx
-            .insert(users)
-            .values({
-              id: crypto.randomUUID(),
-              name: contactName || normalizedEmail.split("@")[0],
-              email: normalizedEmail,
-              emailVerified: true,
-              stripeCustomerId: stripeCustomerId || null,
-            })
-            .returning()
-        }
-
-        // Create or update license (enforce 1 per user)
-        await tx
-          .insert(licenses)
-          .values({
-            userId: user.id,
-            planId: plan.id,
-            totalSlots: plan.slots,
-            status: "active",
-            isTrial: false,
-            isLifetime: plan.mode === "lifetime",
-          })
-          .onConflictDoUpdate({
-            target: licenses.userId,
-            set: {
-              planId: plan.id,
-              totalSlots: plan.slots,
-              status: "active",
-              isTrial: false,
-              isLifetime: plan.mode === "lifetime",
-              updatedAt: new Date(),
-            },
-          })
-
-        await createAuditLog(
-          user.id,
-          "checkout.free_plan_activated",
-          "license",
-          plan.id,
-          {
-            email: normalizedEmail,
-            planId: plan.id,
+      try {
+        await stripe.customers.update(stripeCustomerId, {
+          address: {
+            line1: address.line1,
+            line2: address.line2,
+            city: address.city,
+            state: address.state,
+            postal_code: address.postal_code,
+            country: address.country,
           },
-          tx
-        )
-      })
-
-      return NextResponse.json({ success: true })
+          name: contactName,
+          metadata: {
+            company: address.company || "",
+          },
+        })
+      } catch (err) {
+        // Non-fatal: a stale/invalid customer should not block checkout
+        console.error("[checkout] stripe.customers.update failed:", err)
+      }
     }
 
     const isTrial = isTrialEligible
@@ -658,6 +774,7 @@ export async function POST(request: NextRequest) {
       // 2. Handle Paid Subscription Case
       if (isSubscription) {
         const productId = await getOrCreateProduct(stripe, plan.name)
+        const discount = await resolvePromoCode(stripe, promoCode)
         const subscription = await stripe.subscriptions.create({
           customer: stripeCustomerId,
           items: [
@@ -676,7 +793,7 @@ export async function POST(request: NextRequest) {
           payment_behavior: "allow_incomplete",
           expand: ["latest_invoice.payment_intent"],
           metadata,
-          ...(promoCode ? { discounts: [{ promotion_code: promoCode }] } : {}),
+          ...(discount ? { discounts: [discount as any] } : {}),
         })
 
         if (

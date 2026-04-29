@@ -2,16 +2,25 @@ import { getAppSession } from "@/lib/auth-session"
 import { redirect } from "next/navigation"
 import { db } from "@/db"
 import { licenses, plans, users } from "@/db/schema"
-import { and, eq, desc, or } from "drizzle-orm"
+import { and, eq, desc, or, count } from "drizzle-orm"
 import { BillingClient } from "./billing-client"
 import { getStripe } from "@/lib/stripe"
 import { payments as paymentsTable } from "@/db/schema"
 
-export default async function BillingPage() {
+const BILLING_HISTORY_PAGE_SIZE = 10
+
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
   const session = await getAppSession()
   if (!session) {
     redirect("/login?redirect=/billing")
   }
+
+  const params = await searchParams
+  const requestedPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1)
 
   // Fetch user to get stripeCustomerId
   const [userRecord] = await db
@@ -28,7 +37,7 @@ export default async function BillingPage() {
     city: "",
     state: "",
     postalCode: "",
-    country: "United Arab Emirates",
+    country: "",
     company: "",
   }
 
@@ -52,7 +61,7 @@ export default async function BillingPage() {
         city: c.address?.city || "",
         state: c.address?.state || "",
         postalCode: c.address?.postal_code || "",
-        country: c.address?.country || "United Arab Emirates",
+        country: c.address?.country || "",
         company: c.metadata?.company || "",
       }
     }
@@ -95,7 +104,19 @@ export default async function BillingPage() {
     )
     .limit(1)
 
-  // Fetch payment history with plan details
+  // Total payment count for pagination
+  const [{ value: totalPayments }] = await db
+    .select({ value: count() })
+    .from(paymentsTable)
+    .where(eq(paymentsTable.userId, session.userId))
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalPayments / BILLING_HISTORY_PAGE_SIZE)
+  )
+  const currentPage = Math.min(requestedPage, totalPages)
+
+  // Fetch the requested page of payment history with plan details
   const userPayments = await db
     .select({
       id: paymentsTable.id,
@@ -111,33 +132,124 @@ export default async function BillingPage() {
     .leftJoin(plans, eq(paymentsTable.planId, plans.id))
     .where(eq(paymentsTable.userId, session.userId))
     .orderBy(desc(paymentsTable.createdAt))
-    .limit(20)
+    .limit(BILLING_HISTORY_PAGE_SIZE)
+    .offset((currentPage - 1) * BILLING_HISTORY_PAGE_SIZE)
 
-  // Fetch Next Payment Date from DB or Trial
+  // Fetch Next Payment Date. Stripe is the source of truth for active
+  // subscriptions; we only fall back to the DB column when no subscription
+  // is queryable (e.g., free plans, or Stripe call failed).
   let nextPaymentDate: number | null = null
 
   if (activeLicense?.status === "trialing" && activeLicense.trialEndsAt) {
     nextPaymentDate = Math.floor(
       new Date(activeLicense.trialEndsAt).getTime() / 1000
     )
-  } else if (activeLicense?.nextRenewalDate) {
-    nextPaymentDate = Math.floor(
-      new Date(activeLicense.nextRenewalDate).getTime() / 1000
-    )
   }
 
-  if (!nextPaymentDate && activeLicense?.stripeSubscriptionId) {
+  // Pull live data from Stripe (subscription) for the renewal date AND
+  // the currently-applied retention discount so the Plan Details card can
+  // show "50% off for next N months" with an accurate next-charge amount.
+  let activeDiscount: {
+    percentOff: number | null
+    amountOff: number | null
+    durationType: string | null
+    durationInMonths: number | null
+    endsAt: number | null
+    remainingCycles: number | null
+    discountedNextAmount: number | null
+  } | null = null
+
+  if (activeLicense?.stripeSubscriptionId) {
     const stripe = getStripe()
     try {
       const subscription = await stripe.subscriptions.retrieve(
-        activeLicense.stripeSubscriptionId
+        activeLicense.stripeSubscriptionId,
+        { expand: ["discounts.coupon"] }
       )
-      if ("current_period_end" in subscription) {
-        nextPaymentDate = (subscription as any).current_period_end as number
+
+      // For non-trial subs, prefer Stripe's period end over the DB value —
+      // the DB column can drift if the subscription is changed via Stripe
+      // dashboard or external flows.
+      if (activeLicense.status !== "trialing") {
+        const subAny = subscription as any
+        const periodEnd =
+          subscription.items.data[0]?.current_period_end ??
+          subAny.current_period_end
+        if (periodEnd) nextPaymentDate = periodEnd as number
+      }
+
+      // Discount lookup: prefer `subscription.discounts` (newer API), fall
+      // back to the legacy singular `subscription.discount`. Each entry can
+      // be a string ID (when expand didn't materialize the object) or a
+      // full Discount with the coupon expanded.
+      const subAnyForDisc = subscription as any
+      const discountsRaw: any[] = Array.isArray(subAnyForDisc.discounts)
+        ? subAnyForDisc.discounts
+        : subAnyForDisc.discount
+          ? [subAnyForDisc.discount]
+          : []
+      const activeDiscountRaw = discountsRaw.find(
+        (d) => typeof d !== "string" && d?.coupon
+      )
+
+      if (activeDiscountRaw) {
+        const coupon = activeDiscountRaw.coupon
+        const endsAt = (activeDiscountRaw.end as number | null) ?? null
+        const isYearly = activeLicense.billingCycle === "yearly"
+        const cycleSeconds = isYearly ? 365 * 86400 : 30 * 86400
+
+        let remainingCycles: number | null = null
+        if (coupon.duration === "forever") {
+          remainingCycles = null // unbounded
+        } else if (coupon.duration === "once") {
+          remainingCycles = 1
+        } else if (coupon.duration === "repeating") {
+          if (endsAt) {
+            const secondsLeft = endsAt - Math.floor(Date.now() / 1000)
+            remainingCycles = Math.max(0, Math.ceil(secondsLeft / cycleSeconds))
+          } else if (coupon.duration_in_months) {
+            // Fallback: derive from the coupon's configured months
+            remainingCycles = isYearly
+              ? Math.max(1, Math.ceil(coupon.duration_in_months / 12))
+              : coupon.duration_in_months
+          }
+        }
+
+        // Compute the discounted next payment amount based on the unit_amount
+        const unitAmount = subscription.items.data[0]?.price?.unit_amount ?? 0
+        let discountedNextAmount: number | null = null
+        if (coupon.percent_off != null) {
+          discountedNextAmount = Math.round(
+            unitAmount * (1 - coupon.percent_off / 100)
+          )
+        } else if (coupon.amount_off != null) {
+          discountedNextAmount = Math.max(0, unitAmount - coupon.amount_off)
+        }
+
+        activeDiscount = {
+          percentOff: coupon.percent_off ?? null,
+          amountOff: coupon.amount_off ?? null,
+          durationType: coupon.duration ?? null,
+          durationInMonths: coupon.duration_in_months ?? null,
+          endsAt,
+          remainingCycles,
+          discountedNextAmount,
+        }
       }
     } catch (err) {
-      console.error("Failed to fetch subscription for next payment date:", err)
+      console.error(
+        "[billing/page] Failed to fetch subscription for renewal/discount:",
+        err
+      )
     }
+  }
+
+  // Fall back to the DB-stored renewal date when Stripe didn't give us one
+  // (no subscription, or the retrieve call failed above).
+  if (!nextPaymentDate && activeLicense?.nextRenewalDate) {
+    nextPaymentDate = Math.floor(
+      new Date(activeLicense.nextRenewalDate).getTime() / 1000
+    )
   }
 
   return (
@@ -147,6 +259,13 @@ export default async function BillingPage() {
       initialBillingInfo={initialBillingInfo}
       userPayments={userPayments}
       nextPaymentDate={nextPaymentDate}
+      activeDiscount={activeDiscount}
+      paymentsPagination={{
+        currentPage,
+        totalPages,
+        totalCount: totalPayments,
+        pageSize: BILLING_HISTORY_PAGE_SIZE,
+      }}
     />
   )
 }

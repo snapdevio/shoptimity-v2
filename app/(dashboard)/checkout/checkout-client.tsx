@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import {
   ChevronDown,
   MoveLeft,
@@ -103,6 +103,8 @@ function CheckoutInner({
   const [isAddingCard, setIsAddingCard] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [isInitializingSetup, setIsInitializingSetup] = useState(false)
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const paymentRef = useRef<HTMLDivElement>(null)
 
   // Address states (Consolidated)
   // Handle Auto-applying Coupons from Plan
@@ -310,9 +312,22 @@ function CheckoutInner({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setAttemptedSubmit(true)
+
     if (!initialEmail || !initialName) {
       toast.error("Form Incomplete", {
         description: "Please fill in your name and email to proceed.",
+      })
+      return
+    }
+
+    if (!selectedCardId && !isFreePlan) {
+      paymentRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      })
+      toast.error("Payment method required", {
+        description: "Please select or add a payment method to continue.",
       })
       return
     }
@@ -392,14 +407,11 @@ function CheckoutInner({
       const params = new URLSearchParams(searchParams.toString())
       params.set("planId", targetPlan.id)
       params.set("isyearly", yearly ? "true" : "false")
-      window.history.replaceState(null, "", `?${params.toString()}`)
+      router.replace(`?${params.toString()}`, { scroll: false })
     }
   }
 
-  const isButtonDisabled =
-    isSubmitting ||
-    isAddingCard ||
-    ((price.final > 0 || currentPlan.trialDays > 0) && !selectedCardId)
+  const isButtonDisabled = isSubmitting || isAddingCard
 
   return (
     <div className="animate-in duration-500 fade-in">
@@ -560,10 +572,23 @@ function CheckoutInner({
               </div>
             </div>
           )}
-          <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+          <div
+            ref={paymentRef}
+            className={cn(
+              "rounded-[20px] border p-6 shadow-sm transition-all md:p-8",
+              attemptedSubmit && !selectedCardId && !isFreePlan
+                ? "border-red-500 bg-red-50/30 ring-4 ring-red-500/10"
+                : "border-gray-200 bg-white"
+            )}
+          >
             <div className="mb-6 flex items-center justify-between">
-              <h2 className="font-heading text-[20px] font-bold text-base-content">
+              <h2 className="flex items-center gap-2 font-heading text-[20px] font-bold text-base-content">
                 {isFreePlan ? "Payment (Optional)" : "Payment method"}
+                {attemptedSubmit && !selectedCardId && !isFreePlan && (
+                  <span className="animate-pulse text-[12px] font-bold text-red-500">
+                    (Required)
+                  </span>
+                )}
               </h2>
               <div className="flex gap-2">
                 <img
@@ -909,7 +934,7 @@ function CheckoutInner({
             <div className="flex items-center justify-between">
               <span className="text-[15px] text-gray-600">Billing cycle</span>
               <span className="text-[15px] font-bold text-base-content capitalize">
-                {isFreePlan ? "Forever" : isYearly ? "Yearly" : "Monthly"}
+                {isFreePlan ? "Free Forever" : isYearly ? "Yearly" : "Monthly"}
               </span>
             </div>
             {price.couponSavings > 0 && (
