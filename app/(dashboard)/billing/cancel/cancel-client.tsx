@@ -11,6 +11,7 @@ import {
   Gift,
   Zap,
   Clock,
+  Tag,
 } from "lucide-react"
 import { toast } from "sonner"
 import { downgradeToFreePlan, applyRetentionDiscount } from "@/actions/billing"
@@ -60,6 +61,8 @@ export function CancelClient({
   const [isDiscountClaimed, setIsDiscountClaimed] = useState(false)
   const [isPending, setIsPending] = useState(false)
   const [timeLeft, setTimeLeft] = useState(offerTimeoutSeconds)
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false)
+  const [showCouponCode, setShowCouponCode] = useState(false)
 
   useEffect(() => {
     if (step !== "offer") return
@@ -170,9 +173,30 @@ export function CancelClient({
             )}
             .
           </p>
+          <ul className="mt-5 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-[13px] text-slate-600">
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+              <span>
+                Your subscription has been cancelled — you{" "}
+                <span className="font-bold text-slate-900">
+                  will not be charged
+                </span>{" "}
+                on the next renewal.
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+              <span>
+                You keep full{" "}
+                <span className="font-bold text-slate-900">{planName}</span>{" "}
+                access for the time already paid — your plan automatically
+                switches to the free plan after the period ends.
+              </span>
+            </li>
+          </ul>
           <button
             onClick={() => router.push("/billing")}
-            className="mt-8 w-full rounded-xl bg-slate-900 py-3.5 text-sm font-bold text-white shadow-lg transition-all hover:bg-black active:scale-95"
+            className="mt-8 w-full cursor-pointer rounded-xl bg-orange-600 py-3.5 text-sm font-bold text-white shadow-lg transition-all hover:bg-orange-700 active:scale-95"
           >
             Back to Billing
           </button>
@@ -264,6 +288,15 @@ export function CancelClient({
                   <p className="mt-3 text-sm font-medium text-slate-500">
                     Valid for the next {discountDuration} {durationUnit}
                   </p>
+                  {couponCode && (
+                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-white px-3 py-1 text-[11px] font-bold text-primary">
+                      <Tag className="h-3 w-3" />
+                      Coupon auto-applied:
+                      <span className="font-mono tracking-widest text-slate-400">
+                        ●●●●●●●●
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -279,26 +312,22 @@ export function CancelClient({
 
                 <div className="flex flex-col gap-3 pt-4">
                   <button
-                    onClick={handleClaimDiscount}
+                    onClick={() => {
+                      setShowCouponCode(false)
+                      setIsCouponModalOpen(true)
+                    }}
                     disabled={isPending}
                     className="w-full cursor-pointer rounded-xl bg-primary py-4 text-lg font-bold text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                   >
-                    {isPending ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Clock className="h-5 w-5 animate-spin" />
-                        Applying...
+                    <div className="flex flex-col items-center leading-tight">
+                      <span className="text-lg">
+                        Claim {discountPercent}% Discount
                       </span>
-                    ) : (
-                      <div className="flex flex-col items-center leading-tight">
-                        <span className="text-lg">
-                          Claim {discountPercent}% Discount
-                        </span>
-                        <span className="text-[13px] font-medium opacity-90">
-                          Pay ${(discountedPrice / 100).toFixed(2)} on your next{" "}
-                          {billingCycle === "yearly" ? "year" : "month"}
-                        </span>
-                      </div>
-                    )}
+                      <span className="text-[13px] font-medium opacity-90">
+                        Pay ${(discountedPrice / 100).toFixed(2)} on your next{" "}
+                        {billingCycle === "yearly" ? "year" : "month"}
+                      </span>
+                    </div>
                   </button>
                   <button
                     onClick={() => setStep("reasons")}
@@ -364,7 +393,7 @@ export function CancelClient({
                         placeholder="Please tell us more about why you're leaving..."
                         value={otherReason}
                         onChange={(e) => setOtherReason(e.target.value)}
-                        className="min-h-[100px] w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/50 p-4 text-sm transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 focus:outline-none"
+                        className="min-h-25 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/50 p-4 text-sm transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 focus:outline-none"
                       />
                     </div>
                   )}
@@ -412,6 +441,100 @@ export function CancelClient({
           continue to use the free version of Shoptimity with limited features.
         </p>
       </div>
+
+      {isCouponModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="border-b border-primary/10 bg-primary/5 px-6 py-8 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-primary shadow-md">
+                <Tag className="h-7 w-7" />
+              </div>
+              <h3 className="font-heading text-xl font-bold text-slate-900">
+                Confirm your discount
+              </h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Review the offer before we apply it to your subscription.
+              </p>
+            </div>
+
+            <div className="space-y-4 p-6 md:p-8">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">
+                  Coupon code
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className="font-mono text-base font-bold tracking-widest text-slate-900">
+                    {showCouponCode && couponCode ? couponCode : "●●●●●●●●"}
+                  </span>
+                  {couponCode && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCouponCode((v) => !v)}
+                      className="cursor-pointer rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:bg-slate-100"
+                    >
+                      {showCouponCode ? "Hide" : "Reveal"}
+                    </button>
+                  )}
+                </div>
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Auto-applied — you don't need to enter it manually.
+                </p>
+              </div>
+
+              <div className="space-y-2 rounded-2xl bg-slate-50 p-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Discount</span>
+                  <span className="font-bold text-primary">
+                    {discountPercent}% off
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Valid for</span>
+                  <span className="font-bold text-slate-900">
+                    {discountDuration} {durationUnit}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t border-slate-200 pt-2">
+                  <span className="font-bold text-slate-900">
+                    Next {billingCycle === "yearly" ? "year" : "month"}
+                  </span>
+                  <span className="text-base font-bold text-primary">
+                    ${(discountedPrice / 100).toFixed(2)}
+                    {priceUnit}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setIsCouponModalOpen(false)}
+                  disabled={isPending}
+                  className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await handleClaimDiscount()
+                    setIsCouponModalOpen(false)
+                  }}
+                  disabled={isPending}
+                  className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-95 disabled:opacity-50"
+                >
+                  {isPending ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      Applying…
+                    </>
+                  ) : (
+                    "Apply discount"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

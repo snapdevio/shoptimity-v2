@@ -37,10 +37,16 @@ export default async function LicensesPage() {
       trialEndsAt: licenses.trialEndsAt,
       stripeSubscriptionId: licenses.stripeSubscriptionId,
       isLifetime: licenses.isLifetime,
+      billingCycle: licenses.billingCycle,
       planMode: plans.mode,
+      planFinalPrice: plans.finalPrice,
+      planRegularPrice: plans.regularPrice,
+      planYearlyDiscountPercentage: plans.yearlyDiscountPercentage,
       stripeInvoiceUrl: payments.stripeInvoiceUrl,
       amount: payments.amount,
       currency: payments.currency,
+      planCurrency: plans.currency,
+      paymentStatus: payments.status,
     })
     .from(licenses)
     .innerJoin(plans, eq(licenses.planId, plans.id))
@@ -79,8 +85,36 @@ export default async function LicensesPage() {
           and(eq(domains.licenseId, license.id), isNull(domains.deletedAt))
         )
 
+      // After an upgrade (e.g. monthly → yearly) the license's
+      // `sourceOrderId` still points at the ORIGINAL signup payment, so the
+      // initial join above returns the stale monthly amount/cycle. Resolve
+      // the latest payment for this subscription so "Amount Paid" matches
+      // what the user is actually being billed today.
+      let latestPayment: typeof payments.$inferSelect | undefined
+      if (license.stripeSubscriptionId) {
+        ;[latestPayment] = await db
+          .select()
+          .from(payments)
+          .where(
+            eq(payments.stripeSubscriptionId, license.stripeSubscriptionId)
+          )
+          .orderBy(desc(payments.createdAt))
+          .limit(1)
+      }
+
+      const effectiveAmount = latestPayment?.amount ?? license.amount
+      const effectiveCurrency = latestPayment?.currency ?? license.currency
+      const effectiveInvoiceUrl =
+        latestPayment?.stripeInvoiceUrl ?? license.stripeInvoiceUrl
+      const effectivePaymentStatus =
+        latestPayment?.status ?? license.paymentStatus
+
       return {
         ...license,
+        amount: effectiveAmount,
+        currency: effectiveCurrency,
+        stripeInvoiceUrl: effectiveInvoiceUrl,
+        paymentStatus: effectivePaymentStatus,
         createdAt: license.createdAt.toISOString(),
         trialEndsAt: license.trialEndsAt?.toISOString() || null,
         domains: activeDomains.map((d) => ({
@@ -88,6 +122,22 @@ export default async function LicensesPage() {
           createdAt: d.createdAt.toISOString(),
         })),
         usedSlots: activeDomainCount,
+        displayAmount: (() => {
+          // Match the billing page's "Subscription" column: always show
+          // the plan-based regular charge so the two pages agree. Using
+          // the latest payment amount drifts after upgrades because the
+          // proration charge is smaller than the full yearly rate.
+          let amt = license.planFinalPrice || 0
+          if (
+            license.billingCycle === "yearly" &&
+            license.planMode === "monthly"
+          ) {
+            const discount = license.planYearlyDiscountPercentage || 0
+            amt = amt * 12 * (1 - discount / 100)
+          }
+          return amt
+        })(),
+        displayCurrency: effectiveCurrency || license.planCurrency || "USD",
       }
     })
   )

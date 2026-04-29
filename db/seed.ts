@@ -840,6 +840,7 @@ async function main() {
       yearlyCancelCouponCode: "STAY50YEAR",
       monthlyCancelDuration: 3,
       yearlyCancelDuration: 1,
+      trialDays: 3,
     },
   ]
 
@@ -1105,7 +1106,7 @@ async function main() {
     value: {
       coupon_code: "WELCOME5",
       discount_percent: 5,
-      enable_discount: true,
+      enable_discount: false,
       cancel_offer_timeout: 300,
     },
   }

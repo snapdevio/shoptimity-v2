@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
   if (process.env.NODE_ENV === "development") {
-    console.log("event webhook Main=>", JSON.stringify(event))
+    console.log(`${Date.now()} event webhook Main=>`, JSON.stringify(event))
   }
   // Idempotency check
   const existing = await db
@@ -126,14 +126,27 @@ export async function POST(request: NextRequest) {
       .set({ processed: true, processedAt: new Date() })
       .where(eq(webhookEvents.id, webhookRecordId))
   } catch (err) {
-    const errorMessage =
+    // Drizzle wraps the underlying pg error; surface as much as we can so
+    // operators can diagnose schema/connection issues from the logs.
+    const cause = (err as any)?.cause
+    const pgCode = cause?.code
+    const pgDetail = cause?.detail || cause?.message
+    const baseMessage =
       err instanceof Error ? err.message : "Unknown processing error"
+    const errorMessage = pgDetail
+      ? `${baseMessage} | pg ${pgCode || ""}: ${pgDetail}`
+      : baseMessage
+
     await db
       .update(webhookEvents)
       .set({ processed: false, processingError: errorMessage })
       .where(eq(webhookEvents.id, webhookRecordId))
 
-    console.error(`Webhook processing error for ${event.id}:`, errorMessage)
+    console.error(
+      `Webhook processing error for ${event.id} (${event.type}):`,
+      errorMessage,
+      err instanceof Error ? err.stack : undefined
+    )
     return NextResponse.json({ error: "Processing failed" }, { status: 500 })
   }
 
@@ -207,7 +220,8 @@ async function fulfillTrialSetup({
         userId: user.id,
         stripeSessionId: stripeSessionId,
         stripeCustomerId: stripeCustomerId,
-        stripeSubscriptionId: stripeSetupIntentId,
+        stripeSetupIntentId: stripeSetupIntentId,
+        stripeSubscriptionId: null,
         amount: finalAmount || plan.finalPrice, // Use custom amount if provided
         currency: plan.currency || "usd",
         planId: planId,
@@ -242,7 +256,9 @@ async function fulfillTrialSetup({
         isLifetime: plan.mode === "lifetime",
         billingCycle: isYearly ? "yearly" : (plan.mode as any),
         trialEndsAt: new Date(Date.now() + plan.trialDays * 86400000),
-        stripeSubscriptionId: stripeSetupIntentId, // HACK: Reusing field for setup intent ID
+        nextRenewalDate: new Date(Date.now() + plan.trialDays * 86400000),
+        stripeSetupIntentId: stripeSetupIntentId,
+        stripeSubscriptionId: null,
       })
       .onConflictDoUpdate({
         target: licenses.userId,
@@ -255,13 +271,15 @@ async function fulfillTrialSetup({
           isLifetime: plan.mode === "lifetime",
           billingCycle: isYearly ? "yearly" : (plan.mode as any),
           trialEndsAt: new Date(Date.now() + plan.trialDays * 86400000),
-          stripeSubscriptionId: stripeSetupIntentId,
+          nextRenewalDate: new Date(Date.now() + plan.trialDays * 86400000),
+          stripeSetupIntentId: stripeSetupIntentId,
+          stripeSubscriptionId: null,
           updatedAt: new Date(),
         },
       })
 
     await createAuditLog(
-      null,
+      user.id,
       "trial.setup_completed",
       "license",
       order.id,
@@ -436,7 +454,22 @@ async function fulfillOrder({
       }
     }
 
-    // 4. Create or Update License (Atomic Upsert for 1 license per user)
+    // 4. Create order record first to get sourceOrderId
+    const [order] = await tx
+      .insert(orders)
+      .values({
+        userId: userRecord.id,
+        paymentId: paymentId,
+        planId,
+        licenseQuantity,
+        contactName: name || userRecord.name || normalizedEmail.split("@")[0],
+        status: "fulfilled",
+      })
+      .returning()
+
+    const sourceOrderId = order.id
+
+    // 5. Create or Update License (Atomic Upsert for 1 license per user)
     const [license] = await tx
       .insert(licenses)
       .values({
@@ -444,6 +477,7 @@ async function fulfillOrder({
         planId,
         totalSlots: plan.slots * licenseQuantity,
         status: "active",
+        sourceOrderId: sourceOrderId,
         isTrial: isTrial || false,
         isLifetime: isLifetime || false,
         billingCycle: billingCycle,
@@ -456,6 +490,7 @@ async function fulfillOrder({
                 Date.now() + (billingCycle === "yearly" ? 365 : 30) * 86400000
               )),
         stripeSubscriptionId: stripeSubscriptionId || null,
+        stripeSetupIntentId: stripePaymentMethodId || null, // Tracking PM ID here too
       })
       .onConflictDoUpdate({
         target: licenses.userId,
@@ -463,6 +498,7 @@ async function fulfillOrder({
           planId,
           totalSlots: plan.slots * licenseQuantity,
           status: "active",
+          sourceOrderId: sourceOrderId,
           isTrial: isTrial || false,
           isLifetime: isLifetime || false,
           billingCycle: billingCycle,
@@ -475,22 +511,13 @@ async function fulfillOrder({
                   Date.now() + (billingCycle === "yearly" ? 365 : 30) * 86400000
                 )),
           stripeSubscriptionId: stripeSubscriptionId || null,
+          stripeSetupIntentId: stripePaymentMethodId || null,
           updatedAt: new Date(),
         },
       })
       .returning()
 
     const finalLicenseId = license.id
-
-    // 5. Create order record
-    await tx.insert(orders).values({
-      userId: userRecord.id,
-      paymentId: paymentId,
-      planId,
-      licenseQuantity,
-      contactName: name || userRecord.name || normalizedEmail.split("@")[0],
-      status: "fulfilled",
-    })
 
     // Fetch existing domains after update to enqueue their metadata export
     const existingDomains = await tx
@@ -541,9 +568,9 @@ async function fulfillOrder({
       }
     }
 
-    // Audit log
+    // Audit log — record per-user activity for proper tracking
     await createAuditLog(
-      null,
+      userRecord.id,
       "webhook.fulfillment_completed",
       "license",
       finalLicenseId,
@@ -551,6 +578,10 @@ async function fulfillOrder({
         userId: userRecord.id,
         paymentId: paymentId,
         licenseId: finalLicenseId,
+        planId,
+        billingCycle,
+        isTrial: !!isTrial,
+        isLifetime,
       },
       tx
     )
@@ -621,8 +652,20 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     license_quantity: licenseQuantityStr,
     contact_name: contactName,
     domains: domainsJson,
-    promo_code: promoCode,
+    promo_code: promoCodeFromMetadata,
   } = metadata
+
+  // Native Stripe Promotion Code extraction
+  let promoCode = promoCodeFromMetadata as string
+  if (!promoCode && session.total_details?.breakdown?.discounts) {
+    const discount = session.total_details.breakdown.discounts.find(
+      (d) => (d as any).discount?.promotion_code
+    )
+    if (discount) {
+      const d = (discount as any).discount
+      promoCode = d.promotion_code?.code || d.coupon?.name || d.coupon?.id
+    }
+  }
 
   const customerEmail =
     session.customer_details?.email || session.customer_email
@@ -787,7 +830,28 @@ async function handlePaymentIntentSucceeded(
     contact_name: contactName,
     domains: domainsJson,
   } = metadata
-  // console.log(`719 [${paymentIntent.id}]metadata=>`, JSON.stringify(metadata, null, 2))
+
+  const piAny = paymentIntent as any
+  const associatedInvoiceId =
+    typeof piAny.invoice === "string"
+      ? piAny.invoice
+      : piAny.invoice?.id || piAny.payment_details?.order_reference
+
+  // Subscription-driven PIs are paid via an invoice — invoice.payment_succeeded
+  // is the authoritative source of truth for those. Just sync payment status here
+  // and exit to avoid duplicate fulfillment + spurious "no email" warnings.
+  if (
+    associatedInvoiceId &&
+    typeof associatedInvoiceId === "string" &&
+    associatedInvoiceId.startsWith("in_") &&
+    metadata.conversion !== "trial_to_lifetime"
+  ) {
+    await db
+      .update(payments)
+      .set({ status: "paid", updatedAt: new Date() })
+      .where(eq(payments.stripePaymentIntentId, paymentIntent.id))
+    return
+  }
 
   // Only attempt fulfillment if we have the necessary metadata
   // If it has a checkout session ID, let checkout.session.completed handle fulfillment to avoid duplicates
@@ -798,7 +862,6 @@ async function handlePaymentIntentSucceeded(
   let finalDomainsJson = domainsJson
   let finalSubscriptionId: string | null = null
 
-  const piAny = paymentIntent as any
   const orderRef = piAny.payment_details?.order_reference
 
   if (!finalPlanId && orderRef && orderRef.startsWith("in_")) {
@@ -855,8 +918,8 @@ async function handlePaymentIntentSucceeded(
     return
   }
 
-  const email = metadata.email || paymentIntent.receipt_email || ""
-  if (!email) {
+  // Use the resolved finalEmail (may have been pulled from invoice metadata above)
+  if (!finalEmail) {
     console.warn(
       `PaymentIntent ${paymentIntent.id} succeeded but no email found.`
     )
@@ -999,12 +1062,30 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
     })
   }
 
-  await createAuditLog(null, "payment.failed", "payment", paymentIntent.id, {
-    amount: paymentIntent.amount,
-    currency: paymentIntent.currency,
-    error: paymentIntent.last_payment_error?.message || "Unknown payment error",
-    licenseId: licenseId || null,
-  })
+  let actorUserId: string | null = null
+  if (licenseId) {
+    const [lic] = await db
+      .select({ userId: licenses.userId })
+      .from(licenses)
+      .where(eq(licenses.id, licenseId))
+      .limit(1)
+    actorUserId = lic?.userId || null
+  }
+
+  await createAuditLog(
+    actorUserId,
+    "payment.failed",
+    "payment",
+    paymentIntent.id,
+    {
+      userId: actorUserId,
+      amount: paymentIntent.amount,
+      currency: paymentIntent.currency,
+      error:
+        paymentIntent.last_payment_error?.message || "Unknown payment error",
+      licenseId: licenseId || null,
+    }
+  )
 }
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
@@ -1106,9 +1187,21 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     }
 
     // If still no plan_id, try fetching the subscription as a last resort
-    if (!metadata.plan_id) {
+    let promoCode = metadata.promo_code as string
+    if (!metadata.plan_id || !promoCode) {
       const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-      metadata = { ...metadata, ...(subscription.metadata || {}) }
+      if (!metadata.plan_id)
+        metadata = { ...metadata, ...(subscription.metadata || {}) }
+      if (!promoCode) {
+        // Try to get promo code from subscription discounts
+        const discount = subscription.discounts?.find(
+          (d) => typeof d !== "string" && (d as any).promotion_code
+        )
+        if (discount) {
+          const d = discount as any
+          promoCode = d.promotion_code?.code || d.coupon?.name || d.coupon?.id
+        }
+      }
     }
 
     if (metadata.plan_id) {
@@ -1136,6 +1229,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
         stripeInvoiceId: invoice.id,
         stripeInvoiceUrl: invoice.hosted_invoice_url,
         nextRenewalDate: nextRenewalDate,
+        promoCode: promoCode,
       })
     }
     return
@@ -1207,11 +1301,12 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   }
 
   await createAuditLog(
-    null,
+    license.userId,
     "license.trial_to_lifetime",
     "license",
     license.id,
     {
+      userId: license.userId,
       subscriptionId,
       invoiceId: invoice.id,
     }
@@ -1257,11 +1352,18 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     })
   }
 
-  await createAuditLog(null, "license.payment_failed", "license", license.id, {
-    subscriptionId,
-    invoiceId: invoice.id,
-    amountDue: invoice.amount_due,
-  })
+  await createAuditLog(
+    license.userId,
+    "license.payment_failed",
+    "license",
+    license.id,
+    {
+      userId: license.userId,
+      subscriptionId,
+      invoiceId: invoice.id,
+      amountDue: invoice.amount_due,
+    }
+  )
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -1333,13 +1435,15 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   })
 
   await createAuditLog(
-    null,
+    license.userId,
     isTrialCancellation
       ? "license.trial_converted_to_free"
       : "license.subscription_converted_to_free",
     "license",
     license.id,
     {
+      userId: license.userId,
+      previousPlanId: license.planId,
       subscriptionId: subscription.id,
       isTrial: !!subscription.trial_end,
     }
@@ -1403,13 +1507,15 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   await createAuditLog(
-    null,
+    license.userId,
     "license.subscription_updated",
     "license",
     license.id,
     {
+      userId: license.userId,
       subscriptionStatus: subscription.status,
       isTrial: subscription.status === "trialing",
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
     }
   )
 }
@@ -1452,11 +1558,12 @@ async function handleSubscriptionTrialWillEnd(
   // })
 
   await createAuditLog(
-    null,
+    user.id,
     "license.trial_will_end_webhook",
     "license",
     license.id,
     {
+      userId: user.id,
       subscriptionId: subscription.id,
       trialEndsAt: subscription.trial_end,
     }
@@ -1467,12 +1574,28 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   // Log subscription creation for tracking
   const metadata = subscription.metadata || {}
 
+  // Resolve actor user via stripeCustomerId for proper per-user activity logging
+  let actorUserId: string | null = null
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer?.id
+  if (customerId) {
+    const [u] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.stripeCustomerId, customerId))
+      .limit(1)
+    actorUserId = u?.id || null
+  }
+
   await createAuditLog(
-    null,
+    actorUserId,
     "subscription.created",
     "subscription",
     subscription.id,
     {
+      userId: actorUserId,
       customerId: subscription.customer,
       status: subscription.status,
       trialEnd: subscription.trial_end,
@@ -1480,20 +1603,10 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     }
   )
 
-  // If this is the first subscription and we don't have it recorded yet,
-  // log it for investigation
-  const [license] = await db
-    .select()
-    .from(licenses)
-    .where(eq(licenses.stripeSubscriptionId, subscription.id))
-    .limit(1)
-
-  if (!license && metadata.plan_id) {
-    console.warn(
-      `[webhook] New subscription ${subscription.id} created but license not found. ` +
-        `Plan: ${metadata.plan_id}. Awaiting checkout.session.completed...`
-    )
-  }
+  // Note: It's normal for the license to not exist yet here — Stripe fires
+  // customer.subscription.created BEFORE checkout.session.completed.
+  // The license is created by the checkout.session.completed / invoice.payment_succeeded
+  // handlers, so we don't poll/warn for that expected race.
 }
 
 async function handleChargeRefunded(charge: Stripe.Charge) {
@@ -1582,12 +1695,19 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     }
   })
 
-  await createAuditLog(null, "payment.refunded", "payment", charge.id, {
-    paymentId: payment.id,
-    amount: charge.amount_refunded,
-    reason: (charge as any).reason || "unknown",
-    licenseId: license.id,
-  })
+  await createAuditLog(
+    license.userId,
+    "payment.refunded",
+    "payment",
+    charge.id,
+    {
+      userId: license.userId,
+      paymentId: payment.id,
+      amount: charge.amount_refunded,
+      reason: (charge as any).reason || "unknown",
+      licenseId: license.id,
+    }
+  )
 
   // console.log(
   //   `[webhook] Refunded payment ${payment.id} and revoked license ${license.id}`

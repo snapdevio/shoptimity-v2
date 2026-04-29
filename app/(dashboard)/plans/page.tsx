@@ -7,7 +7,7 @@ import { getSettings } from "@/actions/admin-settings"
 import { PlansClient } from "./plans-client"
 import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"
-import { licenses } from "@/db/schema"
+import { licenses, plans } from "@/db/schema"
 import { eq, and } from "drizzle-orm"
 
 export const metadata: Metadata = {
@@ -29,17 +29,29 @@ export default async function PlansPage() {
 
   const session = await getAppSession()
   let activePlanId: string | undefined
+  let activePlanMode: string | undefined
+  let activeBillingCycle: string | undefined
+  let hasStripeSubscription = false
 
   if (session) {
     const [activeLicense] = await db
-      .select({ planId: licenses.planId })
+      .select({
+        planId: licenses.planId,
+        planMode: plans.mode,
+        billingCycle: licenses.billingCycle,
+        stripeSubscriptionId: licenses.stripeSubscriptionId,
+      })
       .from(licenses)
+      .leftJoin(plans, eq(licenses.planId, plans.id))
       .where(
         and(eq(licenses.userId, session.userId), eq(licenses.status, "active"))
       )
       .limit(1)
 
     activePlanId = activeLicense?.planId || undefined
+    activePlanMode = activeLicense?.planMode || undefined
+    activeBillingCycle = activeLicense?.billingCycle || undefined
+    hasStripeSubscription = !!activeLicense?.stripeSubscriptionId
   }
 
   return (
@@ -48,6 +60,9 @@ export default async function PlansPage() {
       groupedFeatures={groupedFeatures}
       settings={settings || {}}
       activePlanId={activePlanId}
+      activePlanMode={activePlanMode}
+      activeBillingCycle={activeBillingCycle}
+      hasStripeSubscription={hasStripeSubscription}
     />
   )
 }

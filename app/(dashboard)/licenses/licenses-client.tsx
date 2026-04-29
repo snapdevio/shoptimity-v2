@@ -76,10 +76,18 @@ export interface License {
   trialEndsAt: string | null
   stripeSubscriptionId: string | null
   isLifetime: boolean
+  billingCycle?: string
   planMode?: string
+  planFinalPrice?: number | null
+  planRegularPrice?: number | null
+  planYearlyDiscountPercentage?: number | null
   stripeInvoiceUrl?: string | null
   amount?: number | null
   currency?: string | null
+  planCurrency?: string | null
+  paymentStatus?: string | null
+  displayAmount?: number
+  displayCurrency?: string
 }
 
 interface LicensesClientProps {
@@ -187,7 +195,7 @@ function MultipleLicensesView({
         />
       ))}
 
-      <Card className="relative flex min-h-[300px] flex-col overflow-hidden border-dashed border-primary/30 bg-primary/5 transition-colors hover:border-primary/50 hover:bg-primary/10">
+      <Card className="relative flex min-h-75 flex-col overflow-hidden border-dashed border-primary/30 bg-primary/5 transition-colors hover:border-primary/50 hover:bg-primary/10">
         <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-primary/10 via-transparent to-transparent" />
         <div className="relative flex h-full flex-col items-center justify-center p-6 text-center">
           <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
@@ -301,7 +309,7 @@ function SingleLicenseView({
             </div>
           </div>
 
-          <div className="mt-auto space-y-6">
+          <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
                 <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -313,16 +321,29 @@ function SingleLicenseView({
               </div>
               <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
                 <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                  Amount Paid
+                  {license.isTrial ? "Plan Price" : "Amount Paid"}
                 </p>
-                <p className="mt-1 text-sm font-semibold">
-                  {license.amount
-                    ? new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: license.currency || "USD",
-                      }).format(license.amount / 100)
-                    : "Free"}
-                </p>
+                <div className="mt-1">
+                  <p className="text-sm font-semibold">
+                    {new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: license.displayCurrency || "USD",
+                    }).format((license.displayAmount || 0) / 100)}
+                  </p>
+                  {license.planMode === "free" ? (
+                    <p className="text-[10px] font-medium text-muted-foreground">
+                      Free Forever
+                    </p>
+                  ) : (
+                    license.billingCycle && (
+                      <p className="text-[10px] font-medium text-muted-foreground capitalize">
+                        {license.billingCycle === "lifetime"
+                          ? "Lifetime License"
+                          : `${license.billingCycle} Billing`}
+                      </p>
+                    )
+                  )}
+                </div>
               </div>
               <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
                 <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -417,34 +438,12 @@ function SingleLicenseView({
             {license.totalSlots > 1 ? (
               <div className="space-y-4">
                 {license.domains.map((domain) => (
-                  <div
+                  <DomainRow
                     key={domain.id}
-                    className={cn(
-                      "group relative flex items-center justify-between rounded-2xl border border-border/50 bg-background/80 p-4 transition-all hover:border-primary/30 hover:bg-background",
-                      !isActive && "cursor-not-allowed opacity-60 grayscale"
-                    )}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-inner ring-1 ring-primary/20">
-                        <GlobeIcon className="size-5" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-foreground">
-                          {domain.domainName}
-                        </h4>
-                        <p className="mt-1 text-[10px] text-muted-foreground">
-                          Connected since {formatDate(domain.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {isActive && (
-                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <EditDomainDialog domain={domain} />
-                        <DeleteDomainDialog domain={domain} />
-                      </div>
-                    )}
-                  </div>
+                    domain={domain}
+                    isActive={isActive}
+                    onCollision={onCollision}
+                  />
                 ))}
 
                 {Array.from({
@@ -466,7 +465,7 @@ function SingleLicenseView({
                   !isActive && "cursor-not-allowed opacity-60 grayscale"
                 )}
               >
-                <div className="mb-6 flex size-20 items-center justify-center rounded-3xl bg-primary/10 text-primary shadow-inner ring-1 ring-primary/20 transition-transform group-hover:scale-110">
+                <div className="mb-6 flex size-12 items-center justify-center rounded-3xl bg-primary/10 text-primary shadow-inner ring-1 ring-primary/20 transition-transform group-hover:scale-110">
                   <GlobeIcon className="size-10" />
                 </div>
                 <h4 className="text-xl font-bold tracking-tight text-foreground">
@@ -522,13 +521,13 @@ function SingleLicenseView({
                         !isActive && "cursor-not-allowed opacity-50 grayscale"
                       )}
                     >
-                      <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20 transition-transform group-hover:scale-110 group-active:scale-95">
+                      <div className="mb-6 flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20 transition-transform group-hover:scale-110 group-active:scale-95">
                         <PlusIcon className="size-10" />
                       </div>
                       <h4 className="text-xl font-bold tracking-tight text-primary">
                         Assign Your Store
                       </h4>
-                      <p className="mt-2 max-w-[200px] text-sm text-muted-foreground">
+                      <p className="mt-2 max-w-50 text-sm text-muted-foreground">
                         {isActive
                           ? "Enter your Shopify .myshopify.com domain to activate your license."
                           : "Please activate your license to assign a domain."}
@@ -590,11 +589,11 @@ function LicenseGuide() {
             key={index}
             className="group relative flex flex-col rounded-3xl border border-border/50 bg-card/20 p-6 transition-all hover:bg-card/40 hover:shadow-lg"
           >
-            <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 transition-transform group-hover:scale-110">
+            <div className="mb-4 flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 transition-transform group-hover:scale-110">
               <step.icon className="size-6" />
             </div>
             <div className="mb-1 flex items-center gap-2">
-              <span className="flex size-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-black text-primary">
+              <span className="flex size-6 items-center justify-center rounded-full bg-primary/20 text-[14px] font-black text-primary">
                 {index + 1}
               </span>
               <h4 className="font-bold text-foreground">{step.title}</h4>
@@ -643,7 +642,7 @@ function LicenseCard({
   return (
     <Card className="relative flex flex-col overflow-hidden border-border/50 bg-card/40 shadow-sm backdrop-blur-md transition-all hover:bg-card/60 hover:shadow-md dark:shadow-none">
       {isActive && (
-        <div className="pointer-events-none absolute top-0 right-0 h-[150px] w-[250px] translate-x-1/3 -translate-y-1/3 rounded-full bg-primary/10 blur-[60px]" />
+        <div className="pointer-events-none absolute top-0 right-0 h-37.5 w-62.5 translate-x-1/3 -translate-y-1/3 rounded-full bg-primary/10 blur-[60px]" />
       )}
       <CardHeader className="border-b border-border/30 [.border-b]:pb-1">
         <div className="flex items-start justify-between">
@@ -730,6 +729,13 @@ function LicenseCard({
                 {license.totalSlots}
               </span>{" "}
               domain slots filled
+              <span className="mx-2 text-muted-foreground/30">•</span>
+              <span className="font-medium text-foreground">
+                {new Intl.NumberFormat("en-US", {
+                  style: "currency",
+                  currency: license.displayCurrency || "USD",
+                }).format((license.displayAmount || 0) / 100)}
+              </span>
             </CardDescription>
           </div>
         </div>
@@ -773,54 +779,47 @@ function DomainRow({
   return (
     <div
       className={cn(
-        "group relative flex flex-col justify-between rounded-lg border border-border/60 bg-background/60 p-3 shadow-sm transition-all hover:border-border hover:bg-background/80 sm:flex-row sm:items-center",
-        isActive
-          ? "border-green-500/20 bg-green-500/10"
-          : "pointer-events-none border-destructive/20 bg-red-500/5 opacity-60 grayscale select-none"
+        "group relative flex min-h-18 items-center justify-between rounded-2xl border border-border/50 bg-background/80 p-4 transition-all hover:border-primary/30 hover:bg-background",
+        !isActive &&
+          "pointer-events-none border-destructive/20 bg-red-500/5 opacity-60 grayscale select-none"
       )}
     >
-      <div className="flex items-center gap-3 overflow-hidden">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
-          <GlobeIcon className="h-4 w-4" />
+      <div className="flex items-center gap-4">
+        <div className="flex size-6 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-inner ring-1 ring-primary/20">
+          <GlobeIcon className="size-3" />
         </div>
-        <div className="truncate">
+        <div className="flex flex-col">
           {isActive ? (
             <a
               href={`https://${domain.domainName}/admin`}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate text-sm leading-none font-medium hover:text-primary hover:underline"
+              className="font-bold text-foreground hover:text-primary hover:underline"
             >
               {domain.domainName}
             </a>
           ) : (
-            <span className="cursor-not-allowed truncate text-sm leading-none font-medium text-muted-foreground/60">
+            <span className="font-bold text-muted-foreground/60">
               {domain.domainName}
             </span>
           )}
-          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <p className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
             {isActive ? (
               <>
-                <CheckCircle2Icon className="h-3 w-3 text-green-500" />
-                <span className="truncate">Connected</span>
+                <CheckCircle2Icon className="size-3 text-green-500" />
+                <span>Connected since {formatDate(domain.createdAt)}</span>
               </>
             ) : (
               <>
-                <AlertCircleIcon className="h-3 w-3 text-destructive" />
-                <span className="truncate font-medium text-destructive">
-                  Inactive
-                </span>
+                <AlertCircleIcon className="size-3 text-destructive" />
+                <span className="font-medium text-destructive">Inactive</span>
               </>
             )}
-            <span className="opacity-50">&bull;</span>
-            <span className="truncate">
-              Assigned {formatDate(domain.createdAt)}
-            </span>
           </p>
         </div>
       </div>
       {isActive && (
-        <div className="mt-3 flex items-center justify-end gap-1 transition-opacity sm:mt-0 sm:opacity-50 sm:group-hover:opacity-100">
+        <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
           <EditDomainDialog domain={domain} />
           <DeleteDomainDialog domain={domain} />
         </div>
@@ -842,16 +841,16 @@ function EmptySlotRow({
 }) {
   if (!isActive) {
     return (
-      <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/10 p-3 opacity-60 grayscale">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground ring-1 ring-border">
+      <div className="flex min-h-18 items-center justify-between rounded-2xl border border-border/50 bg-muted/5 p-4 opacity-60 grayscale select-none">
+        <div className="flex items-center gap-4">
+          <div className="flex size-6 items-center justify-center rounded-xl bg-muted text-muted-foreground ring-1 ring-border">
             <span className="block h-0.5 w-3 rounded-full bg-current/40" />
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="text-sm font-bold text-muted-foreground">
               Locked Slot
             </p>
-            <p className="mt-1 text-xs text-muted-foreground/40">
+            <p className="mt-0.5 text-[10px] text-muted-foreground/40">
               {status === "revoked" ? "License revoked" : "License inactive"}
             </p>
           </div>
@@ -865,16 +864,16 @@ function EmptySlotRow({
       licenseId={licenseId}
       // onCollision={onCollision}
       trigger={
-        <button className="group flex w-full cursor-pointer flex-col justify-between rounded-lg border border-dashed border-primary/20 bg-primary/5 p-3 text-left transition-all hover:border-primary/40 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-dashed border-primary/30 bg-background text-primary/60 transition-colors group-hover:text-primary">
-              <PlusIcon className="h-4 w-4" />
+        <button className="group flex min-h-18 w-full cursor-pointer items-center justify-between rounded-2xl border border-dashed border-primary/20 bg-primary/5 p-4 text-left transition-all hover:border-primary/40 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none">
+          <div className="flex items-center gap-4">
+            <div className="flex size-6 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-inner ring-1 ring-primary/20 transition-colors group-hover:bg-primary/20">
+              <PlusIcon className="size-3" />
             </div>
             <div>
-              <p className="text-sm font-medium text-primary/80 transition-colors group-hover:text-primary">
+              <p className="font-bold text-primary/80 transition-colors group-hover:text-primary">
                 Assign Domain
               </p>
-              <p className="mt-1.5 text-xs text-muted-foreground/70">
+              <p className="mt-1 text-[10px] text-muted-foreground/70">
                 Click to fill this empty slot
               </p>
             </div>
@@ -1094,7 +1093,10 @@ function AddDomainDialog({
               </div>
             </div>
             <DialogFooter>
-              <DialogClose render={<Button variant="outline" />}>
+              <DialogClose
+                render={<Button variant="outline" />}
+                className="cursor-pointer"
+              >
                 Cancel
               </DialogClose>
               <Button
@@ -1255,8 +1257,12 @@ function EditDomainDialog({ domain }: { domain: Domain }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger
           render={
-            <Button variant="ghost" size="icon-xs">
-              <PencilIcon />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9 cursor-pointer hover:bg-primary/10 hover:text-primary"
+            >
+              <PencilIcon className="size-4.5" />
               <span className="sr-only">Edit domain</span>
             </Button>
           }
@@ -1345,10 +1351,16 @@ function EditDomainDialog({ domain }: { domain: Domain }) {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose render={<Button variant="outline" />}>
+              <DialogClose
+                render={<Button variant="outline" className="cursor-pointer" />}
+              >
                 Cancel
               </DialogClose>
-              <Button type="submit" disabled={isPending || !form.isVerified}>
+              <Button
+                type="submit"
+                disabled={isPending || !form.isVerified}
+                className="cursor-pointer"
+              >
                 {isPending ? (
                   <>
                     <Spinner className="mr-2" />
@@ -1402,8 +1414,12 @@ function DeleteDomainDialog({ domain }: { domain: Domain }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant="ghost" size="icon-xs">
-            <TrashIcon className="text-destructive" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 cursor-pointer hover:bg-destructive/10"
+          >
+            <TrashIcon className="size-4.5 text-destructive" />
             <span className="sr-only">Delete domain</span>
           </Button>
         }
@@ -1423,12 +1439,16 @@ function DeleteDomainDialog({ domain }: { domain: Domain }) {
           </Alert>
         )}
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
+          <DialogClose
+            render={<Button variant="outline" />}
+            className="cursor-pointer"
+          >
             Cancel
           </DialogClose>
           <Button
             variant="destructive"
             onClick={handleDelete}
+            className="cursor-pointer"
             disabled={isPending}
           >
             {isPending ? (

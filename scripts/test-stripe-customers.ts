@@ -32,7 +32,8 @@ async function listCustomers(limit: number = 20) {
       for (const sub of subscriptions.data) {
         console.log(`  [${subIndex++}] Subscription ID: ${sub.id}`)
         console.log(`      Status: ${sub.status}`)
-
+        console.log(`      Status: ${JSON.stringify(sub)}`)
+        console.log(`   Cancel at : ${sub.cancel_at}`)
         const currentPeriodEnd = (sub as any).current_period_end
         if (currentPeriodEnd) {
           console.log(
@@ -156,6 +157,46 @@ async function createDemoCoupon() {
   }
 }
 
+/**
+ * Creates a custom discount coupon and promotion code
+ */
+async function createCustomCoupon(code: string, percent: number) {
+  console.log(`\nCreating custom coupon '${code}' with ${percent}% off...`)
+
+  try {
+    // Delete existing coupon if it exists
+    try {
+      await stripe.coupons.del(code)
+      console.log(`- Cleaned up existing coupon '${code}'`)
+    } catch (e) {}
+
+    const coupon = await stripe.coupons.create({
+      id: code,
+      percent_off: percent,
+      duration: "once",
+      name: `${percent}% Discount (${code})`,
+      // duration: "repeating",
+      // duration_in_months: 3,
+    })
+
+    const promoCode = await stripe.promotionCodes.create({
+      promotion: {
+        type: "coupon",
+        coupon: coupon.id,
+      },
+      code: code,
+      active: true,
+    } as any)
+    console.log(`- Promotion code created: ${promoCode.id}`)
+
+    console.log(`\nSuccess!`)
+    console.log(`Code to use at checkout: ${code}`)
+  } catch (error: any) {
+    console.error("\nError during creation:")
+    console.error(`- Message: ${error.message}`)
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2)
   const command = args[0] || "list"
@@ -178,9 +219,16 @@ async function main() {
     case "coupon":
       await createDemoCoupon()
       break
+    case "custom-coupon":
+      if (!param1 || !param2) {
+        console.log("Usage: custom-coupon <code> <percentage>")
+        return
+      }
+      await createCustomCoupon(param1, parseInt(param2))
+      break
     default:
       console.log(
-        "Unknown command. Use 'list', 'delete <email>', 'create <email> <name>', or 'coupon'."
+        "Unknown command. Use 'list', 'delete <email>', 'create <email> <name>', 'coupon', or 'custom-coupon <code> <percentage>'."
       )
   }
 }
@@ -191,3 +239,4 @@ main().catch(console.error)
 // npx tsx --env-file=.env scripts/test-stripe-customers.ts create admin@gmail.com "Test User"
 // npx tsx --env-file=.env scripts/test-stripe-customers.ts delete admin@gmail.com
 // npx tsx --env-file=.env scripts/test-stripe-customers.ts coupon
+// npx tsx --env-file=.env scripts/test-stripe-customers.ts custom-coupon STAY50 50

@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/db"
-import { users, licenses, plans } from "@/db/schema"
+import { users, licenses, plans, payments } from "@/db/schema"
 import { eq, and } from "drizzle-orm"
 import { getAppSession } from "@/lib/auth-session"
 import { getStripe } from "@/lib/stripe"
@@ -366,43 +366,97 @@ export async function applyRetentionDiscount(
     if (license.retentionDiscountUsed)
       return { error: "Retention discount already used for this license" }
 
-    let couponId = ""
-
-    if (couponCode) {
-      // Validate the provided coupon code first
-      try {
-        const stripeCoupon = await stripe.coupons.retrieve(couponCode)
-        couponId = stripeCoupon.id
-      } catch (e) {
-        console.warn(
-          `Configured retention coupon ${couponCode} not found in Stripe, falling back to dynamic creation.`
-        )
+    // The coupon must be pre-configured on the plan and exist in Stripe
+    // (with its own `duration`/`duration_in_months` set by the admin).
+    // We never create coupons on the fly — that would lead to ad-hoc
+    // discounts that don't match the plan's intended terms.
+    if (!couponCode) {
+      return {
+        error:
+          "No retention coupon is configured for this plan. Please contact support.",
       }
     }
 
+    const resolvedDiscount = await resolveYearlyDiscount(stripe, couponCode)
+    if (!resolvedDiscount) {
+      console.error(
+        `[applyRetentionDiscount] Configured coupon ${couponCode} not found in Stripe.`
+      )
+      return {
+        error:
+          "The retention coupon for this plan could not valid. Please contact support.",
+      }
+    }
+
+    // For local-DB tracking only — Stripe enforces the actual coupon
+    // duration based on what was configured on the coupon itself.
     const durationInMonths =
       billingCycle === "yearly" ? duration * 12 : duration
 
-    if (!couponId) {
-      const coupon = await stripe.coupons.create({
-        percent_off: discountPercent,
-        duration: "repeating",
-        duration_in_months: durationInMonths,
-        name: `${discountPercent}% Retention Discount`,
-      })
-      couponId = coupon.id
+    // Compute the REGULAR base price for this billing cycle. The retention
+    // coupon is meant to apply to the regular price (e.g. $19 × 12 = $228
+    // → 50% off → $114), NOT on top of the yearly discount that was baked
+    // into unit_amount during the monthly→yearly upgrade. This is also the
+    // price the cancel page shows on the offer screen, so the actual
+    // charge needs to match that promise.
+    const [currentPlan] = await db
+      .select()
+      .from(plans)
+      .where(eq(plans.id, license.planId))
+      .limit(1)
+    if (!currentPlan) return { error: "Plan not found" }
+
+    let regularUnitAmount: number
+    if (billingCycle === "yearly") {
+      // Inline yearly (currentPlan.mode === "monthly" with hasYearlyPlan):
+      // regular yearly = monthly × 12. For a separate yearly plan record,
+      // currentPlan.finalPrice is already the regular yearly price.
+      regularUnitAmount =
+        currentPlan.mode === "monthly"
+          ? currentPlan.finalPrice * 12
+          : currentPlan.finalPrice
+    } else {
+      regularUnitAmount = currentPlan.finalPrice
     }
 
-    // 3. Apply it to the subscription and ensure it's not set to cancel
+    // Pull the existing subscription item so we keep its product/currency/
+    // interval intact while resetting the unit_amount and applying the
+    // coupon. proration_behavior: "none" — the current period was already
+    // paid; the new amount + coupon take effect on the next renewal.
+    const existingSub = await stripe.subscriptions.retrieve(subscriptionId)
+    const existingItem = existingSub.items.data[0]
+    const existingProductId = existingItem.price.product as string
+    const existingCurrency = existingItem.price.currency
+    const existingInterval = existingItem.price.recurring?.interval || "month"
+
     const subscription = await stripe.subscriptions.update(subscriptionId, {
-      discounts: [{ coupon: couponId }],
+      items: [
+        {
+          id: existingItem.id,
+          price_data: {
+            currency: existingCurrency,
+            product: existingProductId,
+            unit_amount: regularUnitAmount,
+            recurring: { interval: existingInterval },
+          },
+        },
+      ],
+      discounts: [resolvedDiscount as any],
       cancel_at_period_end: false, // Ensure they stay subscribed
+      proration_behavior: "none",
     })
 
-    // 4. Update local DB
-    const nextPaymentDate = new Date(
-      (subscription as any).current_period_end * 1000
-    )
+    // 4. Update local DB.
+    // Newer Stripe API versions expose `current_period_end` on the
+    // subscription item rather than the subscription root. Read the item
+    // first and fall back to the legacy root field for older accounts.
+    const subAny = subscription as any
+    const periodEndUnix: number | undefined =
+      subscription.items.data[0]?.current_period_end ??
+      subAny.current_period_end
+    const nextPaymentDate = periodEndUnix
+      ? new Date(periodEndUnix * 1000)
+      : null
 
     await db
       .update(licenses)
@@ -412,6 +466,7 @@ export async function applyRetentionDiscount(
           Date.now() + durationInMonths * 30 * 24 * 60 * 60 * 1000
         ),
         cancelAtPeriodEnd: false,
+        nextRenewalDate: nextPaymentDate,
         updatedAt: new Date(),
       })
       .where(eq(licenses.id, licenseId))
@@ -421,11 +476,13 @@ export async function applyRetentionDiscount(
 
     return {
       success: true,
-      nextPaymentDate: nextPaymentDate.toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      }),
+      nextPaymentDate: nextPaymentDate
+        ? nextPaymentDate.toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })
+        : "your next billing date",
       amountDue: subscription.items.data[0].price.unit_amount
         ? Math.round(
             subscription.items.data[0].price.unit_amount *
@@ -551,6 +608,39 @@ export async function updateBillingInfo(data: {
   }
 }
 
+async function resolveYearlyDiscount(
+  stripe: Stripe,
+  couponCode: string | null | undefined
+): Promise<{ promotion_code?: string; coupon?: string } | undefined> {
+  if (!couponCode) return undefined
+  const code = couponCode.trim()
+  if (!code) return undefined
+
+  try {
+    const promos = await stripe.promotionCodes.list({
+      code,
+      active: true,
+      limit: 1,
+    })
+    if (promos.data.length > 0) {
+      return { promotion_code: promos.data[0].id }
+    }
+  } catch (err) {
+    console.error("[resolveYearlyDiscount] promotionCodes.list failed:", err)
+  }
+
+  try {
+    const coupon = await stripe.coupons.retrieve(code)
+    if (coupon && !(coupon as any).deleted) {
+      return { coupon: coupon.id }
+    }
+  } catch (err) {
+    console.error("[resolveYearlyDiscount] coupons.retrieve failed:", err)
+  }
+
+  return undefined
+}
+
 export async function previewSubscriptionUpgrade(licenseId: string) {
   const session = await getAppSession()
   if (!session) return { error: "Unauthorized" }
@@ -587,22 +677,49 @@ export async function previewSubscriptionUpgrade(licenseId: string) {
       .limit(1)
     if (!currentPlan) return { error: "Plan not found" }
 
-    const [yearlyPlan] = await db
-      .select()
-      .from(plans)
-      .where(and(eq(plans.name, currentPlan.name), eq(plans.mode, "yearly")))
-      .limit(1)
+    // Resolve the target yearly plan record. Two supported shapes:
+    // 1) Inline (preferred): currentPlan.hasYearlyPlan === true — the same
+    //    plan row carries yearlyDiscountPercentage / yearlyDiscountCouponCode,
+    //    so we keep the same plan id and just flip billingCycle to yearly.
+    // 2) Legacy: a separate plan row with mode === "yearly" and matching name.
+    let yearlyPlan: typeof currentPlan | undefined
+    if (currentPlan.hasYearlyPlan) {
+      yearlyPlan = currentPlan
+    } else {
+      ;[yearlyPlan] = await db
+        .select()
+        .from(plans)
+        .where(and(eq(plans.name, currentPlan.name), eq(plans.mode, "yearly")))
+        .limit(1)
+    }
 
     if (!yearlyPlan) return { error: "Yearly equivalent plan not found" }
 
-    // Calculate final price for yearly plans
-    const discount = currentPlan.yearlyDiscountPercentage || 0
-    const discountedMonthly = Math.round(
-      currentPlan.finalPrice * (1 - discount / 100)
-    )
-    const finalYearlyAmount = discountedMonthly * 12
+    // Resolve the auto-applied coupon for the yearly upgrade.
+    const couponCode =
+      currentPlan.yearlyDiscountCouponCode ||
+      yearlyPlan.yearlyDiscountCouponCode
+    const discount = await resolveYearlyDiscount(stripe, couponCode)
 
-    // Preview the upcoming invoice with the upgrade
+    const fullYearlyAmount = currentPlan.finalPrice * 12
+    const discountPercent =
+      currentPlan.yearlyDiscountPercentage ||
+      yearlyPlan.yearlyDiscountPercentage ||
+      0
+    const discountedYearlyAmount =
+      Math.round(currentPlan.finalPrice * (1 - discountPercent / 100)) * 12
+
+    // Strategy: bake the percentage discount into the unit_amount for the
+    // preview. This is the most reliable approach across Stripe API versions
+    // (the various `discounts` shapes on createPreview/subscription_details
+    // are inconsistent and cause "Failed to preview upgrade" errors when the
+    // coupon parameter shape is rejected). The actual coupon application
+    // happens on `subscriptions.update`, where the API is stable.
+    const unitAmount = discountedYearlyAmount
+
+    // Preview upcoming invoice — proration_behavior: always_invoice
+    // produces a single invoice that credits unused monthly time and
+    // charges the new yearly amount, due immediately.
     const upcomingInvoice = await stripe.invoices.createPreview({
       customer: subscription.customer as string,
       subscription: license.stripeSubscriptionId,
@@ -613,31 +730,57 @@ export async function previewSubscriptionUpgrade(licenseId: string) {
             price_data: {
               currency: yearlyPlan.currency || "usd",
               product: currentProductId,
-              unit_amount: finalYearlyAmount,
+              unit_amount: unitAmount,
               recurring: { interval: "year" },
             },
           },
         ],
+        proration_behavior: "always_invoice",
       },
     })
+
+    const creditAmount =
+      upcomingInvoice.lines.data
+        .filter((line: any) => line.amount < 0)
+        .reduce((sum: number, line: any) => sum + line.amount, 0) || 0
+
+    // Discount amount = full yearly - discounted yearly (what the user saved
+    // by being on yearly). Surfaced in the modal as the auto-applied coupon
+    // line. Only shown when a coupon code is configured on the plan.
+    const couponDiscountAmount =
+      discount && discountPercent > 0
+        ? fullYearlyAmount - discountedYearlyAmount
+        : 0
 
     return {
       success: true,
       preview: {
         currentPlan: currentPlan.name,
         newPlan: yearlyPlan.name,
-        creditAmount:
-          upcomingInvoice.lines.data.find((line: any) => line.amount < 0)
-            ?.amount || 0,
+        creditAmount,
         chargeAmount: upcomingInvoice.amount_due,
         currency: upcomingInvoice.currency,
         yearlyPlanId: yearlyPlan.id,
-        finalYearlyAmount,
+        // finalYearlyAmount is the actual unit_amount used for the
+        // subscription (discount baked in). regularYearlyAmount is the
+        // pre-discount sticker price shown in the modal.
+        finalYearlyAmount: unitAmount,
+        regularYearlyAmount: fullYearlyAmount,
+        appliedCouponCode: discount ? couponCode : null,
+        couponDiscountAmount,
+        // proration_behavior: "always_invoice" resets the billing cycle, so
+        // the new yearly period starts now and renews ~365 days from today.
+        nextRenewalDate: Date.now() + 365 * 86400000,
       },
     }
-  } catch (error) {
-    console.error("[previewSubscriptionUpgrade] Error:", error)
-    return { error: "Failed to preview upgrade" }
+  } catch (error: any) {
+    const stripeMessage = error?.raw?.message || error?.message
+    console.error("[previewSubscriptionUpgrade] Error:", stripeMessage || error)
+    return {
+      error: stripeMessage
+        ? `Failed to preview upgrade: ${stripeMessage}`
+        : "Failed to preview upgrade",
+    }
   }
 }
 
@@ -668,6 +811,12 @@ export async function upgradeSubscriptionToYearly(
       .limit(1)
     if (!yearlyPlan) return { error: "Yearly plan not found" }
 
+    const [currentPlan] = await db
+      .select()
+      .from(plans)
+      .where(eq(plans.id, license.planId))
+      .limit(1)
+
     const stripe = getStripe()
     const subscription = await stripe.subscriptions.retrieve(
       license.stripeSubscriptionId
@@ -675,7 +824,18 @@ export async function upgradeSubscriptionToYearly(
     const subscriptionItem = subscription.items.data[0]
     const currentProductId = subscriptionItem.price.product as string
 
-    // Update the subscription with proration
+    // The yearly discount is baked into `finalYearlyAmount` (the unit_amount
+    // sent from the preview), so we don't pass a separate Stripe coupon —
+    // doing so would double-discount. We still record the source coupon code
+    // in metadata for auditing.
+    const couponCode =
+      currentPlan?.yearlyDiscountCouponCode ||
+      yearlyPlan.yearlyDiscountCouponCode
+
+    // Update the subscription with proration. The `always_invoice` behavior
+    // closes out the current monthly cycle (already paid, generating credit
+    // for unused time) and immediately invoices the new yearly amount minus
+    // that credit.
     const updatedSubscription = await stripe.subscriptions.update(
       license.stripeSubscriptionId,
       {
@@ -690,33 +850,123 @@ export async function upgradeSubscriptionToYearly(
             },
           },
         ],
-        proration_behavior: "always_invoice", // Creates immediate invoice with credits
+        proration_behavior: "always_invoice",
+        metadata: {
+          ...(subscription.metadata || {}),
+          plan_id: yearlyPlan.id,
+          is_yearly: "true",
+          upgraded_from_monthly: "true",
+          ...(couponCode ? { promo_code: couponCode } : {}),
+        },
       }
     )
 
-    // Update local DB
+    // Pay the proration invoice immediately if it was generated as open,
+    // then record it in the local payments table so it appears in
+    // Billing History. The webhook only updates the existing license/payment;
+    // it doesn't create a new payment row for upgrade invoices, so we do
+    // that here while we have full context.
+    const latestInvoiceId = updatedSubscription.latest_invoice as string
+    let paidInvoice: Stripe.Invoice | null = null
+    if (latestInvoiceId) {
+      try {
+        let latestInvoice = await stripe.invoices.retrieve(latestInvoiceId)
+        if (latestInvoice.status === "open") {
+          latestInvoice = await stripe.invoices.pay(latestInvoice.id)
+        }
+        paidInvoice = latestInvoice
+
+        const customerId =
+          typeof latestInvoice.customer === "string"
+            ? latestInvoice.customer
+            : (latestInvoice.customer as Stripe.Customer | null)?.id || null
+        const paymentIntentId =
+          typeof (latestInvoice as any).payment_intent === "string"
+            ? ((latestInvoice as any).payment_intent as string)
+            : (
+                (latestInvoice as any)
+                  .payment_intent as Stripe.PaymentIntent | null
+              )?.id || null
+
+        await db
+          .insert(payments)
+          .values({
+            userId: session.userId,
+            planId: yearlyPlan.id,
+            stripeSessionId: latestInvoice.id, // unique; invoice IDs are unique
+            stripePaymentIntentId: paymentIntentId,
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: license.stripeSubscriptionId,
+            stripeInvoiceId: latestInvoice.id,
+            stripeInvoiceUrl: latestInvoice.hosted_invoice_url || null,
+            amount:
+              latestInvoice.amount_paid > 0
+                ? latestInvoice.amount_paid
+                : latestInvoice.amount_due,
+            currency: latestInvoice.currency,
+            appliedPromoCode: couponCode || null,
+            status:
+              latestInvoice.status === "paid"
+                ? "paid"
+                : latestInvoice.status || "pending",
+          })
+          .onConflictDoNothing({ target: payments.stripeSessionId })
+      } catch (err) {
+        console.error(
+          "[upgradeSubscriptionToYearly] Failed to pay/record invoice:",
+          err
+        )
+      }
+    }
+
+    // Resolve the new renewal date AFTER the proration invoice has been
+    // paid. With proration_behavior: "always_invoice" + an interval change
+    // (month → year), Stripe only resets the period when the invoice
+    // settles, so the value on `updatedSubscription` from `subscriptions.
+    // update` is still the OLD monthly period_end. We must re-read the
+    // subscription, with a layered fallback in case the API doesn't return
+    // a fresh value yet.
+    let nextRenewalDate: Date | null = null
+    try {
+      const fresh = await stripe.subscriptions.retrieve(
+        license.stripeSubscriptionId
+      )
+      const freshAny = fresh as any
+      const periodEnd =
+        fresh.items.data[0]?.current_period_end ?? freshAny.current_period_end
+      if (periodEnd) nextRenewalDate = new Date(periodEnd * 1000)
+    } catch (err) {
+      console.error(
+        "[upgradeSubscriptionToYearly] Failed to refetch subscription:",
+        err
+      )
+    }
+
+    // Fallback 1: use the new yearly line on the proration invoice.
+    if (!nextRenewalDate && paidInvoice?.lines?.data?.length) {
+      const yearlyLine = paidInvoice.lines.data.find(
+        (l: any) => l?.price?.recurring?.interval === "year"
+      ) as any
+      const lineEnd = yearlyLine?.period?.end
+      if (lineEnd) nextRenewalDate = new Date(lineEnd * 1000)
+    }
+
+    // Fallback 2: just use today + 365 days. The cycle is reset by
+    // always_invoice, so this is a safe approximation.
+    if (!nextRenewalDate) {
+      nextRenewalDate = new Date(Date.now() + 365 * 86400000)
+    }
+
+    // Update local DB with the correct yearly renewal date.
     await db
       .update(licenses)
       .set({
         planId: yearlyPlan.id,
         billingCycle: "yearly",
-        nextRenewalDate: new Date(
-          (updatedSubscription as any).current_period_end * 1000
-        ),
+        nextRenewalDate,
         updatedAt: new Date(),
       })
       .where(eq(licenses.id, licenseId))
-
-    // Handle invoice payment immediately if open
-    const latestInvoiceId = updatedSubscription.latest_invoice as string
-    if (latestInvoiceId) {
-      const latestInvoice = await stripe.invoices.retrieve(latestInvoiceId)
-      if (latestInvoice.status === "open") {
-        await stripe.invoices.pay(latestInvoice.id).catch((err) => {
-          console.error("Failed to pay invoice immediately", err)
-        })
-      }
-    }
 
     revalidatePath("/billing")
     return { success: true, message: "Subscription upgraded successfully" }
@@ -830,6 +1080,18 @@ export async function validateCoupon(code: string) {
     if (promoCodes.data.length > 0) {
       const promo = promoCodes.data[0] as any
       const coupon = promo.coupon as Stripe.Coupon
+
+      if (
+        !coupon ||
+        typeof coupon === "string" ||
+        (coupon as any).deleted ||
+        coupon.valid === false
+      ) {
+        return {
+          error: "Invalid promotion code configuration or coupon expired",
+        }
+      }
+
       return {
         id: promo.id,
         couponId: coupon.id,
@@ -842,7 +1104,11 @@ export async function validateCoupon(code: string) {
     // Then try as raw coupon ID
     try {
       const coupon = await stripe.coupons.retrieve(code.trim())
-      if (coupon) {
+      if (
+        coupon &&
+        !(coupon as any).deleted &&
+        (coupon.valid || coupon.valid === undefined)
+      ) {
         return {
           id: coupon.id,
           couponId: coupon.id,

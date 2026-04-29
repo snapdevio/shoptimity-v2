@@ -38,6 +38,7 @@ export const licenses = pgTable(
     status: varchar("status", { length: 20 }).notNull().default("active"),
     sourceOrderId: uuid("source_order_id").references(() => orders.id),
     stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+    stripeSetupIntentId: varchar("stripe_setup_intent_id", { length: 255 }),
     isTrial: boolean("is_trial").notNull().default(false),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     isLifetime: boolean("is_lifetime").notNull().default(false),

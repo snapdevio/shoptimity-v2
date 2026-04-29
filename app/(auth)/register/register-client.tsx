@@ -4,15 +4,24 @@ import { Suspense, useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
+  MailIcon,
   AlertCircleIcon,
   EyeIcon,
   EyeOffIcon,
   CheckCircleIcon,
+  ArrowRight,
 } from "lucide-react"
 import { usePostHog } from "posthog-js/react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Spinner } from "@/components/ui/spinner"
@@ -153,55 +162,102 @@ function RegisterForm({ className, ...props }: React.ComponentProps<"div">) {
   }
 
   if (success) {
+    const inbox = getInboxDetails(email)
+    const searchTerm = encodeURIComponent("Verify your Shoptimity account")
+
     return (
-      <div className="flex flex-col gap-6 py-10 text-center">
-        <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10">
-          <CheckCircleIcon className="size-8 text-primary" />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight">
-            Check your email
-          </h1>
-          <p className="text-sm text-balance text-muted-foreground">
-            We sent a verification link to{" "}
-            <strong className="font-semibold text-foreground">{email}</strong>.
-          </p>
-        </div>
-        {(() => {
-          const inbox = getInboxDetails(email)
-          if (inbox) {
-            return (
-              <Button asChild className="w-full rounded-xl" size="lg">
-                <a href={inbox.url} target="_blank" rel="noopener noreferrer">
-                  Go to {inbox.name}
-                </a>
-              </Button>
-            )
-          }
-          return (
+      <div className="animate-in duration-500 zoom-in-95 fade-in">
+        <Card className="mx-auto w-full max-w-md overflow-hidden border-border/50 bg-card/50 shadow-2xl backdrop-blur-sm">
+          <div className="h-1.5 w-full bg-linear-to-r from-primary/50 via-primary to-primary/50" />
+          <CardHeader className="pt-10 text-center">
+            <div className="mx-auto mb-6 flex size-20 items-center justify-center rounded-3xl bg-primary/10 shadow-inner ring-1 ring-primary/20">
+              <MailIcon className="animate-bounce-subtle size-10 text-primary" />
+            </div>
+            <CardTitle className="text-3xl font-bold tracking-tight">
+              Check your email
+            </CardTitle>
+            <CardDescription className="mt-4 px-4 text-base leading-relaxed text-muted-foreground">
+              We've sent a magic link to{" "}
+              <span className="mt-1 block rounded-lg border border-primary/10 bg-primary/5 px-2 py-1 font-bold break-all text-foreground">
+                {email}
+              </span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-8 pt-2 pb-8">
             <div className="flex flex-col gap-3">
-              <Button asChild className="w-full rounded-xl" size="lg">
-                <a
-                  href="https://mail.google.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {inbox ? (
+                <Button
+                  asChild
+                  className="h-12 w-full cursor-pointer rounded-xl bg-primary font-bold shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-[0.98]"
+                  size="lg"
                 >
-                  Open Gmail
-                </a>
+                  <a
+                    href={inbox.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2"
+                  >
+                    Open {inbox.name}
+                    <ArrowRight className="size-4" />
+                  </a>
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    asChild
+                    className="h-12 w-full cursor-pointer rounded-xl bg-primary font-bold shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-[0.98]"
+                    size="lg"
+                  >
+                    <a
+                      href={`https://mail.google.com/mail/u/0/#search/${searchTerm}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <MailIcon className="size-4" />
+                      Open Gmail
+                    </a>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="h-12 w-full cursor-pointer rounded-xl font-bold transition-all hover:bg-slate-50 active:scale-[0.98]"
+                    size="lg"
+                  >
+                    <a
+                      href={`https://outlook.live.com/mail/0/search/results?q=${searchTerm}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <MailIcon className="size-4" />
+                      Open Outlook
+                    </a>
+                  </Button>
+                </>
+              )}
+            </div>
+
+            <div className="mt-8 flex flex-col items-center gap-4 text-center">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <span className="flex size-1.5 rounded-full bg-primary/50" />
+                Didn't receive the email? Check your spam folder.
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSuccess(false)
+                  setEmail("")
+                }}
+                className="cursor-pointer text-xs font-bold text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
+              >
+                Use a different email address
               </Button>
             </div>
-          )
-        })()}
-        <Button
-          variant="link"
-          size="sm"
-          onClick={() => {
-            setSuccess(false)
-            setEmail("")
-          }}
-        >
-          Use a different email
-        </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -409,7 +465,7 @@ function RegisterForm({ className, ...props }: React.ComponentProps<"div">) {
 export function RegisterClient() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-muted/40 p-6 md:p-10">
-      <div className="w-full max-w-sm md:max-w-5xl">
+      <div className="w-full max-w-md md:max-w-5xl">
         <Suspense
           fallback={
             <Card className="overflow-hidden border-none p-0 shadow-2xl">
