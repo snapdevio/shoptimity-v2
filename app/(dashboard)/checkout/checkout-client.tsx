@@ -1054,9 +1054,7 @@ function CheckoutInner({
                   return (
                     <>
                       You won't be charged today. Your{" "}
-                      <strong className="text-base-content">
-                        free trial
-                      </strong>{" "}
+                      <strong className="text-base-content">free trial</strong>{" "}
                       continues until{" "}
                       <strong className="text-base-content">
                         {trialEndDate}

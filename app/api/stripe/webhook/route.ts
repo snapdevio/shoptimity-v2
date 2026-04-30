@@ -41,9 +41,7 @@ async function extractCustomerEmail(
   }
 
   const customerId =
-    typeof obj?.customer === "string"
-      ? obj.customer
-      : obj?.customer?.id || null
+    typeof obj?.customer === "string" ? obj.customer : obj?.customer?.id || null
   if (customerId) {
     try {
       const [user] = await db
@@ -928,10 +926,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // We allow amount_total to be less than finalPrice if promotion codes are allowed.
   // For yearly plans we use the yearly base (monthly × 12) as the cap.
   const isYearlyMeta = metadata.is_yearly === "true"
-  const baseMonthly =
-    plan.mode === "yearly"
-      ? plan.finalPrice
-      : plan.finalPrice
+  const baseMonthly = plan.mode === "yearly" ? plan.finalPrice : plan.finalPrice
   const maxExpected = isYearlyMeta ? baseMonthly * 12 : plan.finalPrice
 
   if (session.amount_total !== null && session.amount_total > maxExpected) {
@@ -1389,9 +1384,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       (invoice as any).subscription_details?.trial_end ||
       (invoice as any).parent?.subscription_details?.trial_end ||
       null
-    const invoiceTrialEnd = trialEndUnix
-      ? new Date(trialEndUnix * 1000)
-      : null
+    const invoiceTrialEnd = trialEndUnix ? new Date(trialEndUnix * 1000) : null
     const isStillTrialing =
       invoice.amount_paid === 0 &&
       !!invoiceTrialEnd &&

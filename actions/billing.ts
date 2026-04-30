@@ -157,7 +157,7 @@ export async function removeCard(paymentMethodId: string) {
         )) as any
         if (
           customer.invoice_settings?.default_payment_method ===
-          paymentMethodId ||
+            paymentMethodId ||
           !customer.invoice_settings?.default_payment_method
         ) {
           await stripe.customers.update(user.stripeCustomerId, {
@@ -346,10 +346,7 @@ export async function cancelSubscription(subscriptionId: string) {
         .select({ domainName: domains.domainName })
         .from(domains)
         .where(
-          and(
-            eq(domains.licenseId, ownedLicense.id),
-            isNull(domains.deletedAt)
-          )
+          and(eq(domains.licenseId, ownedLicense.id), isNull(domains.deletedAt))
         )
 
       await db
@@ -471,7 +468,7 @@ export async function applyRetentionDiscount(
       .limit(1)
 
     if (!license) return { error: "License not found" }
-    
+
     // Note: we intentionally do NOT block on `license.retentionDiscountUsed`.
     // The cancel-flow offer is plan-driven — admins control availability via
     // the plan's `cancelApplyDiscount` toggle, not per-license bookkeeping.
@@ -644,8 +641,7 @@ export async function applyRetentionDiscount(
     // and can drift from the coupon's real terms. Using the live coupon
     // keeps the success toast's "$X next charge" promise consistent with
     // what the billing page (also reading from Stripe) will later display.
-    const subItemUnit =
-      subscription.items.data[0]?.price?.unit_amount ?? null
+    const subItemUnit = subscription.items.data[0]?.price?.unit_amount ?? null
     const appliedCoupon = appliedDiscount?.coupon as any
     let amountDue = 0
     if (subItemUnit != null) {
@@ -666,10 +662,10 @@ export async function applyRetentionDiscount(
       success: true,
       nextPaymentDate: nextPaymentDate
         ? nextPaymentDate.toLocaleDateString("en-US", {
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-        })
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })
         : "your next billing date",
       amountDue,
     }
@@ -1305,9 +1301,9 @@ export async function upgradeSubscriptionToYearly(
           typeof (latestInvoice as any).payment_intent === "string"
             ? ((latestInvoice as any).payment_intent as string)
             : (
-              (latestInvoice as any)
-                .payment_intent as Stripe.PaymentIntent | null
-            )?.id || null
+                (latestInvoice as any)
+                  .payment_intent as Stripe.PaymentIntent | null
+              )?.id || null
 
         await db
           .insert(payments)

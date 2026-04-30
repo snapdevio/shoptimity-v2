@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { formatDate } from "@/lib/format"
+import { formatDate, formatCurrency } from "@/lib/format"
 
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
 import { Badge } from "@/components/ui/badge"
@@ -27,14 +27,6 @@ interface AdminPaymentsClientProps {
   pageSize: number
   totalPages: number
   initialSearch: string
-}
-
-function formatCurrency(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-    minimumFractionDigits: 2,
-  }).format(amount / 100)
 }
 
 function statusVariant(status: string) {

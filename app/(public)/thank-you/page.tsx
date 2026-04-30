@@ -37,6 +37,7 @@ import { getStripe } from "@/lib/stripe"
 import { db } from "@/db"
 import { plans } from "@/db/schema"
 import { eq } from "drizzle-orm"
+import { formatCurrency } from "@/lib/format"
 
 interface ThankYouPageProps {
   searchParams: { [key: string]: string | string[] | undefined }
@@ -82,11 +83,7 @@ export default async function ThankYouPage({
   const planId =
     (session?.metadata?.plan_id as string | undefined) || planIdParam
   const [plan] = planId
-    ? await db
-        .select()
-        .from(plans)
-        .where(eq(plans.id, planId))
-        .limit(1)
+    ? await db.select().from(plans).where(eq(plans.id, planId)).limit(1)
     : [null]
 
   const isFreePlan = session
@@ -115,9 +112,7 @@ export default async function ThankYouPage({
         ? [
             {
               id: "plan-item",
-              description: `${plan.name}${
-                isYearlyParam ? " (Yearly)" : ""
-              }`,
+              description: `${plan.name}${isYearlyParam ? " (Yearly)" : ""}`,
               amount: isFreePlan ? 0 : planAmount,
               quantity: 1,
             },
@@ -206,10 +201,7 @@ export default async function ThankYouPage({
                     </div>
                     <p className="text-lg font-bold text-foreground">
                       {item.amount > 0
-                        ? new Intl.NumberFormat("en-US", {
-                            style: "currency",
-                            currency: currency,
-                          }).format(item.amount / 100)
+                        ? formatCurrency(item.amount, currency)
                         : "Free"}
                     </p>
                   </div>

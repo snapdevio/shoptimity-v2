@@ -39,6 +39,24 @@ export function formatDateRelative(date: Date | string | number) {
 }
 
 /**
+ * Format a Stripe-style amount-in-minor-units (cents) as a localized currency
+ * string. Centralized so every screen renders prices the same way regardless
+ * of whether the backend hands us `amount` or `amount_total`.
+ *
+ * @param amountInCents Stripe amount in the smallest currency unit
+ * @param currency ISO 4217 code; case-insensitive, falls back to "USD"
+ */
+export function formatCurrency(
+  amountInCents: number | null | undefined,
+  currency: string | null | undefined = "USD"
+): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: (currency || "USD").toUpperCase(),
+  }).format((amountInCents ?? 0) / 100)
+}
+
+/**
  * Calendar-day remaining count to a future date, used for trial end labels.
  * Compares date-only (local midnight) so "tomorrow" reads as 1 day even if
  * the timestamp is a few hours away.

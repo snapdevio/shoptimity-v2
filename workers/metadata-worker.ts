@@ -5,13 +5,7 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3"
 import { db } from "../db"
-import {
-  licenses,
-  plans,
-  domains,
-  users,
-  payments,
-} from "../db/schema"
+import { licenses, plans, domains, users, payments } from "../db/schema"
 import { eq, and, isNull, lt, gt, isNotNull, sql } from "drizzle-orm"
 import { getStripe } from "../lib/stripe"
 import { enqueueEmailJob } from "../lib/queue"
@@ -564,9 +558,7 @@ export async function registerMetadataWorker(boss: PgBoss): Promise<void> {
         )
       }
       // Log overall result to audit trail
-      if (
-        expiredResult.success
-      ) {
+      if (expiredResult.success) {
         await createAuditLog(
           null,
           "metadata_worker.trial_sync_completed",

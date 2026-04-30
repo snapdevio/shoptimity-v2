@@ -614,9 +614,7 @@ export async function POST(request: NextRequest) {
   // than their account — that was the trial-abuse vector: same user, same
   // card, fresh email each time → infinite trials.
   const session = await getAppSession()
-  const email = session?.email
-    ? session.email.toLowerCase().trim()
-    : bodyEmail
+  const email = session?.email ? session.email.toLowerCase().trim() : bodyEmail
 
   // Get plan
   const [initialPlan] = await db

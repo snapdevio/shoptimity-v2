@@ -28,6 +28,7 @@ import { loadStripe } from "@stripe/stripe-js"
 import { Elements } from "@stripe/react-stripe-js"
 import { CardForm } from "@/components/checkout/card-form"
 import { cn } from "@/lib/utils"
+import { formatCurrency } from "@/lib/format"
 import { Country, State, City } from "country-state-city"
 import {
   Pagination,
@@ -1081,10 +1082,7 @@ export function BillingClient({
                           )}
                         </td>
                         <td className="px-6 py-4 font-bold text-slate-900">
-                          {new Intl.NumberFormat("en-US", {
-                            style: "currency",
-                            currency: payment.currency.toUpperCase(),
-                          }).format(payment.amount / 100)}
+                          {formatCurrency(payment.amount, payment.currency)}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-600">
                           {payment.planName || "Pro"}

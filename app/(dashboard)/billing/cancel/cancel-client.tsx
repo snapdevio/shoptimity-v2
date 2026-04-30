@@ -81,8 +81,7 @@ export function CancelClient({
     try {
       const res = await downgradeToFreePlan(licenseId, {
         reason: selectedReason,
-        details:
-          selectedReason === "Other" ? otherReason.trim() || null : null,
+        details: selectedReason === "Other" ? otherReason.trim() || null : null,
       })
       if (res.error) {
         toast.error(res.error)

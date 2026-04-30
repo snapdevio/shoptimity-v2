@@ -386,31 +386,29 @@ export async function adminGetUserSummary(userId: string) {
     return { error: "User not found" as const }
   }
 
-  const [
-    licenseCount,
-    paymentCount,
-    orderCount,
-    domainCount,
-    auditLogCount,
-  ] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(licenses)
-      .where(eq(licenses.userId, userId)),
-    db
-      .select({ value: count() })
-      .from(payments)
-      .where(eq(payments.userId, userId)),
-    db.select({ value: count() }).from(orders).where(eq(orders.userId, userId)),
-    db
-      .select({ value: count() })
-      .from(domains)
-      .where(eq(domains.userId, userId)),
-    db
-      .select({ value: count() })
-      .from(auditLogs)
-      .where(eq(auditLogs.actorUserId, userId)),
-  ])
+  const [licenseCount, paymentCount, orderCount, domainCount, auditLogCount] =
+    await Promise.all([
+      db
+        .select({ value: count() })
+        .from(licenses)
+        .where(eq(licenses.userId, userId)),
+      db
+        .select({ value: count() })
+        .from(payments)
+        .where(eq(payments.userId, userId)),
+      db
+        .select({ value: count() })
+        .from(orders)
+        .where(eq(orders.userId, userId)),
+      db
+        .select({ value: count() })
+        .from(domains)
+        .where(eq(domains.userId, userId)),
+      db
+        .select({ value: count() })
+        .from(auditLogs)
+        .where(eq(auditLogs.actorUserId, userId)),
+    ])
 
   return {
     user: {

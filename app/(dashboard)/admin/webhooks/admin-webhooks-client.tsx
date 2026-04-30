@@ -136,9 +136,7 @@ export function AdminWebhooksClient({
                             size="icon-xs"
                             onClick={() => toggleRow(row.id)}
                             aria-label={
-                              isExpanded
-                                ? "Collapse error"
-                                : "Expand error"
+                              isExpanded ? "Collapse error" : "Expand error"
                             }
                           >
                             {isExpanded ? (

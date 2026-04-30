@@ -150,9 +150,7 @@ export function UserDetailDialog({
           </div>
         )}
 
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
         {summary && !loading && (
           <div className="space-y-5">

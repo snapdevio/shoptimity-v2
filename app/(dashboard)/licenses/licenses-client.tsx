@@ -54,7 +54,7 @@ import {
   verifyStoreDomain,
 } from "@/actions/domains"
 import { normalizeDomain, validateDomain } from "@/lib/domains"
-import { formatDate, formatDaysRemaining } from "@/lib/format"
+import { formatCurrency, formatDate, formatDaysRemaining } from "@/lib/format"
 import { toast } from "sonner"
 
 interface Domain {
@@ -326,10 +326,10 @@ function SingleLicenseView({
                 </p>
                 <div className="mt-1">
                   <p className="text-sm font-semibold">
-                    {new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: license.displayCurrency || "USD",
-                    }).format((license.displayAmount || 0) / 100)}
+                    {formatCurrency(
+                      license.displayAmount,
+                      license.displayCurrency
+                    )}
                   </p>
                   {license.planMode === "free" ? (
                     <p className="text-[10px] font-medium text-muted-foreground">
@@ -727,10 +727,7 @@ function LicenseCard({
               domain slots filled
               <span className="mx-2 text-muted-foreground/30">•</span>
               <span className="font-medium text-foreground">
-                {new Intl.NumberFormat("en-US", {
-                  style: "currency",
-                  currency: license.displayCurrency || "USD",
-                }).format((license.displayAmount || 0) / 100)}
+                {formatCurrency(license.displayAmount, license.displayCurrency)}
               </span>
             </CardDescription>
           </div>
