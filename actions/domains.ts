@@ -282,11 +282,33 @@ export async function deleteDomain(formData: FormData) {
 }
 
 export async function verifyStoreDomain(domain: string): Promise<boolean> {
-  const normalized = domain.toLowerCase().trim()
+  // SSRF guard: the function does an outbound `fetch()` on a
+  // caller-supplied host. Without these checks an unauthenticated user
+  // could probe internal services (e.g. `localhost:8080`,
+  // `169.254.169.254`, `*.internal`) and observe response codes. We:
+  //   1. Require an authenticated session (no anonymous probing).
+  //   2. Run the input through the same Shopify-domain validator used at
+  //      assignment time, so only `*.myshopify.com` hosts pass.
+  //   3. Strip any path/query/fragment that snuck through normalization.
+  const session = await getAppSession()
+  if (!session) return false
+
+  const normalized = normalizeDomain(domain)
+  const validation = validateDomain(normalized)
+  if (!validation.valid) return false
+
+  // Belt-and-suspenders: even after validation, pin the URL to the bare
+  // host so a malformed input that slipped past the regex can't carry a
+  // path or alternate authority.
+  const url = `https://${normalized}/`
+
   try {
-    const shopResponse = await fetch(`https://${normalized}`, {
+    const shopResponse = await fetch(url, {
       method: "HEAD",
       redirect: "manual",
+      // 5s timeout via AbortSignal so a slow target can't tie up the
+      // server action.
+      signal: AbortSignal.timeout(5000),
     })
 
     return (

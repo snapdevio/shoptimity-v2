@@ -2,10 +2,27 @@
 
 import { db } from "@/db"
 import { featureCategories, features, planFeatures } from "@/db/schema"
-import { eq, sql, and, ilike, or } from "drizzle-orm"
+import { eq, sql, ilike, asc, desc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { getAppSession } from "@/lib/auth-session"
+
+// Allowlists for client-supplied sort fields. See note in admin-plans.ts.
+const CATEGORY_SORT_COLUMNS = {
+  position: featureCategories.position,
+  name: featureCategories.name,
+  slug: featureCategories.slug,
+  createdAt: featureCategories.createdAt,
+  updatedAt: featureCategories.updatedAt,
+} as const
+
+const FEATURE_SORT_COLUMNS = {
+  position: features.position,
+  name: features.name,
+  slug: features.slug,
+  createdAt: features.createdAt,
+  updatedAt: features.updatedAt,
+} as const
 
 async function requireAdmin() {
   const session = await getAppSession()
@@ -73,16 +90,17 @@ export async function getAllCategories(params?: {
     const limit = params?.limit || 10
     const offset = (page - 1) * limit
     const search = params?.search || ""
-    const sortField = (params?.sortField as any) || "position"
+    const sortField = params?.sortField || "position"
     const sortOrder = params?.sortOrder || "asc"
 
     const whereClause = search
       ? ilike(featureCategories.name, `%${search}%`)
       : undefined
-    const order =
-      sortOrder === "asc"
-        ? sql`${(featureCategories as any)[sortField]} ASC`
-        : sql`${(featureCategories as any)[sortField]} DESC`
+    const sortColumn =
+      CATEGORY_SORT_COLUMNS[
+        sortField as keyof typeof CATEGORY_SORT_COLUMNS
+      ] || featureCategories.position
+    const order = sortOrder === "desc" ? desc(sortColumn) : asc(sortColumn)
 
     const data = await db
       .select()
@@ -175,14 +193,14 @@ export async function getAllFeatures(params?: {
     const limit = params?.limit || 10
     const offset = (page - 1) * limit
     const search = params?.search || ""
-    const sortField = (params?.sortField as any) || "position"
+    const sortField = params?.sortField || "position"
     const sortOrder = params?.sortOrder || "asc"
 
     const whereClause = search ? ilike(features.name, `%${search}%`) : undefined
-    const order =
-      sortOrder === "asc"
-        ? sql`${(features as any)[sortField]} ASC`
-        : sql`${(features as any)[sortField]} DESC`
+    const sortColumn =
+      FEATURE_SORT_COLUMNS[sortField as keyof typeof FEATURE_SORT_COLUMNS] ||
+      features.position
+    const order = sortOrder === "desc" ? desc(sortColumn) : asc(sortColumn)
 
     const data = await db
       .select({

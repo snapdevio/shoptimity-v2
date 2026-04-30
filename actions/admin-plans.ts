@@ -2,10 +2,25 @@
 
 import { db } from "@/db"
 import { plans } from "@/db/schema"
-import { eq, sql } from "drizzle-orm"
+import { eq, sql, asc, desc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { getAppSession } from "@/lib/auth-session"
+
+// Allowlist of plan columns clients are permitted to sort on. Anything
+// outside this set falls back to `position`. Without an allowlist a bad
+// sortField becomes `(plans as any)[bad]` → undefined → the `sql` tag
+// emits a parameter rather than a column reference, which renders the
+// ORDER BY broken (and at minimum exposes column-name introspection via
+// error responses).
+const PLAN_SORT_COLUMNS = {
+  position: plans.position,
+  name: plans.name,
+  finalPrice: plans.finalPrice,
+  slots: plans.slots,
+  createdAt: plans.createdAt,
+  updatedAt: plans.updatedAt,
+} as const
 
 async function requireAdmin() {
   const session = await getAppSession()
@@ -119,19 +134,14 @@ export async function getAllPlans(params?: {
     const limit = params?.limit || 10
     const offset = (page - 1) * limit
     const search = params?.search || ""
-    const sortField = (params?.sortField as any) || "position"
+    const sortField = params?.sortField || "position"
     const sortOrder = params?.sortOrder || "asc"
 
-    let query = db.select().from(plans)
-
-    // TODO: Add search filter if needed, but for plans it's usually a small list.
-    // For consistency with other pages, we'll implement it.
-
-    // Sort logic
+    const sortColumn =
+      PLAN_SORT_COLUMNS[sortField as keyof typeof PLAN_SORT_COLUMNS] ||
+      plans.position
     const order =
-      sortOrder === "asc"
-        ? sql`${(plans as any)[sortField]} ASC`
-        : sql`${(plans as any)[sortField]} DESC`
+      sortOrder === "desc" ? desc(sortColumn) : asc(sortColumn)
 
     const data = await db
       .select()

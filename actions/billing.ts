@@ -1,12 +1,41 @@
 "use server"
 
 import { db } from "@/db"
-import { users, licenses, plans, payments } from "@/db/schema"
-import { eq, and } from "drizzle-orm"
+import { users, licenses, plans, payments, domains } from "@/db/schema"
+import { eq, and, isNull } from "drizzle-orm"
 import { getAppSession } from "@/lib/auth-session"
 import { getStripe } from "@/lib/stripe"
+import { enqueueLicenseMetadataExportJob } from "@/lib/queue"
 import { revalidatePath } from "next/cache"
 import Stripe from "stripe"
+
+// Re-export the public license JSON for every active domain on a license.
+// Call this AFTER any local-DB plan / billingCycle / isTrial change that
+// the webhook isn't going to drive — otherwise the R2 file at
+// `license.shoptimity.com/.../<domain>.json` keeps the old plan_name.
+async function refreshLicenseR2(licenseId: string, userId: string) {
+  try {
+    const attached = await db
+      .select({ domainName: domains.domainName })
+      .from(domains)
+      .where(and(eq(domains.licenseId, licenseId), isNull(domains.deletedAt)))
+
+    for (const d of attached) {
+      await enqueueLicenseMetadataExportJob({
+        domainName: d.domainName,
+        userId,
+        action: "upsert",
+      }).catch((err) => {
+        console.error(
+          `[billing] Failed to enqueue R2 refresh for ${d.domainName}:`,
+          err
+        )
+      })
+    }
+  } catch (err) {
+    console.error("[billing] refreshLicenseR2 lookup failed:", err)
+  }
+}
 
 export async function getUserCards() {
   const session = await getAppSession()
@@ -282,6 +311,23 @@ export async function cancelSubscription(subscriptionId: string) {
   try {
     const stripe = getStripe()
 
+    // Ownership check: the caller-supplied subscriptionId must belong to a
+    // license owned by the session user. Without this, anyone with a
+    // leaked `sub_*` / `seti_*` / `pm_*` could cancel another user's
+    // subscription via this endpoint.
+    const [ownedLicense] = await db
+      .select({ id: licenses.id })
+      .from(licenses)
+      .where(
+        and(
+          eq(licenses.stripeSubscriptionId, subscriptionId),
+          eq(licenses.userId, session.userId)
+        )
+      )
+      .limit(1)
+
+    if (!ownedLicense) return { error: "Subscription not found" }
+
     // Handle Trial Cancellations (Setup Intents / stored payment methods).
     // Also cover `pm_*` since the checkout flow stores a payment method ID
     // here for direct-trial signups. Clearing isTrial / trialEndsAt prevents
@@ -290,6 +336,20 @@ export async function cancelSubscription(subscriptionId: string) {
       subscriptionId.startsWith("seti_") ||
       !subscriptionId.startsWith("sub_")
     ) {
+      // Snapshot attached domains BEFORE the revoke. Once `status` is
+      // `revoked`, the worker's upsert path will short-circuit to
+      // delete-from-R2 — which is exactly what we want, but we still
+      // need to enqueue a job per domain so the public file goes away.
+      const attachedDomains = await db
+        .select({ domainName: domains.domainName })
+        .from(domains)
+        .where(
+          and(
+            eq(domains.licenseId, ownedLicense.id),
+            isNull(domains.deletedAt)
+          )
+        )
+
       await db
         .update(licenses)
         .set({
@@ -300,7 +360,20 @@ export async function cancelSubscription(subscriptionId: string) {
           stripeSubscriptionId: null,
           updatedAt: new Date(),
         })
-        .where(eq(licenses.stripeSubscriptionId, subscriptionId))
+        .where(eq(licenses.id, ownedLicense.id))
+
+      for (const d of attachedDomains) {
+        await enqueueLicenseMetadataExportJob({
+          domainName: d.domainName,
+          userId: session.userId,
+          action: "delete",
+        }).catch((err) => {
+          console.error(
+            `[cancelSubscription] Failed to enqueue R2 delete for ${d.domainName}:`,
+            err
+          )
+        })
+      }
 
       revalidatePath("/billing")
       return { success: true }
@@ -317,7 +390,7 @@ export async function cancelSubscription(subscriptionId: string) {
         cancelAtPeriodEnd: true,
         updatedAt: new Date(),
       })
-      .where(eq(licenses.stripeSubscriptionId, subscriptionId))
+      .where(eq(licenses.id, ownedLicense.id))
 
     revalidatePath("/billing")
     return {
@@ -336,6 +409,21 @@ export async function reactivateSubscription(subscriptionId: string) {
 
   try {
     const stripe = getStripe()
+
+    // Ownership check (see cancelSubscription).
+    const [ownedLicense] = await db
+      .select({ id: licenses.id })
+      .from(licenses)
+      .where(
+        and(
+          eq(licenses.stripeSubscriptionId, subscriptionId),
+          eq(licenses.userId, session.userId)
+        )
+      )
+      .limit(1)
+
+    if (!ownedLicense) return { error: "Subscription not found" }
+
     await stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: false,
     })
@@ -347,7 +435,7 @@ export async function reactivateSubscription(subscriptionId: string) {
         cancelAtPeriodEnd: false,
         updatedAt: new Date(),
       })
-      .where(eq(licenses.stripeSubscriptionId, subscriptionId))
+      .where(eq(licenses.id, ownedLicense.id))
 
     revalidatePath("/billing")
     return { success: true }
@@ -1062,6 +1150,9 @@ export async function upgradeSubscriptionToYearly(
           .where(eq(users.id, session.userId))
       })
 
+      // Refresh the public license JSON — billingCycle just changed.
+      await refreshLicenseR2(licenseId, session.userId)
+
       revalidatePath("/billing")
       return {
         success: true,
@@ -1173,6 +1264,9 @@ export async function upgradeSubscriptionToYearly(
         .update(users)
         .set({ hasUsedTrial: true, updatedAt: new Date() })
         .where(eq(users.id, session.userId))
+
+      // Refresh the public license JSON — planId / billingCycle changed.
+      await refreshLicenseR2(licenseId, session.userId)
 
       revalidatePath("/billing")
       return {
@@ -1295,6 +1389,9 @@ export async function upgradeSubscriptionToYearly(
       })
       .where(eq(licenses.id, licenseId))
 
+    // Refresh the public license JSON — planId / billingCycle changed.
+    await refreshLicenseR2(licenseId, session.userId)
+
     revalidatePath("/billing")
     return { success: true, message: "Subscription upgraded successfully" }
   } catch (error: any) {
@@ -1355,6 +1452,10 @@ export async function downgradeToFreePlan(licenseId: string) {
             updatedAt: new Date(),
           })
           .where(eq(licenses.id, licenseId))
+
+        // Refresh the public license JSON so the public file reflects
+        // the Free plan (was Pro/Trial before).
+        await refreshLicenseR2(licenseId, session.userId)
       }
 
       revalidatePath("/billing")

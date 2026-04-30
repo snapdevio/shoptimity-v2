@@ -6,6 +6,9 @@ import { and, eq } from "drizzle-orm"
 import { z } from "zod"
 import { createAuditLog } from "@/lib/audit"
 import { getAppSession } from "@/lib/auth-session"
+import { domains as domainsTable } from "@/db/schema/domains"
+import { isNull } from "drizzle-orm"
+import { enqueueLicenseMetadataExportJob } from "@/lib/queue"
 
 async function activateFreePlan(opts: {
   stripe: Stripe
@@ -17,6 +20,11 @@ async function activateFreePlan(opts: {
 }) {
   const { stripe, userId, email, contactName, plan } = opts
   const normalizedEmail = email.toLowerCase().trim()
+
+  // Domains to refresh in R2 after the transaction commits. The license
+  // upsert below changes `planId` (e.g. Pro → Free); without re-exporting
+  // metadata, the public `<domain>.json` keeps the old plan_name.
+  const domainsToRefresh: { domainName: string; userId: string }[] = []
 
   await db.transaction(async (tx) => {
     // Resolve user (prefer authenticated session userId, fallback to email)
@@ -99,6 +107,24 @@ async function activateFreePlan(opts: {
         },
       })
 
+    // Collect existing domains for post-commit R2 refresh. The license id
+    // is preserved by the upsert, so domain rows still link here — they
+    // just need a fresh JSON snapshot reflecting the new (free) plan_name.
+    if (existingLicense) {
+      const existingDomains = await tx
+        .select({ domainName: domainsTable.domainName })
+        .from(domainsTable)
+        .where(
+          and(
+            eq(domainsTable.licenseId, existingLicense.id),
+            isNull(domainsTable.deletedAt)
+          )
+        )
+      for (const d of existingDomains) {
+        domainsToRefresh.push({ domainName: d.domainName, userId: user.id })
+      }
+    }
+
     await createAuditLog(
       user.id,
       existingLicense
@@ -116,6 +142,22 @@ async function activateFreePlan(opts: {
       tx
     )
   })
+
+  // Enqueue R2 refresh after commit so the worker reads the just-saved
+  // free-plan state. Without this, the public license JSON keeps showing
+  // the previous plan_name (Pro / Trial / etc).
+  for (const job of domainsToRefresh) {
+    await enqueueLicenseMetadataExportJob({
+      domainName: job.domainName,
+      userId: job.userId,
+      action: "upsert",
+    }).catch((err) => {
+      console.error(
+        `[checkout] Failed to enqueue R2 refresh for ${job.domainName} (free activation):`,
+        err
+      )
+    })
+  }
 }
 
 const checkoutSchema = z.object({
@@ -489,7 +531,56 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Hosts allowed to POST to this checkout endpoint. Same set as
+// `auth.trustedOrigins` in lib/auth.ts so the two stay aligned. Anything
+// else gets a 403 — without this guard a malicious site could submit a
+// cross-origin form to start a Stripe subscription on the victim's saved
+// card (the route reads the better-auth cookie, which browsers will send
+// on cross-origin POSTs).
+const ALLOWED_ORIGIN_HOSTS = new Set([
+  "shoptimity.com",
+  "www.shoptimity.com",
+  "localhost:3000",
+  "127.0.0.1:3000",
+  "chirag-web.shopify.xx.kg",
+])
+
+function isSameOrigin(request: NextRequest): boolean {
+  const origin = request.headers.get("origin")
+  const referer = request.headers.get("referer")
+  // Prefer Origin (set on POSTs by all modern browsers). Fall back to
+  // Referer for older clients. If neither is present we err on the side
+  // of denial — legitimate browser flows always set at least one.
+  let host: string | null = null
+  if (origin) {
+    try {
+      host = new URL(origin).host
+    } catch {
+      return false
+    }
+  } else if (referer) {
+    try {
+      host = new URL(referer).host
+    } catch {
+      return false
+    }
+  }
+  if (!host) return false
+  if (ALLOWED_ORIGIN_HOSTS.has(host)) return true
+  // Allow the caller's own host (covers preview / staging deployments
+  // without having to enumerate them here).
+  if (host === request.nextUrl.host) return true
+  return false
+}
+
 export async function POST(request: NextRequest) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json(
+      { error: "Forbidden: origin not allowed" },
+      { status: 403 }
+    )
+  }
+
   let body: unknown
   try {
     body = await request.json()
@@ -511,7 +602,7 @@ export async function POST(request: NextRequest) {
   }
 
   const {
-    email,
+    email: bodyEmail,
     contactName,
     planId,
     licenseQuantity,
@@ -521,6 +612,16 @@ export async function POST(request: NextRequest) {
     address,
     promoCode,
   } = parsed.data
+
+  // Resolve session up front. When a session is present the body email is
+  // overridden with the session email so an authenticated user can't
+  // register a checkout (and especially a trial) under a different email
+  // than their account — that was the trial-abuse vector: same user, same
+  // card, fresh email each time → infinite trials.
+  const session = await getAppSession()
+  const email = session?.email
+    ? session.email.toLowerCase().trim()
+    : bodyEmail
 
   // Get plan
   const [initialPlan] = await db
@@ -567,30 +668,31 @@ export async function POST(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://shoptimity.com"
   const stripe = getStripe()
 
-  // Find user by email if possible to check trial history. The per-user
-  // `hasUsedTrial` flag is the source of truth (a cancelled trial leaves
-  // no recoverable license row to gate on).
+  // Trial eligibility: gate on the SESSION user when authenticated, falling
+  // back to email lookup only for unauthenticated checkout. Gating purely
+  // on the body-supplied email lets a logged-in user cycle through fresh
+  // emails with the same card to claim trials repeatedly.
   let isTrialEligible = plan.trialDays > 0
-  const [existingUser] = await db
-    .select({ id: users.id, hasUsedTrial: users.hasUsedTrial })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1)
-
-  if (existingUser?.hasUsedTrial) {
-    isTrialEligible = false
-  }
-
-  // Resolve session + stripeCustomerId up front
-  const session = await getAppSession()
   let stripeCustomerId: string | undefined
+
   if (session) {
     const [user] = await db
-      .select({ stripeCustomerId: users.stripeCustomerId })
+      .select({
+        stripeCustomerId: users.stripeCustomerId,
+        hasUsedTrial: users.hasUsedTrial,
+      })
       .from(users)
       .where(eq(users.id, session.userId))
       .limit(1)
     stripeCustomerId = user?.stripeCustomerId || undefined
+    if (user?.hasUsedTrial) isTrialEligible = false
+  } else {
+    const [existingUser] = await db
+      .select({ id: users.id, hasUsedTrial: users.hasUsedTrial })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
+    if (existingUser?.hasUsedTrial) isTrialEligible = false
   }
 
   // Handle Free Plan Fulfillment FIRST — no Stripe calls required.
@@ -721,6 +823,15 @@ export async function POST(request: NextRequest) {
           ? new Date(subscription.trial_end * 1000)
           : new Date(Date.now() + plan.trialDays * 86400000)
 
+        // Domains attached to the user's existing license (typical case:
+        // free-plan user starting a Pro trial). The license upsert below
+        // changes planId / isTrial in place, so the public R2 JSON needs
+        // to be re-exported with the new plan_name + trial fields.
+        const directTrialDomainsToRefresh: {
+          domainName: string
+          userId: string
+        }[] = []
+
         await db.transaction(async (tx) => {
           // Find or create user
           let [user] = await tx
@@ -783,7 +894,9 @@ export async function POST(request: NextRequest) {
             .returning()
 
           // Create license — now backed by the real Stripe subscription.
-          await tx
+          // Capture the returned id so we can fetch attached domains for
+          // R2 refresh (a free-plan upgrade keeps the same license row).
+          const [trialLicense] = await tx
             .insert(licenses)
             .values({
               userId: user.id,
@@ -815,6 +928,25 @@ export async function POST(request: NextRequest) {
                 updatedAt: new Date(),
               },
             })
+            .returning({ id: licenses.id })
+
+          if (trialLicense) {
+            const existingDomains = await tx
+              .select({ domainName: domainsTable.domainName })
+              .from(domainsTable)
+              .where(
+                and(
+                  eq(domainsTable.licenseId, trialLicense.id),
+                  isNull(domainsTable.deletedAt)
+                )
+              )
+            for (const d of existingDomains) {
+              directTrialDomainsToRefresh.push({
+                domainName: d.domainName,
+                userId: user.id,
+              })
+            }
+          }
 
           await createAuditLog(
             user.id,
@@ -830,6 +962,23 @@ export async function POST(request: NextRequest) {
             tx
           )
         })
+
+        // Refresh R2 JSON for any pre-existing domains so the public
+        // license file reflects the new (Pro/trial) plan name. Without
+        // this, a free-plan user starting a Pro trial keeps seeing
+        // `plan_name: "Free"` at the public URL.
+        for (const job of directTrialDomainsToRefresh) {
+          await enqueueLicenseMetadataExportJob({
+            domainName: job.domainName,
+            userId: job.userId,
+            action: "upsert",
+          }).catch((err) => {
+            console.error(
+              `[checkout] Failed to enqueue R2 refresh for ${job.domainName} (direct trial):`,
+              err
+            )
+          })
+        }
 
         return NextResponse.json({ success: true })
       }

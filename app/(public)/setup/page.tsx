@@ -29,42 +29,42 @@ const steps = [
     title: "Choose a Plan",
     description:
       "Browse our premium plan designed for focused growth. Each account includes a single license slot, which can be used for one Shopify store domain at a time. This ensures optimal performance and dedicated usage for your store.",
-    image: "/assets/setup/step-1.png",
+    image: "/shoptimity-v2/assets/setup/pricing.webp",
   },
   {
     icon: Mail,
     title: "Complete Checkout",
     description:
       "Our checkout process is fast and fully secured by Stripe. Simply enter your payment details, and you'll receive an instant confirmation email and access to your customer portal.",
-    image: "/assets/setup/step-2.png",
+    image: "/shoptimity-v2/assets/setup/checkout.webp",
   },
   {
     icon: LogIn,
     title: "Access Your Dashboard",
     description:
       "Sign in using Google, Microsoft, or your email and password. Once logged in, you can manage your theme licenses and assets from a single dashboard.",
-    image: "/assets/setup/step-3.png",
+    image: "/shoptimity-v2/assets/setup/login.webp",
   },
   {
     icon: Globe,
     title: "Add Your Store Domains",
     description:
       "Enter your Shopify .myshopify.com domain to assign your license. Each account supports one active domain per license slot.",
-    image: "/assets/setup/step-4.png",
+    image: "/shoptimity-v2/assets/setup/assign-domain.webp",
   },
   {
     icon: Download,
     title: "Download Theme Templates",
     description:
       "Access our premium template library and download the latest theme builds in ZIP format. Our themes are optimized for performance and conversion right out of the box.",
-    image: "/assets/setup/step-5.png",
+    image: "/shoptimity-v2/assets/setup/download-template.webp",
   },
   {
     icon: ShieldCheck,
     title: "Final Activation",
     description:
       "Upload the ZIP file to your Shopify Admin. Your license will automatically activate once the theme is installed on a registered domain. You're now ready to build!",
-    image: "/assets/setup/step-6.png",
+    image: "/shoptimity-v2/assets/setup/assign-license.webp",
   },
 ]
 

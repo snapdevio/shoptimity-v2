@@ -14,8 +14,20 @@ async function requireAdmin() {
   return session
 }
 
+// Settings buckets that are intentionally exposed to the public site
+// (pricing page copy, retention-offer timeout, etc). Any other key is
+// treated as admin-only — this prevents an unauthenticated caller from
+// reading buckets that may store API keys, webhook URLs, or other secrets
+// just by guessing the key.
+const PUBLIC_SETTINGS_KEYS = new Set<string>(["general_settings"])
+
 export async function getSettings(key: string = "general_settings") {
   try {
+    if (!PUBLIC_SETTINGS_KEYS.has(key)) {
+      // Non-public bucket — must be admin to read.
+      await requireAdmin()
+    }
+
     const [result] = await db
       .select()
       .from(settings)

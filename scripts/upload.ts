@@ -4,10 +4,10 @@ import * as path from "path"
 import "dotenv/config"
 
 // Configuration
-const VIDEO_URL = "https://license.shoptimity.com/video/step.mp4"
-const TEMPLATES_BASE_URL = "https://license.shoptimity.com/templates"
-const OG_IMAGE_URL = "https://license.shoptimity.com/assets/og.png"
-const SETUP_ASSETS_BASE_URL = "https://license.shoptimity.com/assets/setup"
+const VIDEO_URL = "https://license.shoptimity.com/shoptimity-v2/video/step.mp4"
+const TEMPLATES_BASE_URL = "https://license.shoptimity.com/shoptimity-v2/templates"
+const OG_IMAGE_URL = "https://license.shoptimity.com/shoptimity-v2/assets/og.png"
+const SETUP_ASSETS_BASE_URL = "https://license.shoptimity.com/shoptimity-v2/assets/setup"
 
 // Shared R2 Client
 let _client: S3Client | null = null
@@ -199,7 +199,7 @@ async function uploadAsset(
  * Handle setup asset image uploads.
  */
 async function uploadSetupAssets(purgeQueue: string[]) {
-  const setupDir = path.join(process.cwd(), "public", "assets", "setup")
+  const setupDir = path.join(process.cwd(), "public", "new")
 
   if (!fs.existsSync(setupDir)) {
     console.warn(":warning:  public/assets/setup/ directory not found.")
@@ -222,7 +222,7 @@ async function uploadSetupAssets(purgeQueue: string[]) {
   for (const file of files) {
     const filePath = path.join(setupDir, file)
     const fileBuffer = fs.readFileSync(filePath)
-    const key = `assets/setup/${file}`
+    const key = `shoptimity-v2/assets/setup/${file}`
     const ext = path.extname(file).toLowerCase()
     const contentType =
       ext === ".svg" ? "image/svg+xml" : `image/${ext.replace(".", "")}`
@@ -248,10 +248,10 @@ async function main() {
   const purgeQueue: string[] = []
 
   // 1. Templates (Renaming + Uploading)
-  await uploadTemplates(purgeQueue)
+  // await uploadTemplates(purgeQueue)
 
   // 2. Setup Assets
-  // await uploadSetupAssets(purgeQueue)
+  await uploadSetupAssets(purgeQueue)
 
   // 3. Main Video
   // await uploadAsset("public/step.mp4", "video/step.mp4", "video/mp4", VIDEO_URL, purgeQueue);
