@@ -91,7 +91,7 @@ const LandingHero: React.FC = () => {
       className="relative mx-auto overflow-hidden bg-white pt-0 pb-0"
       id="home"
     >
-      <div className="relative z-10 container mx-auto max-w-7xl">
+      <div className="relative z-10 container mx-auto max-w-7xl md:px-6">
         <div className="grid grid-cols-1 items-center gap-4 md:gap-12 lg:grid-cols-2">
           <div className="py-8 text-center lg:py-24 lg:text-left">
             <h1 className="scroll-animate mb-8 font-heading text-[32px] leading-tight text-gray-900 md:text-[38px] lg:text-5xl">

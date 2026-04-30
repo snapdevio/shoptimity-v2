@@ -228,7 +228,7 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
             </div>
 
             {dbPlans.some((p) => p.hasYearlyPlan) && (
-              <div className="mb-8 flex items-center gap-4">
+              <div className="mb-6 flex items-center gap-4">
                 <span
                   className={cn(
                     "text-sm font-semibold",
@@ -284,11 +284,6 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                       : "/month"}
                 </span>
               </div>
-              {isYearly && currentPlan.yearlyPrice > 0 && discount > 0 && (
-                <span className="ml-2 rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-bold text-emerald-700">
-                  Save {discount}%
-                </span>
-              )}
             </div>
 
             <div className="mb-10 font-sans">
@@ -302,7 +297,7 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                     key={plan.id}
                     onClick={() => setSelectedPlanIndex(idx)}
                     className={cn(
-                      "group relative flex w-full cursor-pointer items-center justify-between rounded-2xl border-2 p-4 transition-all duration-300",
+                      "group relative flex w-full cursor-pointer flex-col gap-4 rounded-2xl border-2 p-4 transition-all duration-300 sm:flex-row sm:items-center sm:justify-between",
                       selectedPlanIndex === idx
                         ? "border-primary bg-primary/5 shadow-md"
                         : "border-transparent bg-base-300 hover:bg-primary/10"
@@ -324,13 +319,13 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                           />
                         </div>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="flex-grow">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="flex items-center gap-2 font-bold text-base-content">
                             {plan.name}
                             {plan.yearlyPrice > 0 && isYearly && (
                               <span
-                                className={`rounded bg-primary px-2 py-0.5 text-[10px] font-normal text-white uppercase`}
+                                className={`rounded bg-primary px-2 py-0.5 text-[10px] font-normal whitespace-nowrap text-white uppercase`}
                               >
                                 Save $
                                 {Math.round(
@@ -345,19 +340,19 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="gap text-[20px] leading-none font-bold text-base-content">
+                    <div className="flex w-full flex-row items-center justify-between border-t border-base-content/5 pt-3 sm:w-auto sm:flex-col sm:items-end sm:border-t-0 sm:pt-0 sm:text-right">
+                      <div className="flex items-baseline gap-1 text-[20px] font-bold text-base-content">
                         {isYearly && plan.yearlyPrice > 0 ? (
                           <>
                             ${plan.yearlyPrice}
-                            <span className="ml-1 text-[13px] font-medium text-base-content-muted">
+                            <span className="text-[13px] font-medium text-base-content-muted">
                               /yr
                             </span>
                           </>
                         ) : plan.monthlyPrice > 0 ? (
                           <>
                             ${plan.monthlyPrice}
-                            <span className="ml-1 text-[13px] font-medium text-base-content-muted">
+                            <span className="text-[13px] font-medium text-base-content-muted">
                               /mo
                             </span>
                           </>
