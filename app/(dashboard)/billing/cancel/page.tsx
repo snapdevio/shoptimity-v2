@@ -99,7 +99,10 @@ export default async function CancelPlanPage() {
   // we approximate from the plan's stored duration in those cases.
   let discountDuration = planDiscountDuration
   if (couponDetails) {
-    if (couponDetails.durationType === "repeating" && couponDetails.durationInMonths) {
+    if (
+      couponDetails.durationType === "repeating" &&
+      couponDetails.durationInMonths
+    ) {
       discountDuration =
         activeLicense.billingCycle === "yearly"
           ? Math.max(1, Math.ceil(couponDetails.durationInMonths / 12))

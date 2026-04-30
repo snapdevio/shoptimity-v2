@@ -6,6 +6,8 @@ import { eq, and, isNull } from "drizzle-orm"
 import { getAppSession } from "@/lib/auth-session"
 import { getStripe } from "@/lib/stripe"
 import { enqueueLicenseMetadataExportJob } from "@/lib/queue"
+import { createAuditLog } from "@/lib/audit"
+import { isKnownCancellationReason } from "@/lib/cancellation-reasons"
 import { revalidatePath } from "next/cache"
 import Stripe from "stripe"
 
@@ -155,7 +157,7 @@ export async function removeCard(paymentMethodId: string) {
         )) as any
         if (
           customer.invoice_settings?.default_payment_method ===
-          paymentMethodId ||
+            paymentMethodId ||
           !customer.invoice_settings?.default_payment_method
         ) {
           await stripe.customers.update(user.stripeCustomerId, {
@@ -344,10 +346,7 @@ export async function cancelSubscription(subscriptionId: string) {
         .select({ domainName: domains.domainName })
         .from(domains)
         .where(
-          and(
-            eq(domains.licenseId, ownedLicense.id),
-            isNull(domains.deletedAt)
-          )
+          and(eq(domains.licenseId, ownedLicense.id), isNull(domains.deletedAt))
         )
 
       await db
@@ -469,7 +468,7 @@ export async function applyRetentionDiscount(
       .limit(1)
 
     if (!license) return { error: "License not found" }
-    
+
     // Note: we intentionally do NOT block on `license.retentionDiscountUsed`.
     // The cancel-flow offer is plan-driven — admins control availability via
     // the plan's `cancelApplyDiscount` toggle, not per-license bookkeeping.
@@ -642,8 +641,7 @@ export async function applyRetentionDiscount(
     // and can drift from the coupon's real terms. Using the live coupon
     // keeps the success toast's "$X next charge" promise consistent with
     // what the billing page (also reading from Stripe) will later display.
-    const subItemUnit =
-      subscription.items.data[0]?.price?.unit_amount ?? null
+    const subItemUnit = subscription.items.data[0]?.price?.unit_amount ?? null
     const appliedCoupon = appliedDiscount?.coupon as any
     let amountDue = 0
     if (subItemUnit != null) {
@@ -664,10 +662,10 @@ export async function applyRetentionDiscount(
       success: true,
       nextPaymentDate: nextPaymentDate
         ? nextPaymentDate.toLocaleDateString("en-US", {
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-        })
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })
         : "your next billing date",
       amountDue,
     }
@@ -904,6 +902,8 @@ export async function previewSubscriptionUpgrade(licenseId: string) {
         preview: {
           currentPlan: currentPlan.name,
           newPlan: yearlyPlan.name,
+          currentCycle: license.billingCycle,
+          newCycle: "yearly" as const,
           creditAmount: 0,
           chargeAmount: 0,
           currency: yearlyPlan.currency || "usd",
@@ -1042,6 +1042,8 @@ export async function previewSubscriptionUpgrade(licenseId: string) {
       preview: {
         currentPlan: currentPlan.name,
         newPlan: yearlyPlan.name,
+        currentCycle: license.billingCycle,
+        newCycle: "yearly" as const,
         creditAmount,
         chargeAmount: isStripeTrial ? 0 : upcomingInvoice.amount_due,
         currency: upcomingInvoice.currency,
@@ -1299,9 +1301,9 @@ export async function upgradeSubscriptionToYearly(
           typeof (latestInvoice as any).payment_intent === "string"
             ? ((latestInvoice as any).payment_intent as string)
             : (
-              (latestInvoice as any)
-                .payment_intent as Stripe.PaymentIntent | null
-            )?.id || null
+                (latestInvoice as any)
+                  .payment_intent as Stripe.PaymentIntent | null
+              )?.id || null
 
         await db
           .insert(payments)
@@ -1400,7 +1402,10 @@ export async function upgradeSubscriptionToYearly(
   }
 }
 
-export async function downgradeToFreePlan(licenseId: string) {
+export async function downgradeToFreePlan(
+  licenseId: string,
+  cancellation?: { reason?: string | null; details?: string | null }
+) {
   const session = await getAppSession()
   if (!session) return { error: "Unauthorized" }
 
@@ -1419,6 +1424,23 @@ export async function downgradeToFreePlan(licenseId: string) {
     if (!subscriptionId) return { error: "No active Stripe subscription" }
 
     const stripe = getStripe()
+
+    // Normalize the supplied reason into a known label + free-text details.
+    // The reason column is small (varchar 100); anything unexpected falls
+    // through to "Other" with the raw string preserved in details so we
+    // don't silently lose what the user wrote.
+    const rawReason = cancellation?.reason?.trim() || null
+    const rawDetails = cancellation?.details?.trim() || null
+    const cancellationReason = rawReason
+      ? isKnownCancellationReason(rawReason)
+        ? rawReason
+        : "Other"
+      : null
+    const cancellationDetails =
+      cancellationReason === "Other"
+        ? rawDetails || rawReason
+        : rawDetails || null
+    const cancelledAt = new Date()
 
     //     // Matches anything starting with 'seti_' OR anything NOT starting with 'sub_'
     // const invalidPattern = /^(seti_|(?!sub_))/;
@@ -1449,7 +1471,10 @@ export async function downgradeToFreePlan(licenseId: string) {
             cancelAtPeriodEnd: false,
             trialEndsAt: null,
             nextRenewalDate: null,
-            updatedAt: new Date(),
+            cancellationReason,
+            cancellationDetails,
+            cancelledAt,
+            updatedAt: cancelledAt,
           })
           .where(eq(licenses.id, licenseId))
 
@@ -1457,6 +1482,20 @@ export async function downgradeToFreePlan(licenseId: string) {
         // the Free plan (was Pro/Trial before).
         await refreshLicenseR2(licenseId, session.userId)
       }
+
+      await createAuditLog(
+        session.userId,
+        "license.cancelled",
+        "license",
+        licenseId,
+        {
+          reason: cancellationReason,
+          details: cancellationDetails,
+          previousPlanId: license.planId,
+          previousSubscriptionId: subscriptionId,
+          immediateDowngrade: true,
+        }
+      )
 
       revalidatePath("/billing")
       return {
@@ -1475,9 +1514,27 @@ export async function downgradeToFreePlan(licenseId: string) {
       .update(licenses)
       .set({
         cancelAtPeriodEnd: true,
-        updatedAt: new Date(),
+        cancellationReason,
+        cancellationDetails,
+        cancelledAt,
+        updatedAt: cancelledAt,
       })
       .where(eq(licenses.id, licenseId))
+
+    await createAuditLog(
+      session.userId,
+      "license.cancelled",
+      "license",
+      licenseId,
+      {
+        reason: cancellationReason,
+        details: cancellationDetails,
+        previousPlanId: license.planId,
+        stripeSubscriptionId: subscriptionId,
+        immediateDowngrade: false,
+        cancelAt: (subscription as any).current_period_end,
+      }
+    )
 
     revalidatePath("/billing")
 

@@ -97,9 +97,8 @@ export async function getAllCategories(params?: {
       ? ilike(featureCategories.name, `%${search}%`)
       : undefined
     const sortColumn =
-      CATEGORY_SORT_COLUMNS[
-        sortField as keyof typeof CATEGORY_SORT_COLUMNS
-      ] || featureCategories.position
+      CATEGORY_SORT_COLUMNS[sortField as keyof typeof CATEGORY_SORT_COLUMNS] ||
+      featureCategories.position
     const order = sortOrder === "desc" ? desc(sortColumn) : asc(sortColumn)
 
     const data = await db

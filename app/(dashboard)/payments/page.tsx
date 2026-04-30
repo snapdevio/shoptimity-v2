@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"
 import { payments } from "@/db/schema"
+import { formatCurrency } from "@/lib/format"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -41,13 +42,6 @@ import {
 } from "@/components/ui/pagination"
 
 const PAGE_SIZE = 10
-
-function formatCurrency(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount / 100)
-}
 
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("en-US", {

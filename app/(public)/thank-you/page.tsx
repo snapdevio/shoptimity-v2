@@ -32,10 +32,12 @@ import {
   CreditCard,
   Package,
 } from "lucide-react"
+import type Stripe from "stripe"
 import { getStripe } from "@/lib/stripe"
 import { db } from "@/db"
 import { plans } from "@/db/schema"
 import { eq } from "drizzle-orm"
+import { formatCurrency } from "@/lib/format"
 
 interface ThankYouPageProps {
   searchParams: { [key: string]: string | string[] | undefined }
@@ -45,41 +47,59 @@ export default async function ThankYouPage({
   searchParams,
 }: ThankYouPageProps) {
   const params = await searchParams
-  const sessionId = params.session_id as string
-  if (!sessionId) {
+  const sessionId = params.session_id as string | undefined
+  const planIdParam = params.planId as string | undefined
+  const isYearlyParam = params.isYearly === "true"
+
+  // Two entry points:
+  // 1. Stripe Checkout (hosted) returns with `?session_id=cs_...`. We resolve
+  //    the session and its line items for the order summary.
+  // 2. In-app checkout (saved card flow in /checkout) skips the hosted UI
+  //    entirely and lands here with `?planId=...&isYearly=...`. There is no
+  //    Stripe session to fetch — we render a plan-only confirmation.
+  if (!sessionId && !planIdParam) {
     redirect("/")
   }
 
-  let session = null
-  try {
-    const stripe = getStripe()
-    session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ["line_items"],
-    })
-  } catch (error) {
-    console.error("Error fetching checkout session:", error)
-    redirect("/")
+  let session: Stripe.Checkout.Session | null = null
+  if (sessionId) {
+    try {
+      const stripe = getStripe()
+      session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ["line_items"],
+      })
+    } catch (error) {
+      console.error("Error fetching checkout session:", error)
+      // Don't redirect away if we still have a planId fallback — render the
+      // in-app shape instead. Redirecting here was the symptom of the
+      // free-plan flow ending up on / when the Stripe lookup failed.
+      if (!planIdParam) redirect("/")
+    }
   }
 
-  // const amountTotal = session?.amount_total ? session.amount_total / 100 : 0
   const currency = session?.currency?.toUpperCase() || "USD"
-  const isFreePlan =
-    session?.amount_total === 0 || session?.metadata?.type === "free_plan"
-  const lineItems = session?.line_items?.data || []
-
-  // Fetch plan details for summary calculation
-  const planId = session?.metadata?.plan_id
+  // Resolve plan: prefer the Stripe session metadata, fall back to the
+  // explicit planId param from the in-app flow.
+  const planId =
+    (session?.metadata?.plan_id as string | undefined) || planIdParam
   const [plan] = planId
-    ? await db
-        .select()
-        .from(plans)
-        .where(eq(plans.id, planId as string))
-        .limit(1)
+    ? await db.select().from(plans).where(eq(plans.id, planId)).limit(1)
     : [null]
+
+  const isFreePlan = session
+    ? session.amount_total === 0 || session.metadata?.type === "free_plan"
+    : (plan?.finalPrice ?? 0) === 0
+  const lineItems = session?.line_items?.data || []
 
   const slotsPerUnit = plan?.slots || 1
 
-  // Map display items: use line items if available, or a virtual item for trials
+  // Map display items: use line items if available, or a virtual item built
+  // from the resolved plan (free trial via Stripe, or in-app saved-card flow).
+  const planAmount = plan
+    ? isYearlyParam && plan.mode === "monthly"
+      ? plan.finalPrice * 12
+      : plan.finalPrice
+    : 0
   const displayItems =
     lineItems.length > 0
       ? lineItems.map((item) => ({
@@ -91,9 +111,9 @@ export default async function ThankYouPage({
       : plan
         ? [
             {
-              id: "free-item",
-              description: `${plan.name}`,
-              amount: 0,
+              id: "plan-item",
+              description: `${plan.name}${isYearlyParam ? " (Yearly)" : ""}`,
+              amount: isFreePlan ? 0 : planAmount,
               quantity: 1,
             },
           ]
@@ -121,7 +141,7 @@ export default async function ThankYouPage({
               <p className="text-base text-muted-foreground">
                 You can now start managing your Shopify domains.{" "}
                 <Link
-                  href="/login"
+                  href="/licenses"
                   className="cursor-pointer font-semibold text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary"
                 >
                   Click here
@@ -131,7 +151,7 @@ export default async function ThankYouPage({
           </div>
         </div>
 
-        {session && (
+        {(session || (plan && displayItems.length > 0)) && (
           <Card className="mt-10 gap-2 overflow-hidden border-primary/20 py-0">
             <CardHeader className="border-b px-6 py-3 [.border-b]:pb-2">
               <div className="flex items-center justify-between">
@@ -181,10 +201,7 @@ export default async function ThankYouPage({
                     </div>
                     <p className="text-lg font-bold text-foreground">
                       {item.amount > 0
-                        ? new Intl.NumberFormat("en-US", {
-                            style: "currency",
-                            currency: currency,
-                          }).format(item.amount / 100)
+                        ? formatCurrency(item.amount, currency)
                         : "Free"}
                     </p>
                   </div>
@@ -247,10 +264,10 @@ export default async function ThankYouPage({
 
         <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
           <Link
-            href="/login"
+            href="/licenses"
             className={cn(buttonVariants(), "cursor-pointer")}
           >
-            Go to Login
+            Go to Licenses
           </Link>
           <Link
             href="/setup"

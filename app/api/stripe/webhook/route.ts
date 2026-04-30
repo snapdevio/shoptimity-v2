@@ -21,6 +21,43 @@ function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!)
 }
 
+// Best-effort customer email extraction from a Stripe event for display in
+// the admin webhooks list. Different event types carry the email in
+// different fields; subscription events only carry a customer ID, so fall
+// back to looking up the user we've previously linked to that customer.
+async function extractCustomerEmail(
+  event: Stripe.Event
+): Promise<string | null> {
+  const obj = event.data.object as Record<string, any>
+
+  const direct =
+    obj?.customer_details?.email ||
+    obj?.customer_email ||
+    obj?.receipt_email ||
+    obj?.billing_details?.email ||
+    null
+  if (direct && typeof direct === "string") {
+    return direct.toLowerCase().trim()
+  }
+
+  const customerId =
+    typeof obj?.customer === "string" ? obj.customer : obj?.customer?.id || null
+  if (customerId) {
+    try {
+      const [user] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.stripeCustomerId, customerId))
+        .limit(1)
+      if (user?.email) return user.email.toLowerCase().trim()
+    } catch {
+      // Swallow — email is purely informational, never block processing.
+    }
+  }
+
+  return null
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const signature = request.headers.get("stripe-signature")
@@ -58,6 +95,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Event too old" }, { status: 400 })
   }
 
+  const customerEmail = await extractCustomerEmail(event)
+
   // Atomic claim via the unique `eventId` constraint. Two concurrent
   // deliveries of the same event can't both insert; the loser falls
   // through to the existence check below. Without ON CONFLICT, both
@@ -67,6 +106,7 @@ export async function POST(request: NextRequest) {
     .values({
       eventId: event.id,
       type: event.type,
+      customerEmail,
       processed: false,
     })
     .onConflictDoNothing({ target: webhookEvents.eventId })
@@ -886,10 +926,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // We allow amount_total to be less than finalPrice if promotion codes are allowed.
   // For yearly plans we use the yearly base (monthly × 12) as the cap.
   const isYearlyMeta = metadata.is_yearly === "true"
-  const baseMonthly =
-    plan.mode === "yearly"
-      ? plan.finalPrice
-      : plan.finalPrice
+  const baseMonthly = plan.mode === "yearly" ? plan.finalPrice : plan.finalPrice
   const maxExpected = isYearlyMeta ? baseMonthly * 12 : plan.finalPrice
 
   if (session.amount_total !== null && session.amount_total > maxExpected) {
@@ -1347,9 +1384,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       (invoice as any).subscription_details?.trial_end ||
       (invoice as any).parent?.subscription_details?.trial_end ||
       null
-    const invoiceTrialEnd = trialEndUnix
-      ? new Date(trialEndUnix * 1000)
-      : null
+    const invoiceTrialEnd = trialEndUnix ? new Date(trialEndUnix * 1000) : null
     const isStillTrialing =
       invoice.amount_paid === 0 &&
       !!invoiceTrialEnd &&

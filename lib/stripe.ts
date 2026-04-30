@@ -66,7 +66,8 @@ export async function resolveCouponDetails(
     couponId: coupon.id,
     percentOff: coupon.percent_off ?? null,
     amountOff: coupon.amount_off ?? null,
-    durationType: (coupon.duration as ResolvedCouponDetails["durationType"]) ?? null,
+    durationType:
+      (coupon.duration as ResolvedCouponDetails["durationType"]) ?? null,
     durationInMonths: coupon.duration_in_months ?? null,
   }
 }

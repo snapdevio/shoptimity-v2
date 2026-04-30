@@ -28,6 +28,7 @@ import { loadStripe } from "@stripe/stripe-js"
 import { Elements } from "@stripe/react-stripe-js"
 import { CardForm } from "@/components/checkout/card-form"
 import { cn } from "@/lib/utils"
+import { formatCurrency } from "@/lib/format"
 import { Country, State, City } from "country-state-city"
 import {
   Pagination,
@@ -412,6 +413,11 @@ export function BillingClient({
 
     return { hasRetention, regularAmount, effectiveAmount, cycleSuffix }
   }, [activeLicense, activeDiscount])
+
+  function capitalizeCycle(cycle: string | null | undefined): string {
+    const raw = cycle || "monthly"
+    return raw.charAt(0).toUpperCase() + raw.slice(1)
+  }
 
   return (
     <Elements stripe={stripePromise}>
@@ -1076,10 +1082,7 @@ export function BillingClient({
                           )}
                         </td>
                         <td className="px-6 py-4 font-bold text-slate-900">
-                          {new Intl.NumberFormat("en-US", {
-                            style: "currency",
-                            currency: payment.currency.toUpperCase(),
-                          }).format(payment.amount / 100)}
+                          {formatCurrency(payment.amount, payment.currency)}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-600">
                           {payment.planName || "Pro"}
@@ -1207,8 +1210,20 @@ export function BillingClient({
                   </h3>
                   <p className="mt-2 text-sm text-slate-500">
                     You're switching from the{" "}
-                    <strong>{upgradePreview.currentPlan}</strong> (Monthly) to
-                    the <strong>{upgradePreview.newPlan}</strong>.
+                    <strong>
+                      {upgradePreview.currentPlan} (
+                      {capitalizeCycle(
+                        upgradePreview.currentCycle ??
+                          activeLicense?.billingCycle
+                      )}
+                      )
+                    </strong>{" "}
+                    to the{" "}
+                    <strong>
+                      {upgradePreview.newPlan} (
+                      {capitalizeCycle(upgradePreview.newCycle ?? "yearly")})
+                    </strong>
+                    .
                     {upgradePreview.isTrialUpgrade && (
                       <>
                         {" "}

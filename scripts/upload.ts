@@ -5,9 +5,12 @@ import "dotenv/config"
 
 // Configuration
 const VIDEO_URL = "https://license.shoptimity.com/shoptimity-v2/video/step.mp4"
-const TEMPLATES_BASE_URL = "https://license.shoptimity.com/shoptimity-v2/templates"
-const OG_IMAGE_URL = "https://license.shoptimity.com/shoptimity-v2/assets/og.png"
-const SETUP_ASSETS_BASE_URL = "https://license.shoptimity.com/shoptimity-v2/assets/setup"
+const TEMPLATES_BASE_URL =
+  "https://license.shoptimity.com/shoptimity-v2/templates"
+const OG_IMAGE_URL =
+  "https://license.shoptimity.com/shoptimity-v2/assets/og.png"
+const SETUP_ASSETS_BASE_URL =
+  "https://license.shoptimity.com/shoptimity-v2/assets/setup"
 
 // Shared R2 Client
 let _client: S3Client | null = null

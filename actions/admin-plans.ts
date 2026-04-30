@@ -140,8 +140,7 @@ export async function getAllPlans(params?: {
     const sortColumn =
       PLAN_SORT_COLUMNS[sortField as keyof typeof PLAN_SORT_COLUMNS] ||
       plans.position
-    const order =
-      sortOrder === "desc" ? desc(sortColumn) : asc(sortColumn)
+    const order = sortOrder === "desc" ? desc(sortColumn) : asc(sortColumn)
 
     const data = await db
       .select()

@@ -28,9 +28,7 @@ export function getR2Client(): S3Client {
 // control chars here too so a stray bad row in the `domains` table can't
 // place objects outside the `license/` prefix or break the key encoding.
 function safeDomainKey(domainName: string): string {
-  const cleaned = domainName
-    .toLowerCase()
-    .replace(/[^a-z0-9.\-]/g, "") // permit only DNS-safe chars
+  const cleaned = domainName.toLowerCase().replace(/[^a-z0-9.\-]/g, "") // permit only DNS-safe chars
   if (!cleaned) {
     throw new Error("Invalid domain for R2 key")
   }

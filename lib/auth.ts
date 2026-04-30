@@ -7,6 +7,7 @@ import { users } from "@/db/schema/users"
 import { account as accountTable } from "@/db/schema/auth"
 import { desc } from "drizzle-orm"
 import { sendEmail } from "@/lib/email"
+import { getAllowedOriginUrls } from "@/lib/allowed-origins"
 import { render } from "@react-email/components"
 import { MagicLinkEmail } from "../emails/magic-link"
 import { VerificationEmail } from "../emails/verify-email"
@@ -18,12 +19,7 @@ export const auth = betterAuth({
   }),
   baseURL: process.env.AUTH_BASE_URL || process.env.NEXT_PUBLIC_APP_URL,
   secret: process.env.BETTER_AUTH_SECRET,
-  trustedOrigins: [
-    "https://shoptimity.com",
-    "http://localhost:3000",
-    "https://mannish-avert-uncommon.ngrok-free.dev",
-    "https://chirag-web.shopify.xx.kg",
-  ],
+  trustedOrigins: getAllowedOriginUrls(),
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID || "",

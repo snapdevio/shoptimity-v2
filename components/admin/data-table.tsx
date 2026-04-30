@@ -15,6 +15,20 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+function getPageNumbers(page: number, totalPages: number): (number | "...")[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1)
+  }
+  const pages: (number | "...")[] = [1]
+  const start = Math.max(2, page - 1)
+  const end = Math.min(totalPages - 1, page + 1)
+  if (start > 2) pages.push("...")
+  for (let i = start; i <= end; i++) pages.push(i)
+  if (end < totalPages - 1) pages.push("...")
+  pages.push(totalPages)
+  return pages
+}
+
 export interface DataTableColumn<T> {
   key: string
   header: string
@@ -46,6 +60,7 @@ export function DataTable<T extends Record<string, any>>({
   data,
   total,
   page,
+  pageSize,
   totalPages,
   searchValue,
   searchPlaceholder = "Search...",
@@ -178,11 +193,11 @@ export function DataTable<T extends Record<string, any>>({
           <p className="text-sm font-medium text-slate-500">
             Showing{" "}
             <span className="font-bold text-slate-900">
-              {Math.min(total, (page - 1) * 10 + 1)}
+              {Math.min(total, (page - 1) * pageSize + 1)}
             </span>{" "}
             to{" "}
             <span className="font-bold text-slate-900">
-              {Math.min(total, page * 10)}
+              {Math.min(total, page * pageSize)}
             </span>{" "}
             of <span className="font-bold text-slate-900">{total}</span> entries
           </p>
@@ -197,17 +212,26 @@ export function DataTable<T extends Record<string, any>>({
               >
                 <ChevronLeft className="size-4" />
               </Button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <Button
-                  key={p}
-                  variant={page === p ? "default" : "outline"}
-                  size="icon"
-                  className="size-8"
-                  onClick={() => onPageChange(p)}
-                >
-                  {p}
-                </Button>
-              ))}
+              {getPageNumbers(page, totalPages).map((p, idx) =>
+                p === "..." ? (
+                  <span
+                    key={`gap-${idx}`}
+                    className="px-2 text-sm text-slate-500"
+                  >
+                    …
+                  </span>
+                ) : (
+                  <Button
+                    key={p}
+                    variant={page === p ? "default" : "outline"}
+                    size="icon"
+                    className="size-8"
+                    onClick={() => onPageChange(p)}
+                  >
+                    {p}
+                  </Button>
+                )
+              )}
               <Button
                 variant="outline"
                 size="icon"

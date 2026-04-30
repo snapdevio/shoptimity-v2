@@ -20,6 +20,7 @@ import {
   ChartColumnStacked,
   BookDashed,
   LayoutDashboard,
+  Webhook,
 } from "lucide-react"
 
 const ADMIN_NAV = [
@@ -58,6 +59,7 @@ const ADMIN_NAV = [
         icon: ChartBarStacked,
       },
       { label: "Features", href: "/admin/features", icon: ChartColumnStacked },
+      { label: "Webhooks", href: "/admin/webhooks", icon: Webhook },
     ],
   },
 ]
