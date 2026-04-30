@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic"
 
-import { adminGetUsers } from "@/actions/admin"
-import { getAppSession } from "@/lib/auth-session"
-import { AdminUsersClient } from "./admin-users-client"
+import { adminGetWebhookEvents } from "@/actions/admin"
+import { AdminWebhooksClient } from "./admin-webhooks-client"
 
-export default async function AdminUsersPage({
+export default async function AdminWebhooksPage({
   searchParams,
 }: {
   searchParams: Promise<{ page?: string; search?: string; limit?: string }>
@@ -14,30 +13,26 @@ export default async function AdminUsersPage({
   const search = params.search || ""
   const limit = parseInt(params.limit || "10", 10)
 
-  const [result, session] = await Promise.all([
-    adminGetUsers(page, search, limit),
-    getAppSession(),
-  ])
+  const result = await adminGetWebhookEvents(page, search, limit)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          Users
+          Webhooks
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage user accounts, view details, and send magic links.
+          Inspect inbound webhook events and their processing state.
         </p>
       </div>
 
-      <AdminUsersClient
+      <AdminWebhooksClient
         data={result.data}
         total={result.total}
         page={result.page}
         pageSize={result.pageSize}
         totalPages={result.totalPages}
         initialSearch={search}
-        currentUserId={session?.userId ?? ""}
       />
     </div>
   )

@@ -17,6 +17,9 @@ interface Order {
   createdAt: Date
   updatedAt: Date
   userEmail: string | null
+  planName: string | null
+  planMode: "monthly" | "yearly" | "free" | "lifetime" | null
+  planHasYearlyPlan: boolean | null
 }
 
 interface AdminOrdersClientProps {
@@ -83,9 +86,25 @@ export function AdminOrdersClient({
     {
       key: "planId",
       header: "Plan",
-      render: (row) => (
-        <span className="font-mono text-xs">{row.planId.slice(0, 8)}...</span>
-      ),
+      render: (row) => {
+        const cycle =
+          row.planMode === "lifetime"
+            ? "Lifetime"
+            : row.planMode === "yearly"
+              ? "Yearly"
+              : row.planMode === "free"
+                ? "Free"
+                : "Monthly"
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium">{row.planName ?? "-"}</span>
+            <span className="text-xs text-muted-foreground">
+              {cycle}
+              {row.planHasYearlyPlan ? " · Base plan" : ""}
+            </span>
+          </div>
+        )
+      },
     },
     {
       key: "licenseQuantity",
@@ -117,7 +136,7 @@ export function AdminOrdersClient({
       pageSize={pageSize}
       totalPages={totalPages}
       searchValue={initialSearch}
-      searchPlaceholder="Search by..."
+      searchPlaceholder="Search by email, plan, contact, or status..."
       onSearchChange={handleSearchChange}
       onPageChange={handlePageChange}
       emptyMessage="No orders found."

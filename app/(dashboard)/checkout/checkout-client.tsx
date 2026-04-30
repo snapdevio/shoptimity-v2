@@ -361,12 +361,15 @@ function CheckoutInner({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Checkout failed")
 
+      const thankYouUrl = `/thank-you?planId=${encodeURIComponent(
+        currentPlan.id
+      )}&isYearly=${isYearly ? "true" : "false"}`
+
       if (data.url) {
         // Fallback to Stripe Checkout UI if requested
         window.location.href = data.url
       } else if (data.success) {
-        toast.success("Plan activated successfully!")
-        router.push("/licenses")
+        router.push(thankYouUrl)
       } else if (
         data.requiresAction &&
         data.paymentIntentClientSecret &&
@@ -379,8 +382,7 @@ function CheckoutInner({
         if (error) {
           throw new Error(error.message)
         }
-        toast.success("Plan activated successfully!")
-        router.push("/licenses")
+        router.push(thankYouUrl)
       }
     } catch (err: any) {
       toast.error("Checkout Failed", {
@@ -675,22 +677,24 @@ function CheckoutInner({
                     />
                   </div>
                 ) : (
-                  <button
-                    onClick={handleAddNewCard}
-                    disabled={isInitializingSetup}
-                    className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-gray-200 p-4 transition-all hover:bg-gray-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      {isInitializingSetup ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                      ) : (
-                        <Plus className="h-5 w-5 text-gray-400" />
-                      )}
-                      <p className="text-sm font-bold">
-                        Add a new payment method
-                      </p>
-                    </div>
-                  </button>
+                  savedCards.length > 0 && (
+                    <button
+                      onClick={handleAddNewCard}
+                      disabled={isInitializingSetup}
+                      className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-gray-200 p-4 transition-all hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        {isInitializingSetup ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                        ) : (
+                          <Plus className="h-5 w-5 text-gray-400" />
+                        )}
+                        <p className="text-sm font-bold">
+                          Add a new payment method
+                        </p>
+                      </div>
+                    </button>
+                  )
                 )}
 
                 {!isAddingCard && savedCards.length === 0 && (
@@ -1039,31 +1043,44 @@ function CheckoutInner({
                   future payments will be required for this free plan.
                 </>
               ) : currentPlan.trialDays > 0 ? (
-                <>
-                  You won't be charged today. Your{" "}
-                  <strong className="text-base-content">
-                    {currentPlan.trialDays}-day free trial
-                  </strong>{" "}
-                  starts now. First payment of{" "}
-                  <strong className="text-base-content">
-                    ${price.final.toFixed(2)}
-                  </strong>{" "}
-                  on{" "}
-                  <strong className="text-base-content">
-                    {new Date(
-                      Date.now() + currentPlan.trialDays * 86400000
-                    ).toLocaleDateString()}
-                  </strong>
-                  .{" "}
-                  {appliedCoupon && (
-                    <span className="inline-flex animate-in items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[12px] font-bold text-emerald-600 zoom-in-95">
-                      <Check className="h-3 w-3" />
-                      {appliedCoupon.percentOff
-                        ? `${appliedCoupon.percentOff}% off applied to future payment`
-                        : `$${(appliedCoupon.amountOff! / 100).toFixed(2)} off applied to future payment`}
-                    </span>
-                  )}
-                </>
+                (() => {
+                  const trialEndDate = new Date(
+                    Date.now() + currentPlan.trialDays * 86400000
+                  ).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "2-digit",
+                    year: "numeric",
+                  })
+                  return (
+                    <>
+                      You won't be charged today. Your{" "}
+                      <strong className="text-base-content">
+                        free trial
+                      </strong>{" "}
+                      continues until{" "}
+                      <strong className="text-base-content">
+                        {trialEndDate}
+                      </strong>
+                      . If you don't cancel before then, you'll be charged{" "}
+                      <strong className="text-base-content">
+                        ${price.final.toFixed(2)}
+                      </strong>{" "}
+                      on{" "}
+                      <strong className="text-base-content">
+                        {trialEndDate}
+                      </strong>
+                      . You can cancel auto-renewal at any time.{" "}
+                      {appliedCoupon && (
+                        <span className="inline-flex animate-in items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[12px] font-bold text-emerald-600 zoom-in-95">
+                          <Check className="h-3 w-3" />
+                          {appliedCoupon.percentOff
+                            ? `${appliedCoupon.percentOff}% off applied to future payment`
+                            : `$${(appliedCoupon.amountOff! / 100).toFixed(2)} off applied to future payment`}
+                        </span>
+                      )}
+                    </>
+                  )
+                })()
               ) : (
                 <>
                   You'll be charged{" "}

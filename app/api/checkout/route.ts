@@ -9,6 +9,7 @@ import { getAppSession } from "@/lib/auth-session"
 import { domains as domainsTable } from "@/db/schema/domains"
 import { isNull } from "drizzle-orm"
 import { enqueueLicenseMetadataExportJob } from "@/lib/queue"
+import { getAllowedOriginHosts } from "@/lib/allowed-origins"
 
 async function activateFreePlan(opts: {
   stripe: Stripe
@@ -487,7 +488,7 @@ export async function GET(request: NextRequest) {
   const domains = domain ? [domain] : undefined
 
   try {
-    // Free plan — skip Stripe, fulfill directly and redirect to /licenses
+    // Free plan — skip Stripe, fulfill directly and redirect to /thank-you
     if (plan.finalPrice === 0) {
       const [user] = await db
         .select({ stripeCustomerId: users.stripeCustomerId })
@@ -504,7 +505,9 @@ export async function GET(request: NextRequest) {
         stripeCustomerId: user?.stripeCustomerId,
       })
 
-      return NextResponse.redirect(new URL("/licenses", request.url))
+      return NextResponse.redirect(
+        new URL(`/thank-you?planId=${plan.id}`, request.url)
+      )
     }
 
     const isTrial = isTrialEligible
@@ -531,20 +534,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Hosts allowed to POST to this checkout endpoint. Same set as
-// `auth.trustedOrigins` in lib/auth.ts so the two stay aligned. Anything
-// else gets a 403 — without this guard a malicious site could submit a
-// cross-origin form to start a Stripe subscription on the victim's saved
-// card (the route reads the better-auth cookie, which browsers will send
-// on cross-origin POSTs).
-const ALLOWED_ORIGIN_HOSTS = new Set([
-  "shoptimity.com",
-  "www.shoptimity.com",
-  "localhost:3000",
-  "127.0.0.1:3000",
-  "chirag-web.shopify.xx.kg",
-])
-
+// Hosts allowed to POST to this checkout endpoint. Driven by the shared
+// ALLOWED_ORIGINS env var so it stays aligned with `auth.trustedOrigins`.
+// Anything else gets a 403 — without this guard a malicious site could
+// submit a cross-origin form to start a Stripe subscription on the victim's
+// saved card (the route reads the better-auth cookie, which browsers will
+// send on cross-origin POSTs).
 function isSameOrigin(request: NextRequest): boolean {
   const origin = request.headers.get("origin")
   const referer = request.headers.get("referer")
@@ -566,7 +561,7 @@ function isSameOrigin(request: NextRequest): boolean {
     }
   }
   if (!host) return false
-  if (ALLOWED_ORIGIN_HOSTS.has(host)) return true
+  if (getAllowedOriginHosts().has(host)) return true
   // Allow the caller's own host (covers preview / staging deployments
   // without having to enumerate them here).
   if (host === request.nextUrl.host) return true

@@ -904,6 +904,8 @@ export async function previewSubscriptionUpgrade(licenseId: string) {
         preview: {
           currentPlan: currentPlan.name,
           newPlan: yearlyPlan.name,
+          currentCycle: license.billingCycle,
+          newCycle: "yearly" as const,
           creditAmount: 0,
           chargeAmount: 0,
           currency: yearlyPlan.currency || "usd",
@@ -1042,6 +1044,8 @@ export async function previewSubscriptionUpgrade(licenseId: string) {
       preview: {
         currentPlan: currentPlan.name,
         newPlan: yearlyPlan.name,
+        currentCycle: license.billingCycle,
+        newCycle: "yearly" as const,
         creditAmount,
         chargeAmount: isStripeTrial ? 0 : upcomingInvoice.amount_due,
         currency: upcomingInvoice.currency,

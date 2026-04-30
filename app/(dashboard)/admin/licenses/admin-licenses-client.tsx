@@ -30,9 +30,15 @@ interface License {
   status: string
   sourceOrderId: string | null
   revokedReason: string | null
+  billingCycle: "monthly" | "yearly" | "lifetime"
+  isLifetime: boolean
+  isTrial: boolean
   createdAt: Date
   updatedAt: Date
   userEmail: string | null
+  planName: string | null
+  planMode: "monthly" | "yearly" | "free" | "lifetime" | null
+  planHasYearlyPlan: boolean | null
 }
 
 interface AdminLicensesClientProps {
@@ -110,9 +116,27 @@ export function AdminLicensesClient({
     {
       key: "planId",
       header: "Plan",
-      render: (row) => (
-        <span className="font-mono text-xs">{row.planId.slice(0, 8)}...</span>
-      ),
+      render: (row) => {
+        const cycle = row.isLifetime
+          ? "Lifetime"
+          : row.billingCycle === "yearly"
+            ? "Yearly"
+            : row.billingCycle === "monthly"
+              ? "Monthly"
+              : null
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium">{row.planName ?? "-"}</span>
+            <span className="text-xs text-muted-foreground">
+              {cycle ?? "-"}
+              {row.isTrial ? " · Trial" : ""}
+              {row.planHasYearlyPlan && row.billingCycle === "yearly"
+                ? " · Base plan"
+                : ""}
+            </span>
+          </div>
+        )
+      },
     },
     {
       key: "totalSlots",
@@ -145,7 +169,7 @@ export function AdminLicensesClient({
         pageSize={pageSize}
         totalPages={totalPages}
         searchValue={initialSearch}
-        searchPlaceholder="Search by..."
+        searchPlaceholder="Search by email, plan, or status..."
         onSearchChange={handleSearchChange}
         onPageChange={handlePageChange}
         emptyMessage="No licenses found."

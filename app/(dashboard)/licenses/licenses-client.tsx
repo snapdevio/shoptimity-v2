@@ -53,7 +53,6 @@ import {
   deleteDomain,
   verifyStoreDomain,
 } from "@/actions/domains"
-import { cancelLicenseSubscription } from "@/actions/licenses"
 import { normalizeDomain, validateDomain } from "@/lib/domains"
 import { formatDate, formatDaysRemaining } from "@/lib/format"
 import { toast } from "sonner"
@@ -410,10 +409,7 @@ function SingleLicenseView({
                       </p>
                     </div>
                   </div>
-                  <CancelSubscriptionDialog
-                    licenseId={license.id}
-                    isTrial={license.isTrial}
-                  />
+                  <CancelSubscriptionDialog isTrial={license.isTrial} />
                 </div>
               )}
           </div>
@@ -717,10 +713,7 @@ function LicenseCard({
                 license.stripeSubscriptionId) &&
                 (license.status === "active" ||
                   license.status === "trialing") && (
-                  <CancelSubscriptionDialog
-                    licenseId={license.id}
-                    isTrial={license.isTrial}
-                  />
+                  <CancelSubscriptionDialog isTrial={license.isTrial} />
                 )}
             </div>
             <CardDescription className="text-sm">
@@ -1522,86 +1515,19 @@ function CollisionErrorModal({
   )
 }
 
-function CancelSubscriptionDialog({
-  licenseId,
-  isTrial,
-}: {
-  licenseId: string
-  isTrial?: boolean
-}) {
-  if (!isTrial) return null
-
-  const [open, setOpen] = useState(false)
-  const [isPending, startTransition] = useTransition()
-  const posthog = usePostHog()
-
-  function handleCancel() {
-    startTransition(async () => {
-      const result = await cancelLicenseSubscription(licenseId)
-      if (result?.error) {
-        toast.error(result.error)
-      } else {
-        toast.success(
-          `${isTrial ? "Trial" : "Subscription"} cancellation requested successfully`
-        )
-        posthog.capture("subscription_cancel_requested", { licenseId })
-        setOpen(false)
-      }
-    })
-  }
-
+function CancelSubscriptionDialog({ isTrial }: { isTrial?: boolean }) {
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-7 border px-2 text-[10px] font-bold tracking-tight transition-colors",
-              isTrial
-                ? "border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10"
-                : "border-destructive/80 text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
-            )}
-          >
-            <div className="flex items-center gap-1">
-              <TrashIcon className="size-3" />
-              <span>Cancel Trial</span>
-            </div>
-          </Button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            Cancel {isTrial ? "Free Trial" : "Subscription"}
-          </DialogTitle>
-          <DialogDescription>
-            Are you sure you want to cancel the{" "}
-            {isTrial ? "free trial" : "subscription"} for this license? Access
-            to your domain slots will be revoked immediately upon cancellation.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
-            Not now
-          </DialogClose>
-          <Button
-            variant="destructive"
-            onClick={handleCancel}
-            disabled={isPending}
-          >
-            {isPending ? (
-              <>
-                <Spinner className="mr-2" />
-                Processing...
-              </>
-            ) : (
-              "Confirm Cancellation"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Link
+      href="/billing/cancel"
+      className={cn(
+        "inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border px-2 text-[10px] font-bold tracking-tight transition-colors",
+        isTrial
+          ? "border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10"
+          : "border-destructive/80 text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+      )}
+    >
+      <TrashIcon className="size-3" />
+      <span>Cancel {isTrial ? "Trial" : "Subscription"}</span>
+    </Link>
   )
 }

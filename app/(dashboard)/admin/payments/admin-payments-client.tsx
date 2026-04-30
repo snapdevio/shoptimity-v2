@@ -17,6 +17,7 @@ interface Payment {
   status: string
   createdAt: Date
   updatedAt: Date
+  userEmail: string | null
 }
 
 interface AdminPaymentsClientProps {
@@ -84,10 +85,10 @@ export function AdminPaymentsClient({
       render: (row) => formatDate(row.createdAt, "MMM d, yyyy HH:mm"),
     },
     {
-      key: "userId",
-      header: "User ID",
+      key: "userEmail",
+      header: "User Email",
       render: (row) => (
-        <span className="font-mono text-xs">{row.userId.slice(0, 8)}...</span>
+        <span className="font-medium">{row.userEmail ?? "-"}</span>
       ),
     },
     {
@@ -135,7 +136,7 @@ export function AdminPaymentsClient({
       pageSize={pageSize}
       totalPages={totalPages}
       searchValue={initialSearch}
-      searchPlaceholder="Search by..."
+      searchPlaceholder="Search by email, status, or session ID..."
       onSearchChange={handleSearchChange}
       onPageChange={handlePageChange}
       emptyMessage="No payments found."

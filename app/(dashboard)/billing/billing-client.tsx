@@ -413,6 +413,11 @@ export function BillingClient({
     return { hasRetention, regularAmount, effectiveAmount, cycleSuffix }
   }, [activeLicense, activeDiscount])
 
+  function capitalizeCycle(cycle: string | null | undefined): string {
+    const raw = cycle || "monthly"
+    return raw.charAt(0).toUpperCase() + raw.slice(1)
+  }
+
   return (
     <Elements stripe={stripePromise}>
       <div className="flex-1 overflow-x-hidden overflow-y-auto">
@@ -1207,8 +1212,20 @@ export function BillingClient({
                   </h3>
                   <p className="mt-2 text-sm text-slate-500">
                     You're switching from the{" "}
-                    <strong>{upgradePreview.currentPlan}</strong> (Monthly) to
-                    the <strong>{upgradePreview.newPlan}</strong>.
+                    <strong>
+                      {upgradePreview.currentPlan} (
+                      {capitalizeCycle(
+                        upgradePreview.currentCycle ??
+                          activeLicense?.billingCycle
+                      )}
+                      )
+                    </strong>{" "}
+                    to the{" "}
+                    <strong>
+                      {upgradePreview.newPlan} (
+                      {capitalizeCycle(upgradePreview.newCycle ?? "yearly")})
+                    </strong>
+                    .
                     {upgradePreview.isTrialUpgrade && (
                       <>
                         {" "}
