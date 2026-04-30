@@ -26,9 +26,9 @@ import { eq } from "drizzle-orm"
 async function main() {
   console.log("Seeding feature categories...")
   const categoriesData = [
-    { name: "Theme Widgets", slug: "widgets", position: 1 },
-    { name: "Cart Widgets", slug: "cart-widgets", position: 2 },
-    { name: "Theme Sections", slug: "sections", position: 3 },
+    { name: "Theme Sections", slug: "sections", position: 1 },
+    { name: "Theme Widgets", slug: "widgets", position: 2 },
+    { name: "Cart Widgets", slug: "cart-widgets", position: 3 },
   ]
 
   const categoryIds: Record<string, string> = {}

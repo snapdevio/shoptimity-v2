@@ -120,7 +120,21 @@ export function PlansClient({
       }
       groups[plan.name][plan.mode] = plan
     })
-    return Object.values(groups)
+    return Object.values(groups).sort((a, b) => {
+      const aPrice =
+        a.free?.finalPrice ??
+        a.monthly?.finalPrice ??
+        a.yearly?.finalPrice ??
+        a.lifetime?.finalPrice ??
+        0
+      const bPrice =
+        b.free?.finalPrice ??
+        b.monthly?.finalPrice ??
+        b.yearly?.finalPrice ??
+        b.lifetime?.finalPrice ??
+        0
+      return aPrice - bPrice
+    })
   }, [dbPlans])
 
   const filteredGroups = useMemo(() => {
@@ -409,6 +423,12 @@ export function PlansClient({
       .filter(Boolean)
   }, [groupedPlans])
 
+  const freePlanIds = useMemo(() => {
+    return dbPlans
+      .filter((p) => p.mode === "free" || p.name.toLowerCase() === "free")
+      .map((p) => p.id)
+  }, [dbPlans])
+
   const showSwitch = useMemo(() => {
     return availableCycles.length > 1
   }, [availableCycles])
@@ -469,7 +489,7 @@ export function PlansClient({
           <table className="w-full min-w-150 table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="w-1/2 p-4 text-xs font-bold tracking-widest text-slate-400 uppercase md:p-6">
+                <th className="w-1/4 p-4 text-xs font-bold tracking-widest text-slate-400 uppercase md:w-1/2 md:p-6">
                   Features & Components
                 </th>
                 {allTiersForTable.map((plan) => (
@@ -498,16 +518,31 @@ export function PlansClient({
                       {category.name}
                     </td>
                   </tr>
-                  {category.features.map((feature: any) => (
-                    <FeatureRow
-                      key={feature.id}
-                      name={feature.name}
-                      plans={feature.plans}
-                      activePlans={allTiersForTable}
-                      dbPlans={dbPlans}
-                      highlight={feature.isHighlight}
-                    />
-                  ))}
+                  {category.features
+                    .slice()
+                    .sort((a: any, b: any) => {
+                      const aFree = a.plans.some(
+                        (p: any) =>
+                          freePlanIds.includes(p.planId) && p.isEnabled
+                      )
+                      const bFree = b.plans.some(
+                        (p: any) =>
+                          freePlanIds.includes(p.planId) && p.isEnabled
+                      )
+                      if (aFree && !bFree) return -1
+                      if (!aFree && bFree) return 1
+                      return 0
+                    })
+                    .map((feature: any) => (
+                      <FeatureRow
+                        key={feature.id}
+                        name={feature.name}
+                        plans={feature.plans}
+                        activePlans={allTiersForTable}
+                        dbPlans={dbPlans}
+                        highlight={feature.isHighlight}
+                      />
+                    ))}
                 </React.Fragment>
               ))}
             </tbody>
