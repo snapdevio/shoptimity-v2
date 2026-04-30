@@ -141,7 +141,7 @@ export default async function ThankYouPage({
               <p className="text-base text-muted-foreground">
                 You can now start managing your Shopify domains.{" "}
                 <Link
-                  href="/login"
+                  href="/licenses"
                   className="cursor-pointer font-semibold text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary"
                 >
                   Click here
