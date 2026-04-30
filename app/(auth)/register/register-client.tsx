@@ -163,7 +163,7 @@ function RegisterForm({ className, ...props }: React.ComponentProps<"div">) {
 
   if (isSessionLoading) {
     return (
-      <div className="flex h-[400px] items-center justify-center">
+      <div className="flex h-100 items-center justify-center">
         <div className="flex flex-col items-center gap-2">
           <Spinner className="size-8" />
           <p className="text-sm text-muted-foreground">Checking session...</p>
@@ -206,7 +206,7 @@ function RegisterForm({ className, ...props }: React.ComponentProps<"div">) {
                     href={inbox.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2"
+                    className="flex cursor-pointer items-center justify-center gap-2"
                   >
                     Open {inbox.name}
                     <ArrowRight className="size-4" />
@@ -223,7 +223,7 @@ function RegisterForm({ className, ...props }: React.ComponentProps<"div">) {
                       href={`https://mail.google.com/mail/u/0/#search/${searchTerm}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2"
+                      className="flex cursor-pointer items-center justify-center gap-2"
                     >
                       <MailIcon className="size-4" />
                       Open Gmail
@@ -239,7 +239,7 @@ function RegisterForm({ className, ...props }: React.ComponentProps<"div">) {
                       href={`https://outlook.live.com/mail/0/search/results?q=${searchTerm}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2"
+                      className="flex cursor-pointer items-center justify-center gap-2"
                     >
                       <MailIcon className="size-4" />
                       Open Outlook
@@ -451,7 +451,7 @@ function RegisterForm({ className, ...props }: React.ComponentProps<"div">) {
                 Already have an account?{" "}
                 <Link
                   href="/login"
-                  className="font-bold text-primary underline-offset-4 hover:underline"
+                  className="cursor-pointer font-bold text-primary underline-offset-4 hover:underline"
                 >
                   Sign in
                 </Link>
@@ -472,14 +472,14 @@ function RegisterForm({ className, ...props }: React.ComponentProps<"div">) {
         By clicking continue, you agree to our{" "}
         <Link
           href="/terms"
-          className="underline underline-offset-4 transition-colors hover:text-primary"
+          className="cursor-pointer underline underline-offset-4 transition-colors hover:text-primary"
         >
           Terms of Service
         </Link>{" "}
         and{" "}
         <Link
           href="/privacy-policy"
-          className="underline underline-offset-4 transition-colors hover:text-primary"
+          className="cursor-pointer underline underline-offset-4 transition-colors hover:text-primary"
         >
           Privacy Policy
         </Link>
@@ -496,7 +496,7 @@ export function RegisterClient() {
         <Suspense
           fallback={
             <Card className="overflow-hidden border-none p-0 shadow-2xl">
-              <CardContent className="flex h-[600px] items-center justify-center bg-card">
+              <CardContent className="flex h-150 items-center justify-center bg-card">
                 <Spinner className="size-8" />
               </CardContent>
             </Card>

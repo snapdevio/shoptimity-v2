@@ -7,9 +7,6 @@ import { revalidatePath } from "next/cache"
 import { getAppSession } from "@/lib/auth-session"
 
 async function requireAdmin() {
-  if (process.env.NODE_ENV === "development") {
-    return { userId: "dev-user", role: "admin", email: "admin@localhost" }
-  }
   const session = await getAppSession()
   if (!session || session.role !== "admin") {
     throw new Error("Forbidden")
@@ -17,8 +14,20 @@ async function requireAdmin() {
   return session
 }
 
+// Settings buckets that are intentionally exposed to the public site
+// (pricing page copy, retention-offer timeout, etc). Any other key is
+// treated as admin-only — this prevents an unauthenticated caller from
+// reading buckets that may store API keys, webhook URLs, or other secrets
+// just by guessing the key.
+const PUBLIC_SETTINGS_KEYS = new Set<string>(["general_settings"])
+
 export async function getSettings(key: string = "general_settings") {
   try {
+    if (!PUBLIC_SETTINGS_KEYS.has(key)) {
+      // Non-public bucket — must be admin to read.
+      await requireAdmin()
+    }
+
     const [result] = await db
       .select()
       .from(settings)

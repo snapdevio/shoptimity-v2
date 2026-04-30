@@ -101,7 +101,7 @@ export default async function BlogPage({
             {featuredPost && (
               <Link
                 href={`/blogs/${featuredPost.id}`}
-                className="group mb-10 flex flex-col-reverse overflow-hidden rounded-[1rem] border border-gray-100 bg-white shadow-lg shadow-gray-200/50 transition-all duration-500 hover:shadow-xl md:rounded-[2rem] lg:flex-row lg:items-stretch"
+                className="group mb-10 flex cursor-pointer flex-col-reverse overflow-hidden rounded-[1rem] border border-gray-100 bg-white shadow-lg shadow-gray-200/50 transition-all duration-500 hover:shadow-xl md:rounded-[2rem] lg:flex-row lg:items-stretch"
               >
                 {/* Content */}
                 <div className="flex flex-1 flex-col gap-4 p-6 sm:p-8 lg:gap-6 lg:p-10">
@@ -174,7 +174,7 @@ export default async function BlogPage({
                   <Link
                     key={post.id}
                     href={`/blogs/${post.id}`}
-                    className="group flex flex-col overflow-hidden rounded-[1rem] border border-gray-100 bg-white shadow-md shadow-gray-200/30 transition-all duration-500 hover:-translate-y-1 hover:shadow-xl md:rounded-[1.5rem]"
+                    className="group flex cursor-pointer flex-col overflow-hidden rounded-[1rem] border border-gray-100 bg-white shadow-md shadow-gray-200/30 transition-all duration-500 hover:-translate-y-1 hover:shadow-xl md:rounded-[1.5rem]"
                   >
                     <div className="relative aspect-video overflow-hidden">
                       <img
@@ -236,7 +236,7 @@ export default async function BlogPage({
                 </p>
                 <Link
                   href="/blogs"
-                  className="rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-8 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                  className="cursor-pointer rounded-full bg-linear-to-r from-[#ff602e] to-secondary px-8 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition-all hover:-translate-y-0.5 hover:shadow-xl"
                 >
                   Browse All Articles
                 </Link>

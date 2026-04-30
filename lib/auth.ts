@@ -22,6 +22,7 @@ export const auth = betterAuth({
     "https://shoptimity.com",
     "http://localhost:3000",
     "https://mannish-avert-uncommon.ngrok-free.dev",
+    "https://chirag-web.shopify.xx.kg",
   ],
   socialProviders: {
     google: {

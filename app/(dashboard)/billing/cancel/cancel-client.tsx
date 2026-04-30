@@ -62,7 +62,6 @@ export function CancelClient({
   const [isPending, setIsPending] = useState(false)
   const [timeLeft, setTimeLeft] = useState(offerTimeoutSeconds)
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false)
-  const [showCouponCode, setShowCouponCode] = useState(false)
 
   useEffect(() => {
     if (step !== "offer") return
@@ -225,7 +224,7 @@ export function CancelClient({
           </p>
           <button
             onClick={() => router.push("/billing")}
-            className="mt-8 w-full rounded-xl bg-primary py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-95"
+            className="mt-8 w-full cursor-pointer rounded-xl bg-primary py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-95"
           >
             Go to Billing
           </button>
@@ -312,10 +311,7 @@ export function CancelClient({
 
                 <div className="flex flex-col gap-3 pt-4">
                   <button
-                    onClick={() => {
-                      setShowCouponCode(false)
-                      setIsCouponModalOpen(true)
-                    }}
+                    onClick={() => setIsCouponModalOpen(true)}
                     disabled={isPending}
                     className="w-full cursor-pointer rounded-xl bg-primary py-4 text-lg font-bold text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                   >
@@ -365,7 +361,7 @@ export function CancelClient({
                       <button
                         key={reason}
                         onClick={() => setSelectedReason(reason)}
-                        className={`flex items-center rounded-xl border px-4 py-3.5 text-sm font-medium transition-all ${
+                        className={`flex cursor-pointer items-center rounded-xl border px-4 py-3.5 text-sm font-medium transition-all ${
                           selectedReason === reason
                             ? "border-primary bg-primary/5 text-primary ring-2 ring-primary/20"
                             : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
@@ -458,29 +454,6 @@ export function CancelClient({
             </div>
 
             <div className="space-y-4 p-6 md:p-8">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">
-                  Coupon code
-                </p>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <span className="font-mono text-base font-bold tracking-widest text-slate-900">
-                    {showCouponCode && couponCode ? couponCode : "●●●●●●●●"}
-                  </span>
-                  {couponCode && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCouponCode((v) => !v)}
-                      className="cursor-pointer rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:bg-slate-100"
-                    >
-                      {showCouponCode ? "Hide" : "Reveal"}
-                    </button>
-                  )}
-                </div>
-                <p className="mt-2 text-[11px] text-slate-500">
-                  Auto-applied — you don't need to enter it manually.
-                </p>
-              </div>
-
               <div className="space-y-2 rounded-2xl bg-slate-50 p-4 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Discount</span>

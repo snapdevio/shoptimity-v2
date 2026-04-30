@@ -99,7 +99,10 @@ export function ForgotPasswordClient() {
     <div className="flex min-h-svh flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <Link href="/" className="inline-flex items-center gap-2">
+          <Link
+            href="/"
+            className="inline-flex cursor-pointer items-center gap-2"
+          >
             <div className="relative h-10 w-auto">
               <img
                 src={`${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT || ""}/assets/logo.svg`}
@@ -140,7 +143,7 @@ export function ForgotPasswordClient() {
                         href={inbox.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2"
+                        className="flex cursor-pointer items-center justify-center gap-2"
                       >
                         <MailIcon className="size-5" />
                         Go to {inbox.name}
@@ -163,6 +166,7 @@ export function ForgotPasswordClient() {
                         href={`https://mail.google.com/mail/u/0/#search/${searchTerm}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        className="cursor-pointer"
                       >
                         <MailIcon className="size-5" />
                         Open in Gmail
@@ -178,6 +182,7 @@ export function ForgotPasswordClient() {
                         href={`https://outlook.live.com/mail/0/search/results?q=${searchTerm}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        className="cursor-pointer"
                       >
                         <MailIcon className="size-5" />
                         Open in Outlook
@@ -190,7 +195,7 @@ export function ForgotPasswordClient() {
             <CardFooter className="justify-center border-t border-border/50 pt-6">
               <Link
                 href="/login"
-                className="text-sm text-muted-foreground transition-colors hover:text-primary"
+                className="cursor-pointer text-sm text-muted-foreground transition-colors hover:text-primary"
               >
                 Back to login
               </Link>
@@ -245,7 +250,7 @@ export function ForgotPasswordClient() {
             <CardFooter className="justify-center">
               <Link
                 href="/login"
-                className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
+                className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
               >
                 <ArrowLeftIcon className="size-4" />
                 Back to login

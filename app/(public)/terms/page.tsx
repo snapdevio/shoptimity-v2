@@ -129,7 +129,7 @@ export default function TermsPage() {
               review our{" "}
               <Link
                 href="/refund-policy"
-                className="text-primary underline underline-offset-4 hover:text-primary/80"
+                className="cursor-pointer text-primary underline underline-offset-4 hover:text-primary/80"
               >
                 Refund Policy
               </Link>
@@ -217,14 +217,14 @@ export default function TermsPage() {
               through our live chat,{" "}
               <Link
                 href="/contact"
-                className="text-primary underline underline-offset-4 hover:text-primary/80"
+                className="cursor-pointer text-primary underline underline-offset-4 hover:text-primary/80"
               >
                 contact page
               </Link>{" "}
               or email us at{" "}
               <a
                 href="mailto:support@shoptimity.com"
-                className="text-primary underline underline-offset-4 hover:text-primary/80"
+                className="cursor-pointer text-primary underline underline-offset-4 hover:text-primary/80"
               >
                 support@shoptimity.com
               </a>

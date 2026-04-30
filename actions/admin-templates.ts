@@ -17,16 +17,38 @@ async function requireAdmin() {
   return session
 }
 
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024 // 8 MB
+const MAX_ZIP_BYTES = 100 * 1024 * 1024 // 100 MB
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+])
+const ALLOWED_IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg"])
+
 export async function uploadTemplateImage(formData: FormData) {
   try {
     await requireAdmin()
     const file = formData.get("file") as File
     if (!file) return { success: false, error: "No file provided" }
 
+    if (file.size > MAX_IMAGE_BYTES) {
+      return { success: false, error: "Image is too large (max 8 MB)" }
+    }
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      return { success: false, error: "Unsupported image type" }
+    }
+
+    const sanitized = sanitizeFilename(file.name, ALLOWED_IMAGE_EXTS)
+    if (!sanitized) {
+      return { success: false, error: "Invalid filename" }
+    }
+
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    const sanitized = sanitizeFilename(file.name)
     const filename = `${Date.now()}-${sanitized}`
     const key = `assets/templates/${filename}`
 
@@ -48,21 +70,29 @@ export async function uploadTemplateImage(formData: FormData) {
   }
 }
 
-function sanitizeFilename(name: string): string {
-  // Extract extension
+// Returns sanitized "<base>.<ext>" or null if the extension isn't allowed
+// or the base ends up empty. Both the base and the extension are
+// scrubbed — earlier, the extension was passed through unsanitized so a
+// filename like `foo.zip\nbad` could embed control chars in the R2 key.
+function sanitizeFilename(
+  name: string,
+  allowedExts: Set<string>
+): string | null {
   const parts = name.split(".")
-  const ext = parts.pop() || ""
-  const base = parts.join(".")
+  const rawExt = (parts.pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "")
+  if (!allowedExts.has(rawExt)) return null
 
-  // Sanitize base: lowercase, replace spaces with dashes, remove special chars
-  const sanitizedBase = base
+  const sanitizedBase = parts
+    .join(".")
     .toLowerCase()
-    .replace(/\s+/g, "-") // spaces to dashes
-    .replace(/[^a-z0-9-_]/g, "") // remove special chars except dashes/underscores
-    .replace(/-+/g, "-") // collapse multiple dashes
-    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9\-_]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 100) // cap to keep keys reasonable
 
-  return `${sanitizedBase}.${ext}`
+  if (!sanitizedBase) return null
+  return `${sanitizedBase}.${rawExt}`
 }
 
 function getR2KeyFromUrl(url: string | null): string | null {
@@ -76,16 +106,34 @@ function getR2KeyFromUrl(url: string | null): string | null {
   return null
 }
 
+const ALLOWED_ZIP_TYPES = new Set([
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/octet-stream", // some browsers
+])
+const ALLOWED_ZIP_EXTS = new Set(["zip"])
+
 export async function uploadTemplateZip(formData: FormData) {
   try {
     await requireAdmin()
     const file = formData.get("file") as File
     if (!file) return { success: false, error: "No file provided" }
 
+    if (file.size > MAX_ZIP_BYTES) {
+      return { success: false, error: "ZIP is too large (max 100 MB)" }
+    }
+    if (file.type && !ALLOWED_ZIP_TYPES.has(file.type)) {
+      return { success: false, error: "Unsupported file type (expected .zip)" }
+    }
+
+    const sanitized = sanitizeFilename(file.name, ALLOWED_ZIP_EXTS)
+    if (!sanitized) {
+      return { success: false, error: "Invalid filename (expected .zip)" }
+    }
+
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    const sanitized = sanitizeFilename(file.name)
     const filename = `${Date.now()}-${sanitized}`
     const key = `templates/${filename}`
 

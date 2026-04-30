@@ -6,6 +6,9 @@ import { and, eq } from "drizzle-orm"
 import { z } from "zod"
 import { createAuditLog } from "@/lib/audit"
 import { getAppSession } from "@/lib/auth-session"
+import { domains as domainsTable } from "@/db/schema/domains"
+import { isNull } from "drizzle-orm"
+import { enqueueLicenseMetadataExportJob } from "@/lib/queue"
 
 async function activateFreePlan(opts: {
   stripe: Stripe
@@ -17,6 +20,11 @@ async function activateFreePlan(opts: {
 }) {
   const { stripe, userId, email, contactName, plan } = opts
   const normalizedEmail = email.toLowerCase().trim()
+
+  // Domains to refresh in R2 after the transaction commits. The license
+  // upsert below changes `planId` (e.g. Pro → Free); without re-exporting
+  // metadata, the public `<domain>.json` keeps the old plan_name.
+  const domainsToRefresh: { domainName: string; userId: string }[] = []
 
   await db.transaction(async (tx) => {
     // Resolve user (prefer authenticated session userId, fallback to email)
@@ -99,6 +107,24 @@ async function activateFreePlan(opts: {
         },
       })
 
+    // Collect existing domains for post-commit R2 refresh. The license id
+    // is preserved by the upsert, so domain rows still link here — they
+    // just need a fresh JSON snapshot reflecting the new (free) plan_name.
+    if (existingLicense) {
+      const existingDomains = await tx
+        .select({ domainName: domainsTable.domainName })
+        .from(domainsTable)
+        .where(
+          and(
+            eq(domainsTable.licenseId, existingLicense.id),
+            isNull(domainsTable.deletedAt)
+          )
+        )
+      for (const d of existingDomains) {
+        domainsToRefresh.push({ domainName: d.domainName, userId: user.id })
+      }
+    }
+
     await createAuditLog(
       user.id,
       existingLicense
@@ -116,6 +142,22 @@ async function activateFreePlan(opts: {
       tx
     )
   })
+
+  // Enqueue R2 refresh after commit so the worker reads the just-saved
+  // free-plan state. Without this, the public license JSON keeps showing
+  // the previous plan_name (Pro / Trial / etc).
+  for (const job of domainsToRefresh) {
+    await enqueueLicenseMetadataExportJob({
+      domainName: job.domainName,
+      userId: job.userId,
+      action: "upsert",
+    }).catch((err) => {
+      console.error(
+        `[checkout] Failed to enqueue R2 refresh for ${job.domainName} (free activation):`,
+        err
+      )
+    })
+  }
 }
 
 const checkoutSchema = z.object({
@@ -226,6 +268,8 @@ async function createCheckoutSession(props: {
     promoCode,
   } = props
 
+  console.log("[createCheckoutSession] Props:", JSON.stringify(props, null, 2))
+
   // Direct Check: Use all domains if they fit in 300 chars, otherwise fallback to first 3
   const domainsJson = domains ? JSON.stringify(domains) : ""
   const domainsMetadata =
@@ -242,9 +286,13 @@ async function createCheckoutSession(props: {
     is_yearly: isYearlyPlan ? "true" : "false",
     is_lifetime: plan.mode === "lifetime" ? "true" : "false",
     final_amount: String(finalAmount),
-    type: isTrial
-      ? "trial_setup"
-      : plan.mode === "monthly" || plan.mode === "yearly"
+    // Trials are real Stripe subscriptions in the new flow, so they
+    // route through the same `fulfillOrder` webhook path. Keeping
+    // `is_trial: "true"` is enough for the webhook to set trial state
+    // on the license — the legacy `trial_setup` type is only used for
+    // pre-existing setup-mode sessions still in flight.
+    type:
+      plan.mode === "monthly" || plan.mode === "yearly" || isTrial
         ? "subscription"
         : "lifetime_purchase",
     address_line1: address?.line1 || "",
@@ -262,6 +310,12 @@ async function createCheckoutSession(props: {
   // Resolve promo code to either promotion_code ID or coupon ID
   const discount = await resolvePromoCode(stripe, promoCode)
 
+  // Trial signups are now real Stripe subscriptions with
+  // `trial_period_days`, so the only difference between trial and paid
+  // is the trial-period setting. Both use mode=subscription. Setup-mode
+  // is gone — it left a `pm_*` placeholder that the rest of the app
+  // had to special-case (cancel, upgrade, retention discount all
+  // tripped on it).
   return await stripe.checkout.sessions.create({
     customer: stripeCustomerId || undefined,
     customer_email: stripeCustomerId ? undefined : userEmail || undefined,
@@ -269,73 +323,70 @@ async function createCheckoutSession(props: {
       ? { customer_creation: "always" }
       : {}),
     metadata,
-    ...(isTrial
+    ...(isSubscription || isTrial
       ? {
-          mode: "setup",
-          currency: plan.currency || "usd",
-          setup_intent_data: {
+          mode: "subscription",
+          line_items: [
+            {
+              price_data: {
+                currency: plan.currency || "usd",
+                product_data: {
+                  name: `${plan.name} (${isYearlyPlan ? "Yearly" : "Monthly"})`,
+                  description: `${isYearlyPlan ? "Yearly" : "Monthly"} subscription for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
+                },
+                unit_amount: finalAmount,
+                recurring: {
+                  interval: isYearlyPlan ? "year" : "month",
+                },
+              },
+              quantity: 1,
+            },
+          ],
+          subscription_data: {
             metadata,
+            ...(isTrial ? { trial_period_days: plan.trialDays } : {}),
+            ...(stripePaymentMethodId
+              ? { default_payment_method: stripePaymentMethodId }
+              : {}),
           },
-          custom_text: {
-            submit: {
-              message: `You're starting a ${plan.trialDays}-day free trial for the ${plan.name} plan. Your card will NOT be charged today. You will be automatically charged $${(finalAmount / 100).toFixed(2)} after ${plan.trialDays} days unless you cancel.`,
-            },
-          },
+          ...(discount
+            ? { discounts: [discount] }
+            : { allow_promotion_codes: true }),
+          ...(isTrial
+            ? {
+                custom_text: {
+                  submit: {
+                    message: `You're starting a ${plan.trialDays}-day free trial for the ${plan.name} plan. Your card will NOT be charged today. You will be automatically charged $${(finalAmount / 100).toFixed(2)} after ${plan.trialDays} days unless you cancel.`,
+                  },
+                },
+              }
+            : {}),
         }
-      : isSubscription
-        ? {
-            mode: "subscription",
-            line_items: [
-              {
-                price_data: {
-                  currency: plan.currency || "usd",
-                  product_data: {
-                    name: `${plan.name} (${isYearlyPlan ? "Yearly" : "Monthly"})`,
-                    description: `${isYearlyPlan ? "Yearly" : "Monthly"} subscription for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
-                  },
-                  unit_amount: finalAmount,
-                  recurring: {
-                    interval: isYearlyPlan ? "year" : "month",
-                  },
+      : {
+          mode: "payment",
+          line_items: [
+            {
+              price_data: {
+                currency: plan.currency || "usd",
+                product_data: {
+                  name: `${plan.name} (Lifetime ${plan.slots > 1 ? "Licenses" : "License"})`,
+                  description: `Lifetime access for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
                 },
-                quantity: 1,
+                unit_amount: finalAmount,
               },
-            ],
-            subscription_data: {
-              metadata,
-              ...(stripePaymentMethodId
-                ? { default_payment_method: stripePaymentMethodId }
-                : {}),
+              quantity: 1,
             },
-            ...(discount
-              ? { discounts: [discount] }
-              : { allow_promotion_codes: true }),
-          }
-        : {
-            mode: "payment",
-            line_items: [
-              {
-                price_data: {
-                  currency: plan.currency || "usd",
-                  product_data: {
-                    name: `${plan.name} (Lifetime ${plan.slots > 1 ? "Licenses" : "License"})`,
-                    description: `Lifetime access for ${plan.slots} domain${plan.slots > 1 ? "s" : ""}.`,
-                  },
-                  unit_amount: finalAmount,
-                },
-                quantity: 1,
-              },
-            ],
-            payment_intent_data: {
-              metadata: {
-                ...metadata,
-                email: userEmail || "",
-              },
+          ],
+          payment_intent_data: {
+            metadata: {
+              ...metadata,
+              email: userEmail || "",
             },
-            ...(discount
-              ? { discounts: [discount] }
-              : { allow_promotion_codes: true }),
-          }),
+          },
+          ...(discount
+            ? { discounts: [discount] }
+            : { allow_promotion_codes: true }),
+        }),
     success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl}/pricing`,
   })
@@ -414,20 +465,20 @@ export async function GET(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://shoptimity.com"
   const stripe = getStripe()
 
-  // Check trial eligibility if logged in
+  // Check trial eligibility if logged in. The per-user `hasUsedTrial`
+  // flag is the source of truth — checking the licenses row alone is
+  // bypassable because cancellation overwrites the row to the free
+  // plan, leaving no record of the prior trial.
   let isTrialEligible = plan.trialDays > 0
 
   if (session && isTrialEligible) {
-    const existingLicenses = await db
-      .select({ id: licenses.id, isTrial: licenses.isTrial })
-      .from(licenses)
-      .where(
-        and(eq(licenses.userId, session.userId), eq(licenses.planId, planId))
-      )
+    const [userTrialState] = await db
+      .select({ hasUsedTrial: users.hasUsedTrial })
+      .from(users)
+      .where(eq(users.id, session.userId))
       .limit(1)
 
-    if (existingLicenses.length > 0) {
-      // User already had/has a license for this plan
+    if (userTrialState?.hasUsedTrial) {
       isTrialEligible = false
     }
   }
@@ -480,7 +531,56 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Hosts allowed to POST to this checkout endpoint. Same set as
+// `auth.trustedOrigins` in lib/auth.ts so the two stay aligned. Anything
+// else gets a 403 — without this guard a malicious site could submit a
+// cross-origin form to start a Stripe subscription on the victim's saved
+// card (the route reads the better-auth cookie, which browsers will send
+// on cross-origin POSTs).
+const ALLOWED_ORIGIN_HOSTS = new Set([
+  "shoptimity.com",
+  "www.shoptimity.com",
+  "localhost:3000",
+  "127.0.0.1:3000",
+  "chirag-web.shopify.xx.kg",
+])
+
+function isSameOrigin(request: NextRequest): boolean {
+  const origin = request.headers.get("origin")
+  const referer = request.headers.get("referer")
+  // Prefer Origin (set on POSTs by all modern browsers). Fall back to
+  // Referer for older clients. If neither is present we err on the side
+  // of denial — legitimate browser flows always set at least one.
+  let host: string | null = null
+  if (origin) {
+    try {
+      host = new URL(origin).host
+    } catch {
+      return false
+    }
+  } else if (referer) {
+    try {
+      host = new URL(referer).host
+    } catch {
+      return false
+    }
+  }
+  if (!host) return false
+  if (ALLOWED_ORIGIN_HOSTS.has(host)) return true
+  // Allow the caller's own host (covers preview / staging deployments
+  // without having to enumerate them here).
+  if (host === request.nextUrl.host) return true
+  return false
+}
+
 export async function POST(request: NextRequest) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json(
+      { error: "Forbidden: origin not allowed" },
+      { status: 403 }
+    )
+  }
+
   let body: unknown
   try {
     body = await request.json()
@@ -502,7 +602,7 @@ export async function POST(request: NextRequest) {
   }
 
   const {
-    email,
+    email: bodyEmail,
     contactName,
     planId,
     licenseQuantity,
@@ -512,6 +612,16 @@ export async function POST(request: NextRequest) {
     address,
     promoCode,
   } = parsed.data
+
+  // Resolve session up front. When a session is present the body email is
+  // overridden with the session email so an authenticated user can't
+  // register a checkout (and especially a trial) under a different email
+  // than their account — that was the trial-abuse vector: same user, same
+  // card, fresh email each time → infinite trials.
+  const session = await getAppSession()
+  const email = session?.email
+    ? session.email.toLowerCase().trim()
+    : bodyEmail
 
   // Get plan
   const [initialPlan] = await db
@@ -558,38 +668,31 @@ export async function POST(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://shoptimity.com"
   const stripe = getStripe()
 
-  // Find user by email if possible to check trial history
+  // Trial eligibility: gate on the SESSION user when authenticated, falling
+  // back to email lookup only for unauthenticated checkout. Gating purely
+  // on the body-supplied email lets a logged-in user cycle through fresh
+  // emails with the same card to claim trials repeatedly.
   let isTrialEligible = plan.trialDays > 0
-  const [existingUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1)
-
-  if (existingUser && isTrialEligible) {
-    const existingLicenses = await db
-      .select({ id: licenses.id })
-      .from(licenses)
-      .where(
-        and(eq(licenses.userId, existingUser.id), eq(licenses.planId, planId))
-      )
-      .limit(1)
-
-    if (existingLicenses.length > 0) {
-      isTrialEligible = false
-    }
-  }
-
-  // Resolve session + stripeCustomerId up front
-  const session = await getAppSession()
   let stripeCustomerId: string | undefined
+
   if (session) {
     const [user] = await db
-      .select({ stripeCustomerId: users.stripeCustomerId })
+      .select({
+        stripeCustomerId: users.stripeCustomerId,
+        hasUsedTrial: users.hasUsedTrial,
+      })
       .from(users)
       .where(eq(users.id, session.userId))
       .limit(1)
     stripeCustomerId = user?.stripeCustomerId || undefined
+    if (user?.hasUsedTrial) isTrialEligible = false
+  } else {
+    const [existingUser] = await db
+      .select({ id: users.id, hasUsedTrial: users.hasUsedTrial })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
+    if (existingUser?.hasUsedTrial) isTrialEligible = false
   }
 
   // Handle Free Plan Fulfillment FIRST — no Stripe calls required.
@@ -657,9 +760,12 @@ export async function POST(request: NextRequest) {
       is_yearly: isYearly ? "true" : "false",
       is_lifetime: plan.mode === "lifetime" ? "true" : "false",
       final_amount: String(finalAmount),
-      type: isTrial
-        ? "trial_setup"
-        : plan.mode === "monthly" || plan.mode === "yearly"
+      // Trials are real Stripe subscriptions in the new flow — same
+      // type as paid subs. `is_trial: "true"` carries the trial-state
+      // signal for downstream code; the legacy `trial_setup` value is
+      // only relevant for old setup-mode sessions.
+      type:
+        plan.mode === "monthly" || plan.mode === "yearly" || isTrial
           ? "subscription"
           : "lifetime_purchase",
       // Address Metadata
@@ -675,9 +781,56 @@ export async function POST(request: NextRequest) {
 
     // Direct Payment Flow (if saved card and customer exist)
     if (stripePaymentMethodId && stripeCustomerId) {
-      // 1. Handle Trial Case (No immediate charge)
+      // 1. Handle Trial Case — create a real Stripe subscription with
+      //    `trial_period_days` so Stripe handles the auto-charge at trial
+      //    end (no cron needed). The subscription's `sub_*` ID is what we
+      //    store in `licenses.stripeSubscriptionId`, so the upgrade,
+      //    cancel, and retention-discount flows all just work without
+      //    the special-case `pm_*` placeholder handling.
       if (isTrial) {
         const normalizedEmail = email.toLowerCase().trim()
+
+        const productId = await getOrCreateProduct(stripe, plan.name)
+        const discount = await resolvePromoCode(stripe, promoCode)
+
+        // Stripe creates this in `trialing` status — no charge today.
+        // The first invoice fires at `trial_end` and the webhook
+        // (`invoice.payment_succeeded` / `customer.subscription.updated`)
+        // will flip the license to active.
+        const subscription = await stripe.subscriptions.create({
+          customer: stripeCustomerId,
+          items: [
+            {
+              price_data: {
+                currency: plan.currency || "usd",
+                product: productId,
+                unit_amount: finalAmount,
+                recurring: {
+                  interval: isYearly ? "year" : "month",
+                },
+              },
+            },
+          ],
+          default_payment_method: stripePaymentMethodId,
+          trial_period_days: plan.trialDays,
+          // Coupons attach cleanly here — they apply to the first invoice
+          // (post-trial), matching the "$X charged when trial ends" UX.
+          ...(discount ? { discounts: [discount as any] } : {}),
+          metadata,
+        })
+
+        const trialEndsAt = subscription.trial_end
+          ? new Date(subscription.trial_end * 1000)
+          : new Date(Date.now() + plan.trialDays * 86400000)
+
+        // Domains attached to the user's existing license (typical case:
+        // free-plan user starting a Pro trial). The license upsert below
+        // changes planId / isTrial in place, so the public R2 JSON needs
+        // to be re-exported with the new plan_name + trial fields.
+        const directTrialDomainsToRefresh: {
+          domainName: string
+          userId: string
+        }[] = []
 
         await db.transaction(async (tx) => {
           // Find or create user
@@ -696,19 +849,32 @@ export async function POST(request: NextRequest) {
                 email: normalizedEmail,
                 emailVerified: true,
                 stripeCustomerId: stripeCustomerId,
+                hasUsedTrial: true,
               })
               .returning()
+          } else {
+            // Lock the per-user trial gate. Idempotent — re-runs of the
+            // same trial signup just rewrite the same `true` value.
+            await tx
+              .update(users)
+              .set({ hasUsedTrial: true, updatedAt: new Date() })
+              .where(eq(users.id, user.id))
           }
 
-          // Create trialing payment record
+          // Create trialing payment record. `stripeSessionId` must be
+          // unique — using the subscription ID is stable and lets us
+          // reconcile with the webhook later.
           const [payment] = await tx
             .insert(payments)
             .values({
               userId: user.id,
-              stripeSessionId: `direct_trial_${Date.now()}`,
+              stripeSessionId: `trial_sub_${subscription.id}`,
               stripeCustomerId: stripeCustomerId,
+              stripeSubscriptionId: subscription.id,
+              planId: plan.id,
               amount: finalAmount,
               currency: plan.currency || "usd",
+              appliedPromoCode: promoCode || null,
               status: "trialing",
             })
             .returning()
@@ -727,8 +893,10 @@ export async function POST(request: NextRequest) {
             })
             .returning()
 
-          // Create license
-          await tx
+          // Create license — now backed by the real Stripe subscription.
+          // Capture the returned id so we can fetch attached domains for
+          // R2 refresh (a free-plan upgrade keeps the same license row).
+          const [trialLicense] = await tx
             .insert(licenses)
             .values({
               userId: user.id,
@@ -739,8 +907,9 @@ export async function POST(request: NextRequest) {
               isTrial: true,
               isLifetime: plan.mode === "lifetime",
               billingCycle: isYearly ? "yearly" : (plan.mode as any),
-              trialEndsAt: new Date(Date.now() + plan.trialDays * 86400000),
-              stripeSubscriptionId: stripePaymentMethodId, // Store the payment method for the worker
+              trialEndsAt,
+              nextRenewalDate: trialEndsAt,
+              stripeSubscriptionId: subscription.id,
             })
             .onConflictDoUpdate({
               target: licenses.userId,
@@ -752,21 +921,64 @@ export async function POST(request: NextRequest) {
                 isTrial: true,
                 isLifetime: plan.mode === "lifetime",
                 billingCycle: isYearly ? "yearly" : (plan.mode as any),
-                trialEndsAt: new Date(Date.now() + plan.trialDays * 86400000),
-                stripeSubscriptionId: stripePaymentMethodId,
+                trialEndsAt,
+                nextRenewalDate: trialEndsAt,
+                stripeSubscriptionId: subscription.id,
+                cancelAtPeriodEnd: false,
                 updatedAt: new Date(),
               },
             })
+            .returning({ id: licenses.id })
+
+          if (trialLicense) {
+            const existingDomains = await tx
+              .select({ domainName: domainsTable.domainName })
+              .from(domainsTable)
+              .where(
+                and(
+                  eq(domainsTable.licenseId, trialLicense.id),
+                  isNull(domainsTable.deletedAt)
+                )
+              )
+            for (const d of existingDomains) {
+              directTrialDomainsToRefresh.push({
+                domainName: d.domainName,
+                userId: user.id,
+              })
+            }
+          }
 
           await createAuditLog(
             user.id,
             "checkout.direct_trial_activated",
             "license",
             plan.id,
-            { email: normalizedEmail, planId: plan.id },
+            {
+              email: normalizedEmail,
+              planId: plan.id,
+              subscriptionId: subscription.id,
+              trialEnd: subscription.trial_end,
+            },
             tx
           )
         })
+
+        // Refresh R2 JSON for any pre-existing domains so the public
+        // license file reflects the new (Pro/trial) plan name. Without
+        // this, a free-plan user starting a Pro trial keeps seeing
+        // `plan_name: "Free"` at the public URL.
+        for (const job of directTrialDomainsToRefresh) {
+          await enqueueLicenseMetadataExportJob({
+            domainName: job.domainName,
+            userId: job.userId,
+            action: "upsert",
+          }).catch((err) => {
+            console.error(
+              `[checkout] Failed to enqueue R2 refresh for ${job.domainName} (direct trial):`,
+              err
+            )
+          })
+        }
 
         return NextResponse.json({ success: true })
       }

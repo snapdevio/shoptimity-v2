@@ -74,7 +74,7 @@ export function AdminMobileNav() {
     <div className="mb-6 lg:hidden">
       <Drawer.Root open={open} onOpenChange={setOpen} direction="bottom">
         <Drawer.Trigger asChild>
-          <button className="flex w-full items-center justify-between rounded-xl border border-border/50 bg-card/50 p-4 shadow-sm backdrop-blur-md">
+          <button className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-border/50 bg-card/50 p-4 shadow-sm backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 {currentItem?.icon ? (
@@ -126,7 +126,7 @@ export function AdminMobileNav() {
                             <Link
                               href={item.href}
                               className={cn(
-                                "flex items-center justify-between rounded-2xl p-4 transition-all active:scale-[0.98]",
+                                "flex cursor-pointer items-center justify-between rounded-2xl p-4 transition-all active:scale-[0.98]",
                                 isActive
                                   ? "bg-primary/10 text-primary ring-1 ring-primary/20"
                                   : "bg-muted/30 text-muted-foreground hover:bg-muted/50"

@@ -115,7 +115,7 @@ export default async function PlansPage() {
                       buttonVariants({
                         variant: isPopular ? "default" : "outline",
                       }),
-                      "w-full capitalize"
+                      "w-full cursor-pointer capitalize"
                     )}
                   >
                     Get Started

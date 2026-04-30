@@ -129,7 +129,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
     return (
       <section
         id="pricing"
-        className="relative flex min-h-[800px] items-center justify-center bg-base-100 py-16 md:py-24"
+        className="relative flex min-h-200 items-center justify-center bg-base-100 py-16 md:py-24"
       >
         <div className="h-12 w-12 animate-spin rounded-full border-t-2 border-b-2 border-primary"></div>
       </section>
@@ -149,7 +149,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
     <section className="relative bg-base-100 py-16 md:py-24" id="pricing">
       <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-10">
         <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
-          <div className="scroll-animate relative h-auto justify-center rounded-[38px] border p-2 shadow-[0_10px_50px_rgba(0,0,0,0.05)] lg:sticky lg:top-[120px] lg:p-6">
+          <div className="scroll-animate relative h-auto justify-center rounded-[38px] border p-2 shadow-[0_10px_50px_rgba(0,0,0,0.05)] lg:sticky lg:top-30 lg:p-6">
             <div className="relative z-0 mx-auto h-full w-full rounded-[28px]">
               <img
                 src="/assets/pricing-image.webp"
@@ -170,7 +170,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
                 <div className="relative flex rounded-2xl bg-base-300 p-1">
                   <button
                     onClick={() => setBillingCycle("monthly")}
-                    className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
+                    className={`relative z-10 cursor-pointer px-6 py-2 text-sm font-bold transition-colors duration-300 ${
                       billingCycle === "monthly"
                         ? "text-white"
                         : "text-base-content-muted"
@@ -180,7 +180,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
                   </button>
                   <button
                     onClick={() => setBillingCycle("yearly")}
-                    className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
+                    className={`relative z-10 cursor-pointer px-6 py-2 text-sm font-bold transition-colors duration-300 ${
                       billingCycle === "yearly"
                         ? "text-white"
                         : "text-base-content-muted"
@@ -501,7 +501,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ headline }) => {
                 Need more info? Read the full{" "}
                 <a
                   href="/setup"
-                  className="text-primary underline-offset-4 hover:underline"
+                  className="cursor-pointer text-primary underline-offset-4 hover:underline"
                 >
                   Setup Guide
                 </a>

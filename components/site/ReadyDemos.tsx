@@ -37,7 +37,7 @@ const DemoCard: React.FC<DemoItem> = ({
     </p>
     <a
       href={previewLink || "#"}
-      className="mb-8 flex items-center gap-2 font-sans font-semibold transition-all hover:gap-3 hover:text-orange-600"
+      className="mb-8 flex cursor-pointer items-center gap-2 font-sans font-semibold transition-all hover:gap-3 hover:text-orange-600"
       target="_blank"
     >
       View Demo Store
@@ -111,7 +111,7 @@ const ReadyDemos: React.FC<ReadyDemosProps> = () => {
       <section className="bg-base-300 px-4 pb-14 sm:px-6 md:pb-24">
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 lg:grid-cols-2">
           {loading ? (
-            <div className="col-span-full flex min-h-[400px] items-center justify-center">
+            <div className="col-span-full flex min-h-100 items-center justify-center">
               <div className="h-12 w-12 animate-spin rounded-full border-t-2 border-b-2 border-orange-500"></div>
             </div>
           ) : (

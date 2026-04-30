@@ -48,7 +48,7 @@ const ComparisonStickyHeader: React.FC<ComparisonStickyHeaderProps> = ({
           </span>
           <button
             onClick={scrollToPricing}
-            className="rounded-full bg-orange-600 px-6 py-2.5 text-xs font-black text-white shadow-lg transition-transform hover:scale-105 active:scale-95 sm:px-8 sm:text-sm"
+            className="cursor-pointer rounded-full bg-orange-600 px-6 py-2.5 text-xs font-black text-white shadow-lg transition-transform hover:scale-105 active:scale-95 sm:px-8 sm:text-sm"
           >
             VIEW PLANS
           </button>

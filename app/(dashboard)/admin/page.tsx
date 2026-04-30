@@ -196,7 +196,7 @@ export default async function AdminDashboardPage() {
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild className="rounded-xl">
-              <Link href="/admin/orders">
+              <Link href="/admin/orders" className="cursor-pointer">
                 View All <ArrowRight className="ml-2 size-3" />
               </Link>
             </Button>

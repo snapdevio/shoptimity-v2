@@ -31,7 +31,7 @@ const FAQItem: React.FC<FAQItemProps> = ({
     <div className="scroll-animate faq-item overflow-hidden rounded-2xl border bg-base-300 transition-all duration-300 hover:shadow-lg">
       <button
         onClick={onToggle}
-        className="group flex w-full items-center justify-between p-6 text-left focus:outline-none md:p-8"
+        className="group flex w-full cursor-pointer items-center justify-between p-6 text-left focus:outline-none md:p-8"
       >
         <span
           className={`font-sans text-[16px] text-base-content transition-colors duration-300 md:text-xl ${
@@ -42,12 +42,12 @@ const FAQItem: React.FC<FAQItemProps> = ({
         </span>
         <div className="relative h-6 w-6 shrink-0">
           <span
-            className={`absolute top-1/2 left-0 h-[2px] w-full translate-y-[-50%] rounded-full bg-base-content transition-colors duration-300 ${
+            className={`absolute top-1/2 left-0 h-0.5 w-full translate-y-[-50%] rounded-full bg-base-content transition-colors duration-300 ${
               isOpen ? "bg-primary" : "group-hover:bg-primary"
             }`}
           ></span>
           <span
-            className={`absolute top-0 left-1/2 h-full w-[2px] translate-x-[-50%] rounded-full bg-base-content transition-all duration-300 ${
+            className={`absolute top-0 left-1/2 h-full w-0.5 translate-x-[-50%] rounded-full bg-base-content transition-all duration-300 ${
               isOpen
                 ? "scale-y-0 rotate-90 transform bg-primary"
                 : "group-hover:bg-primary"
@@ -127,13 +127,16 @@ const FAQ: React.FC = () => {
 
           <div>
             You can reach us via live chat, through our{" "}
-            <Link href="/contact" className="text-primary hover:underline">
+            <Link
+              href="/contact"
+              className="cursor-pointer text-primary hover:underline"
+            >
               contact page
             </Link>
             , or via{" "}
             <a
               href="mailto:support@shoptimity.com"
-              className="text-primary hover:underline"
+              className="cursor-pointer text-primary hover:underline"
             >
               email
             </a>

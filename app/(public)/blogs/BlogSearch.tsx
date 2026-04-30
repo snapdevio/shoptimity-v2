@@ -51,7 +51,7 @@ export default function BlogSearch() {
       {searchTerm ? (
         <button
           onClick={clearSearch}
-          className="absolute top-1/2 right-4 -translate-y-1/2 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          className="absolute top-1/2 right-4 -translate-y-1/2 cursor-pointer rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
         >
           <X className="size-4" />
         </button>

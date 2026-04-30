@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils"
 export default function NotFoundContent() {
   return (
     <>
-      <div className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 scale-150 rounded-full bg-[radial-gradient(circle,rgba(255,89,36,0.08)_0%,rgba(255,89,36,0)_70%)] opacity-50 blur-3xl" />
-      <div className="pointer-events-none absolute -top-24 -right-24 -z-10 h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(255,111,181,0.05)_0%,rgba(255,111,181,0)_70%)] opacity-30 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-125 w-125 -translate-x-1/2 -translate-y-1/2 scale-150 rounded-full bg-[radial-gradient(circle,rgba(255,89,36,0.08)_0%,rgba(255,89,36,0)_70%)] opacity-50 blur-3xl" />
+      <div className="pointer-events-none absolute -top-24 -right-24 -z-10 h-100 w-100 rounded-full bg-[radial-gradient(circle,rgba(255,111,181,0.05)_0%,rgba(255,111,181,0)_70%)] opacity-30 blur-3xl" />
 
       <div className="relative z-10 w-full max-w-4xl text-center">
         <h1 className="mb-6 font-[Lexend] text-[120px] leading-tight font-bold md:text-[200px]">
@@ -35,6 +35,7 @@ export default function NotFoundContent() {
           <Link
             href="/"
             className={cn(
+              "cursor-pointer",
               buttonVariants({ variant: "default", size: "lg" }),
               "h-[58px] min-w-[220px] rounded-full text-base font-bold shadow-xl shadow-orange-500/20 transition-all duration-300 hover:-translate-y-1 hover:brightness-110 active:scale-95"
             )}
@@ -44,6 +45,7 @@ export default function NotFoundContent() {
           <Link
             href="/contact"
             className={cn(
+              "cursor-pointer",
               buttonVariants({ variant: "outline", size: "lg" }),
               "h-[58px] min-w-[220px] rounded-full bg-white/50 text-base font-bold backdrop-blur-sm transition-all duration-300 hover:bg-white hover:shadow-lg active:scale-95"
             )}

@@ -28,11 +28,16 @@ export async function cancelLicenseSubscription(licenseId: string) {
       return { error: "License not found" }
     }
 
-    // 2. Validate it's a cancelable subscription
-    const isSetupIntent = license.stripeSubscriptionId?.startsWith("seti_")
-
-    // 3. If it's a trial without a real subscription (or a SetupIntent), we revoke immediately
-    if (!license.stripeSubscriptionId || isSetupIntent) {
+    // 2. Validate it's a cancelable Stripe subscription. The
+    // `stripeSubscriptionId` column doubles as a placeholder for trial
+    // licenses — it can hold a `seti_*` SetupIntent, a `pm_*` payment
+    // method, or null. Only `sub_*` IDs are real Stripe subscriptions
+    // we can update; everything else is a trial that we revoke locally.
+    // The check is inlined so TS narrows `stripeSubscriptionId` to
+    // `string` past this guard for the Stripe API call below.
+    const subId = license.stripeSubscriptionId
+    if (!subId || !subId.startsWith("sub_")) {
+      const isSetupIntent = subId?.startsWith("seti_") ?? false
       await db.transaction(async (tx) => {
         // 1. Update license status
         await tx
@@ -89,9 +94,10 @@ export async function cancelLicenseSubscription(licenseId: string) {
       return { success: true }
     }
 
-    // 3. Cancel in Stripe (at period end) for actual subscriptions
+    // 3. Cancel in Stripe (at period end) for actual subscriptions.
+    // `subId` is narrowed to a `sub_*` string by the guard above.
     const stripe = getStripe()
-    await stripe.subscriptions.update(license.stripeSubscriptionId, {
+    await stripe.subscriptions.update(subId, {
       cancel_at_period_end: true,
     })
 
@@ -103,7 +109,7 @@ export async function cancelLicenseSubscription(licenseId: string) {
       "license.subscription_cancel_requested",
       "license",
       licenseId,
-      { stripeSubscriptionId: license.stripeSubscriptionId }
+      { stripeSubscriptionId: subId }
     )
 
     revalidatePath("/licenses")

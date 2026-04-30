@@ -34,7 +34,7 @@ export function ContactActions({ contact }: { contact: any }) {
 
   return (
     <>
-      <div className="flex min-w-[140px] items-center justify-end gap-1.5">
+      <div className="flex min-w-35 items-center justify-end gap-1.5">
         <Button
           variant="ghost"
           size="icon"
@@ -94,7 +94,7 @@ export function ContactActions({ contact }: { contact: any }) {
             <div className="flex justify-end gap-2">
               <a
                 href={`mailto:${contact.email}`}
-                className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
               >
                 <Mail className="mr-2 h-4 w-4" />
                 Reply via Email

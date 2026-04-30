@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { getAppSession } from "@/lib/auth-session"
 import { redirect } from "next/navigation"
 import { db } from "@/db"
@@ -178,29 +180,100 @@ export default async function BillingPage({
         if (periodEnd) nextPaymentDate = periodEnd as number
       }
 
-      // Discount lookup: prefer `subscription.discounts` (newer API), fall
-      // back to the legacy singular `subscription.discount`. Each entry can
-      // be a string ID (when expand didn't materialize the object) or a
-      // full Discount with the coupon expanded.
+      // Authoritative next-charge amount: ask Stripe to preview the
+      // upcoming invoice. The Stripe Dashboard reads from this same
+      // source, so using it here keeps our UI in sync with what merchants
+      // see in Stripe (no manual unit_amount × (1 − percent) math that
+      // can silently disagree).
+      const customerId =
+        typeof subscription.customer === "string"
+          ? subscription.customer
+          : (subscription.customer as any)?.id
+
+      let upcomingPreview: any = null
+      try {
+        upcomingPreview = await stripe.invoices.createPreview({
+          customer: customerId,
+          subscription: activeLicense.stripeSubscriptionId,
+          expand: ["discounts.coupon"],
+        } as any)
+      } catch (err) {
+        console.error(
+          "[billing/page] invoices.createPreview failed:",
+          (err as any)?.raw?.message || err
+        )
+      }
+
+      // Resolve the regular per-cycle amount Stripe is set up to bill —
+      // the subscription item's `unit_amount`. We use this to detect a
+      // discount by *comparison* against the preview's total: if the
+      // preview is less than the unit amount, a discount is in effect,
+      // even if `subscription.discounts` came back as opaque IDs.
+      const subItem = subscription.items.data[0]
+      const subItemUnitAmount = subItem?.price?.unit_amount ?? null
+
+      // Subtotal = pre-discount cycle amount; total = post-discount.
+      // Prefer these over `amount_due` because `amount_due` can be 0 on
+      // a trialing sub (nothing due RIGHT NOW), but `total` reflects
+      // what the user will pay when the trial converts.
+      const previewSubtotal: number | null =
+        upcomingPreview?.subtotal ?? subItemUnitAmount
+      const previewTotal: number | null =
+        upcomingPreview?.total ?? upcomingPreview?.amount_due ?? null
+
+      // A discount is active when the preview total is strictly less
+      // than the regular subtotal. This catches the case where
+      // `subscription.discounts` doesn't expand into objects but the
+      // invoice preview still computes the discounted amount correctly.
+      const hasDiscountByMath =
+        previewTotal != null &&
+        previewSubtotal != null &&
+        previewTotal < previewSubtotal
+
+      // Try to find the discount object on the subscription first (gives
+      // us percentOff/duration/etc. for the green panel copy), then fall
+      // back to the invoice preview's expanded discounts.
       const subAnyForDisc = subscription as any
-      const discountsRaw: any[] = Array.isArray(subAnyForDisc.discounts)
+      const subDiscountsRaw: any[] = Array.isArray(subAnyForDisc.discounts)
         ? subAnyForDisc.discounts
         : subAnyForDisc.discount
           ? [subAnyForDisc.discount]
           : []
-      const activeDiscountRaw = discountsRaw.find(
+      let effectiveDiscount: any = subDiscountsRaw.find(
         (d) => typeof d !== "string" && d?.coupon
       )
 
-      if (activeDiscountRaw) {
-        const coupon = activeDiscountRaw.coupon
-        const endsAt = (activeDiscountRaw.end as number | null) ?? null
+      if (!effectiveDiscount && upcomingPreview) {
+        const invDiscounts: any[] = Array.isArray(upcomingPreview.discounts)
+          ? upcomingPreview.discounts
+          : []
+        effectiveDiscount = invDiscounts.find(
+          (d) => typeof d !== "string" && d?.coupon
+        )
+        if (!effectiveDiscount) {
+          const tda: any[] = Array.isArray(
+            upcomingPreview.total_discount_amounts
+          )
+            ? upcomingPreview.total_discount_amounts
+            : []
+          effectiveDiscount = tda
+            .map((entry) => entry?.discount)
+            .find((d) => typeof d !== "string" && d?.coupon)
+        }
+      }
+
+      if (effectiveDiscount || hasDiscountByMath) {
+        const coupon = effectiveDiscount?.coupon ?? {}
+        const endsAt = (effectiveDiscount?.end as number | null) ?? null
         const isYearly = activeLicense.billingCycle === "yearly"
         const cycleSeconds = isYearly ? 365 * 86400 : 30 * 86400
 
+        // If we have a coupon object, derive remainingCycles from its
+        // duration. Otherwise leave it null so the UI shows the generic
+        // "discount applied" copy without overpromising cycles.
         let remainingCycles: number | null = null
         if (coupon.duration === "forever") {
-          remainingCycles = null // unbounded
+          remainingCycles = null
         } else if (coupon.duration === "once") {
           remainingCycles = 1
         } else if (coupon.duration === "repeating") {
@@ -208,26 +281,47 @@ export default async function BillingPage({
             const secondsLeft = endsAt - Math.floor(Date.now() / 1000)
             remainingCycles = Math.max(0, Math.ceil(secondsLeft / cycleSeconds))
           } else if (coupon.duration_in_months) {
-            // Fallback: derive from the coupon's configured months
             remainingCycles = isYearly
               ? Math.max(1, Math.ceil(coupon.duration_in_months / 12))
               : coupon.duration_in_months
           }
         }
 
-        // Compute the discounted next payment amount based on the unit_amount
-        const unitAmount = subscription.items.data[0]?.price?.unit_amount ?? 0
-        let discountedNextAmount: number | null = null
-        if (coupon.percent_off != null) {
-          discountedNextAmount = Math.round(
-            unitAmount * (1 - coupon.percent_off / 100)
-          )
-        } else if (coupon.amount_off != null) {
-          discountedNextAmount = Math.max(0, unitAmount - coupon.amount_off)
+        // discountedNextAmount: prefer the preview total (what Stripe
+        // will actually bill), fall back to manual coupon math, and
+        // finally to the unit_amount itself. This guarantees the field
+        // is populated whenever ANY discount signal is detected.
+        let discountedNextAmount: number | null =
+          previewTotal != null && previewTotal >= 0 ? previewTotal : null
+
+        if (discountedNextAmount == null && coupon && subItemUnitAmount) {
+          if (coupon.percent_off != null) {
+            discountedNextAmount = Math.round(
+              subItemUnitAmount * (1 - coupon.percent_off / 100)
+            )
+          } else if (coupon.amount_off != null) {
+            discountedNextAmount = Math.max(
+              0,
+              subItemUnitAmount - coupon.amount_off
+            )
+          }
         }
 
+        // Derive percentOff from the math when we don't have a coupon
+        // (e.g. the discount is on the customer or scoped differently
+        // and the object wasn't expanded for us).
+        const derivedPercentOff: number | null =
+          coupon.percent_off ??
+          (hasDiscountByMath && previewSubtotal && previewSubtotal > 0
+            ? Math.round(
+                ((previewSubtotal - (previewTotal as number)) /
+                  previewSubtotal) *
+                  100
+              )
+            : null)
+
         activeDiscount = {
-          percentOff: coupon.percent_off ?? null,
+          percentOff: derivedPercentOff,
           amountOff: coupon.amount_off ?? null,
           durationType: coupon.duration ?? null,
           durationInMonths: coupon.duration_in_months ?? null,

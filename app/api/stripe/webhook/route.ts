@@ -12,7 +12,7 @@ import {
   plans,
 } from "@/db/schema"
 import { eq, and, isNull, sql } from "drizzle-orm"
-import { normalizeDomain } from "@/lib/domains"
+import { normalizeDomain, validateDomain } from "@/lib/domains"
 import { enqueueEmailJob, enqueueLicenseMetadataExportJob } from "@/lib/queue"
 import { createAuditLog } from "@/lib/audit"
 import { getPostHog } from "@/lib/posthog-server"
@@ -45,31 +45,59 @@ export async function POST(request: NextRequest) {
   if (process.env.NODE_ENV === "development") {
     console.log(`${Date.now()} event webhook Main=>`, JSON.stringify(event))
   }
-  // Idempotency check
-  const existing = await db
-    .select({ id: webhookEvents.id, processed: webhookEvents.processed })
-    .from(webhookEvents)
-    .where(eq(webhookEvents.eventId, event.id))
-    .limit(1)
 
-  if (existing.length > 0 && existing[0].processed) {
-    return NextResponse.json({ received: true, duplicate: true })
+  // Defense-in-depth event-age check. Stripe SDK already enforces a ~5min
+  // signature timestamp tolerance in `constructEvent`, but a misconfigured
+  // tolerance, leaked signing key, or replayed event still inside that
+  // window could deliver stale events. Reject anything older than 10min.
+  const eventAgeSeconds = Math.floor(Date.now() / 1000) - event.created
+  if (eventAgeSeconds > 600) {
+    console.warn(
+      `[stripe-webhook] Rejecting stale event ${event.id} (${event.type}), age=${eventAgeSeconds}s`
+    )
+    return NextResponse.json({ error: "Event too old" }, { status: 400 })
   }
-  // console.log("event webhook existing=>", JSON.stringify(existing))
-  // Insert or update webhook event record (idempotency support)
+
+  // Atomic claim via the unique `eventId` constraint. Two concurrent
+  // deliveries of the same event can't both insert; the loser falls
+  // through to the existence check below. Without ON CONFLICT, both
+  // racers pass the prior SELECT and both proceed to processing.
+  const [claimed] = await db
+    .insert(webhookEvents)
+    .values({
+      eventId: event.id,
+      type: event.type,
+      processed: false,
+    })
+    .onConflictDoNothing({ target: webhookEvents.eventId })
+    .returning({ id: webhookEvents.id })
+
   let webhookRecordId: string
-  if (existing.length > 0) {
-    webhookRecordId = existing[0].id
+  if (claimed) {
+    webhookRecordId = claimed.id
   } else {
-    const [record] = await db
-      .insert(webhookEvents)
-      .values({
-        eventId: event.id,
-        type: event.type,
-        processed: false,
+    // Lost the race or this is a retry of a previously-attempted event.
+    // If the prior attempt succeeded, treat as duplicate. If it failed
+    // (processed=false, processingError set), allow this attempt to retry.
+    const [existing] = await db
+      .select({
+        id: webhookEvents.id,
+        processed: webhookEvents.processed,
       })
-      .returning()
-    webhookRecordId = record.id
+      .from(webhookEvents)
+      .where(eq(webhookEvents.eventId, event.id))
+      .limit(1)
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Webhook record missing" },
+        { status: 500 }
+      )
+    }
+    if (existing.processed) {
+      return NextResponse.json({ received: true, duplicate: true })
+    }
+    webhookRecordId = existing.id
   }
   try {
     switch (event.type) {
@@ -178,6 +206,18 @@ async function fulfillTrialSetup({
 }) {
   const normalizedEmail = email.toLowerCase().trim()
 
+  // Track domains that need R2 metadata refresh once the transaction
+  // commits. A user upgrading from the free plan into a trial-paid plan
+  // already has domains attached to their existing license — the upsert
+  // below flips the license's planId, but R2 still holds the old (free)
+  // plan_name JSON until we enqueue an upsert. Without this, the R2 file
+  // lags behind the DB and external consumers never see the new plan.
+  const exportJobsToEnqueue: {
+    domainName: string
+    userId: string
+    action: string
+  }[] = []
+
   await db.transaction(async (tx) => {
     // Find or create user
     let [user] = await tx
@@ -195,12 +235,19 @@ async function fulfillTrialSetup({
           email: normalizedEmail,
           emailVerified: true,
           stripeCustomerId: stripeCustomerId,
+          hasUsedTrial: true,
         })
         .returning()
-    } else if (!user.stripeCustomerId) {
+    } else {
+      // Lock the per-user trial gate (and backfill stripeCustomerId if
+      // missing) so a future cancel + re-signup can't re-claim a trial.
       await tx
         .update(users)
-        .set({ stripeCustomerId })
+        .set({
+          hasUsedTrial: true,
+          ...(user.stripeCustomerId ? {} : { stripeCustomerId }),
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, user.id))
     }
 
@@ -244,7 +291,7 @@ async function fulfillTrialSetup({
       .returning()
 
     // Create license with trial period (Upsert to ensure 1 license per user)
-    await tx
+    const [license] = await tx
       .insert(licenses)
       .values({
         userId: user.id,
@@ -277,6 +324,29 @@ async function fulfillTrialSetup({
           updatedAt: new Date(),
         },
       })
+      .returning()
+
+    // Refresh R2 metadata for any domains the user already had attached
+    // (typical case: a free-plan user trialing into Pro). The license id
+    // is preserved by the upsert, so those rows still link here — they
+    // just need a fresh JSON snapshot reflecting the new plan_name and
+    // is_trial / trial_ends_at fields.
+    if (license) {
+      const existingDomains = await tx
+        .select({ domainName: domains.domainName })
+        .from(domains)
+        .where(
+          and(eq(domains.licenseId, license.id), isNull(domains.deletedAt))
+        )
+
+      for (const d of existingDomains) {
+        exportJobsToEnqueue.push({
+          domainName: d.domainName,
+          userId: user.id,
+          action: "upsert",
+        })
+      }
+    }
 
     await createAuditLog(
       user.id,
@@ -291,6 +361,17 @@ async function fulfillTrialSetup({
       tx
     )
   })
+
+  // Enqueue R2 jobs after the transaction commits — the worker reads
+  // license/plan rows directly and would race the in-flight tx otherwise.
+  for (const job of exportJobsToEnqueue) {
+    await enqueueLicenseMetadataExportJob(job).catch((err) => {
+      console.error(
+        `[webhook] Failed to enqueue export for ${job.domainName} (trial setup):`,
+        err
+      )
+    })
+  }
 }
 async function fulfillOrder({
   email,
@@ -371,6 +452,13 @@ async function fulfillOrder({
           email: normalizedEmail,
           emailVerified: true,
           stripeCustomerId: stripeCustomerId || null,
+          // Lock the per-user trial gate at user-creation time when this
+          // fulfillment is for a trial. The earlier branch in
+          // handleCheckoutCompleted only updates EXISTING users; without
+          // setting it here, a fresh email going through the webhook
+          // trial path would leave hasUsedTrial=false and the same email
+          // could re-trial.
+          hasUsedTrial: !!isTrial,
         })
         .returning()
       user = newUser
@@ -438,6 +526,43 @@ async function fulfillOrder({
 
     if (!plan) {
       throw new Error(`Plan ${planId} not found`)
+    }
+
+    // Defense against accidental clobber of an existing lifetime license.
+    // The license upsert below is keyed on `userId` and replaces every
+    // field — without this guard, any subsequent checkout (legit upgrade
+    // attempt, reused-email signup, replayed event) would silently
+    // overwrite the user's lifetime grant. Skip fulfillment unless the
+    // new order is itself lifetime; lifetime → lifetime is a no-op since
+    // the row is already correct.
+    const [preexisting] = await tx
+      .select({
+        id: licenses.id,
+        isLifetime: licenses.isLifetime,
+        planId: licenses.planId,
+      })
+      .from(licenses)
+      .where(eq(licenses.userId, userRecord.id))
+      .limit(1)
+
+    if (preexisting?.isLifetime && plan.mode !== "lifetime") {
+      console.warn(
+        `[webhook] Skipping fulfillment that would overwrite lifetime license ${preexisting.id} for user ${userRecord.id} (incoming plan ${planId}, mode ${plan.mode}).`
+      )
+      await createAuditLog(
+        userRecord.id,
+        "webhook.fulfillment_blocked_lifetime",
+        "license",
+        preexisting.id,
+        {
+          userId: userRecord.id,
+          incomingPlanId: planId,
+          incomingMode: plan.mode,
+          paymentId,
+        },
+        tx
+      )
+      return
     }
 
     // Determine billing cycle and lifetime status
@@ -537,8 +662,20 @@ async function fulfillOrder({
 
     // Handle Domain Attachments from metadata
     for (const domainName of submittedDomains) {
+      if (typeof domainName !== "string") continue
       const normalized = normalizeDomain(domainName)
       if (!normalized) continue
+      // Reject malformed/non-Shopify input from checkout metadata. Without
+      // this, anything passing the loose `z.array(z.string())` check at
+      // the API layer would land in the `domains` table and propagate
+      // into R2 metadata exports.
+      const validation = validateDomain(normalized)
+      if (!validation.valid) {
+        console.warn(
+          `[webhook] Skipping invalid domain in metadata: ${domainName} (${validation.error})`
+        )
+        continue
+      }
 
       // Check if domain already exists for this license
       const [existingDomain] = await tx
@@ -746,11 +883,39 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Amount Verification: Ensure they paid what was expected (considering promo codes)
-  // We allow amount_total to be less than finalPrice if promotion codes are allowed
-  if (session.amount_total !== null && session.amount_total > plan.finalPrice) {
+  // We allow amount_total to be less than finalPrice if promotion codes are allowed.
+  // For yearly plans we use the yearly base (monthly × 12) as the cap.
+  const isYearlyMeta = metadata.is_yearly === "true"
+  const baseMonthly =
+    plan.mode === "yearly"
+      ? plan.finalPrice
+      : plan.finalPrice
+  const maxExpected = isYearlyMeta ? baseMonthly * 12 : plan.finalPrice
+
+  if (session.amount_total !== null && session.amount_total > maxExpected) {
     throw new Error(
       `[webhook] Security Alert: Amount exceeds plan price for session ${session.id}. ` +
-        `Max expected ${plan.finalPrice}, received ${session.amount_total}. fulfillment aborted.`
+        `Max expected ${maxExpected}, received ${session.amount_total}. fulfillment aborted.`
+    )
+  }
+
+  // Floor check: a paid (non-trial) checkout that comes through with $0
+  // is suspicious unless we explicitly attached a 100%-off promo (which
+  // would arrive on the session as a discount we recognize). Since we
+  // can't fully reason about every coupon configuration, we require at
+  // minimum that one of the following is true for amount_total === 0:
+  //   - the metadata says this is a trial (trial subscriptions legitimately
+  //     have $0 today, charged later), OR
+  //   - the plan itself is free (handled in the API, not here, but defensive), OR
+  //   - the session carries an explicit discount line.
+  if (
+    !isTrial &&
+    plan.mode !== "free" &&
+    session.amount_total === 0 &&
+    !(session.total_details?.breakdown?.discounts?.length ?? 0)
+  ) {
+    throw new Error(
+      `[webhook] Security Alert: Paid plan ${planId} fulfilled at $0 with no recognized discount for session ${session.id}.`
     )
   }
 
@@ -767,6 +932,34 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       ? session.payment_intent
       : session.payment_intent?.id || null
 
+  // For trial subscriptions, prefer Stripe's authoritative `trial_end`
+  // over `Date.now() + trialDays`. This avoids server-clock drift and
+  // matches what Stripe will use to fire the first invoice.
+  const subscriptionObj =
+    expandedSession.subscription &&
+    typeof expandedSession.subscription !== "string"
+      ? (expandedSession.subscription as Stripe.Subscription)
+      : null
+
+  const stripeTrialEnd = subscriptionObj?.trial_end
+    ? new Date(subscriptionObj.trial_end * 1000)
+    : null
+
+  // Lock the per-user trial gate so cancel + re-signup can't re-trial.
+  if (isTrial) {
+    const [existingUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, customerEmail.toLowerCase().trim()))
+      .limit(1)
+    if (existingUser) {
+      await db
+        .update(users)
+        .set({ hasUsedTrial: true, updatedAt: new Date() })
+        .where(eq(users.id, existingUser.id))
+    }
+  }
+
   await fulfillOrder({
     email: customerEmail,
     name: contactName || session.customer_details?.name || undefined,
@@ -782,16 +975,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     amount: session.amount_total || 0,
     currency: session.currency || "usd",
     isTrial: isTrial,
-    trialEndsAt: isTrial
-      ? new Date(Date.now() + plan.trialDays * 86400000)
-      : undefined,
-    nextRenewalDate:
-      expandedSession.subscription &&
-      typeof expandedSession.subscription !== "string"
-        ? new Date(
-            (expandedSession.subscription as any).current_period_end * 1000
-          )
-        : null,
+    trialEndsAt:
+      stripeTrialEnd ||
+      (isTrial ? new Date(Date.now() + plan.trialDays * 86400000) : undefined),
+    nextRenewalDate: subscriptionObj
+      ? stripeTrialEnd ||
+        new Date((subscriptionObj as any).current_period_end * 1000)
+      : null,
     stripeSubscriptionId:
       typeof expandedSession.subscription === "string"
         ? expandedSession.subscription
@@ -1123,10 +1313,16 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     if (subscriptionId)
       conditions.push(eq(payments.stripeSubscriptionId, subscriptionId))
 
+    // Sync amount + currency from the invoice too. When a trial converts
+    // (or after an in-trial upgrade), the original `trialing` payment row
+    // may have a stale amount; this brings it in line with what was
+    // actually charged.
     await db
       .update(payments)
       .set({
         status: invoice.status || "paid",
+        amount: invoice.amount_paid || invoice.amount_due,
+        currency: invoice.currency,
         stripeInvoiceId: invoice.id,
         stripeInvoiceUrl: invoice.hosted_invoice_url,
         updatedAt: new Date(),
@@ -1141,11 +1337,28 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       : null
 
   if (license) {
-    // If license exists, update its renewal date and ensure it's active
+    // Determine whether the invoice that just paid is itself a trial
+    // invoice (Stripe occasionally fires payment_succeeded for the $0
+    // trial-period invoice). If so, the subscription is still trialing
+    // and we must NOT clobber `status: "trialing"` with `"active"` —
+    // that would make the public license JSON look post-trial while the
+    // user is mid-trial.
+    const trialEndUnix =
+      (invoice as any).subscription_details?.trial_end ||
+      (invoice as any).parent?.subscription_details?.trial_end ||
+      null
+    const invoiceTrialEnd = trialEndUnix
+      ? new Date(trialEndUnix * 1000)
+      : null
+    const isStillTrialing =
+      invoice.amount_paid === 0 &&
+      !!invoiceTrialEnd &&
+      invoiceTrialEnd.getTime() > Date.now()
+
     await db
       .update(licenses)
       .set({
-        status: "active",
+        status: isStillTrialing ? "trialing" : "active",
         nextRenewalDate: nextRenewalDate,
         updatedAt: new Date(),
       })
@@ -1205,6 +1418,21 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     }
 
     if (metadata.plan_id) {
+      // Detect trial state from the invoice. If `subscription_details.
+      // trial_end` is in the future, the subscription is currently
+      // trialing and the license must reflect that — otherwise
+      // fulfillOrder defaults `isTrial` to false and the public R2 JSON
+      // ends up with `is_trial: false` / `trial_ends_at: null` for what
+      // is really a live trial.
+      const trialEndUnix =
+        (invoice as any).subscription_details?.trial_end ||
+        (invoice as any).parent?.subscription_details?.trial_end ||
+        null
+      const trialEndsAt = trialEndUnix ? new Date(trialEndUnix * 1000) : null
+      const isTrialActive = !!(
+        trialEndsAt && trialEndsAt.getTime() > Date.now()
+      )
+
       await fulfillOrder({
         email:
           invoice.customer_email ||
@@ -1223,9 +1451,8 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
             : invoice.customer?.id || null,
         amount: invoice.amount_paid,
         currency: invoice.currency,
-        trialEndsAt: (invoice as any).subscription_details?.trial_end
-          ? new Date((invoice as any).subscription_details.trial_end * 1000)
-          : null,
+        isTrial: isTrialActive,
+        trialEndsAt,
         stripeInvoiceId: invoice.id,
         stripeInvoiceUrl: invoice.hosted_invoice_url,
         nextRenewalDate: nextRenewalDate,
@@ -1237,53 +1464,38 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   if (!license.isTrial) return
 
-  // Trial payment succeeded! Convert to lifetime if amount is > 0
+  // Trial payment succeeded — the trial just converted into a paid
+  // subscription. Clear the trial flags. The earlier `if (license)` block
+  // already updated status + nextRenewalDate from the invoice, and the
+  // payments-row sync block above marked the row paid.
   if (invoice.amount_paid > 0) {
-    await db.transaction(async (tx) => {
-      // 1. Mark license as no longer trial and set as Lifetime
-      await tx
+    await db
+      .update(licenses)
+      .set({
+        isTrial: false,
+        trialEndsAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(licenses.id, license.id))
+
+    // Lifetime trial only: a lifetime product is one-time, so once the
+    // trial pays out we cancel the recurring subscription. Monthly/yearly
+    // trials must KEEP the subscription alive — cancelling it here was a
+    // bug that left users with a ghost license and no future billing.
+    if (license.billingCycle === "lifetime") {
+      await db
         .update(licenses)
-        .set({
-          status: "active",
-          isTrial: false,
-          isLifetime: true,
-          trialEndsAt: null,
-          updatedAt: new Date(),
-        })
+        .set({ isLifetime: true, updatedAt: new Date() })
         .where(eq(licenses.id, license.id))
 
-      // 2. Mark payment as paid and store invoice info
-      // Fix: lookup the payment record via the order
-      if (license.sourceOrderId) {
-        const [order] = await tx
-          .select({ paymentId: orders.paymentId })
-          .from(orders)
-          .where(eq(orders.id, license.sourceOrderId))
-          .limit(1)
-
-        if (order?.paymentId) {
-          await tx
-            .update(payments)
-            .set({
-              status: "paid",
-              stripeInvoiceId: invoice.id || null,
-              stripeInvoiceUrl: invoice.hosted_invoice_url || null,
-              stripePaymentIntentId: pi || null,
-              updatedAt: new Date(),
-            })
-            .where(eq(payments.id, order.paymentId))
-        }
-      }
-
-      // 3. Cancel the subscription so they aren't charged again (Lifetime requirement)
       const stripe = getStripe()
       await stripe.subscriptions.cancel(subscriptionId).catch((err) => {
         console.error(
-          `[webhook] Failed to cancel subscription ${subscriptionId}:`,
+          `[webhook] Failed to cancel lifetime trial subscription ${subscriptionId}:`,
           err
         )
       })
-    })
+    }
   }
 
   // Trigger R2 update for all domains on this license
@@ -1302,13 +1514,16 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   await createAuditLog(
     license.userId,
-    "license.trial_to_lifetime",
+    license.billingCycle === "lifetime"
+      ? "license.trial_to_lifetime"
+      : "license.trial_converted",
     "license",
     license.id,
     {
       userId: license.userId,
       subscriptionId,
       invoiceId: invoice.id,
+      billingCycle: license.billingCycle,
     }
   )
 }
@@ -1388,6 +1603,12 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const isTrialCancellation =
     subscription.trial_end && subscription.status === "canceled"
 
+  // Track domains that need an R2 refresh after the license flips to free.
+  // The worker reads the current license/plan state, so a single `upsert`
+  // job per domain is enough to overwrite the old pro-plan JSON. We collect
+  // here, enqueue after commit (avoid racing the in-flight tx).
+  const domainsToRefresh: { domainName: string }[] = []
+
   // Transition to Free Plan instead of revoking
   await db.transaction(async (tx) => {
     // 1. Find the Starter (Free) plan
@@ -1430,9 +1651,34 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       })
       .where(eq(licenses.id, license.id))
 
-    // 3. Keep existing domains but they might be limited by slots if necessary
-    // (Here we assume they stay, but since slots might be 1, if they had more they might need to manage them)
+    // 3. Collect active domains for post-commit R2 refresh. Domains stay
+    //    attached on downgrade; we just need the JSON to reflect the new
+    //    free plan_name and cleared trial fields.
+    const activeDomains = await tx
+      .select({ domainName: domains.domainName })
+      .from(domains)
+      .where(and(eq(domains.licenseId, license.id), isNull(domains.deletedAt)))
+
+    for (const dom of activeDomains) {
+      domainsToRefresh.push({ domainName: dom.domainName })
+    }
   })
+
+  // Enqueue R2 upsert jobs after the transaction commits so the worker
+  // reads the just-saved free-plan state. Without this, the cancel-to-free
+  // auto-conversion at period end leaves stale pro-plan JSON in R2.
+  for (const { domainName } of domainsToRefresh) {
+    await enqueueLicenseMetadataExportJob({
+      domainName,
+      userId: license.userId,
+      action: "upsert",
+    }).catch((err) => {
+      console.error(
+        `[webhook] Failed to enqueue R2 refresh for ${domainName} (sub deleted):`,
+        err
+      )
+    })
+  }
 
   await createAuditLog(
     license.userId,
@@ -1476,10 +1722,28 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     return
   }
 
+  const newIsTrial = subscription.status === "trialing"
+  const oldTrialEndIso = license.trialEndsAt
+    ? license.trialEndsAt.toISOString()
+    : null
+  const newTrialEndIso = trialEndsAt ? trialEndsAt.toISOString() : null
+
+  // Anything that affects the public license JSON should trigger an R2
+  // refresh: trial flag flipping, trial-end date moving, or the
+  // subscription transitioning to canceled/past_due. Without this, a
+  // trialing→active conversion (or an in-trial date change) updates the
+  // DB but the public `<domain>.json` keeps the old `is_trial` /
+  // `trial_ends_at` values.
+  const r2NeedsRefresh =
+    license.isTrial !== newIsTrial ||
+    oldTrialEndIso !== newTrialEndIso ||
+    subscription.status === "canceled" ||
+    subscription.status === "past_due"
+
   await db
     .update(licenses)
     .set({
-      isTrial: subscription.status === "trialing",
+      isTrial: newIsTrial,
       trialEndsAt: trialEndsAt,
       status: subscription.status,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
@@ -1487,11 +1751,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     })
     .where(eq(licenses.id, license.id))
 
-  // If status changed to canceled (immediate) or past_due, we should update R2 to revoke access
-  if (
-    subscription.status === "canceled" ||
-    subscription.status === "past_due"
-  ) {
+  if (r2NeedsRefresh) {
     const licenseDomains = await db
       .select()
       .from(domains)
@@ -1501,7 +1761,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       await enqueueLicenseMetadataExportJob({
         domainName: dom.domainName,
         userId: license.userId,
-        action: "upsert", // The worker will detect the status and delete the R2 file
+        action: "upsert", // The worker re-reads the license and writes
+        // either the fresh JSON (active/trialing) or deletes the file
+        // (canceled/past_due/revoked).
       })
     }
   }
@@ -1630,14 +1892,32 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     return
   }
 
+  // Distinguish full vs partial refunds. A partial refund (support credit,
+  // dispute reduction) should NOT revoke the license — only mark the
+  // payment row so it surfaces in billing history. Stripe sets
+  // `charge.refunded === true` only when the entire amount has been
+  // refunded; we double-check `amount_refunded >= amount` to be safe
+  // across API versions.
+  const isFullRefund =
+    charge.refunded === true || charge.amount_refunded >= charge.amount
+
   // Update payment status
   await db
     .update(payments)
     .set({
-      status: "refunded",
+      status: isFullRefund ? "refunded" : "partially_refunded",
       updatedAt: new Date(),
     })
     .where(eq(payments.id, payment.id))
+
+  if (!isFullRefund) {
+    // Partial refund: log and stop. No license revocation, no domain
+    // teardown — the user is still entitled.
+    console.log(
+      `[webhook] Partial refund for payment ${payment.id} (refunded ${charge.amount_refunded} of ${charge.amount}); license retained.`
+    )
+    return
+  }
 
   // Find order associated with this payment
   const [order] = await db

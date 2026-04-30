@@ -156,7 +156,7 @@ const LandingHero: React.FC = () => {
           </div>
 
           {/* Scrolling Showcase */}
-          <div className="group relative h-[350px] overflow-hidden lg:h-[800px]">
+          <div className="group relative h-87.5 overflow-hidden lg:h-200">
             {/* Desktop: Vertical Columns */}
             <div className="hidden h-full grid-cols-2 gap-4 lg:grid">
               <div className="animate-vertical-loop-slow space-y-4">

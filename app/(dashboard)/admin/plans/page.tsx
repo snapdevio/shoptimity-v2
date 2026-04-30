@@ -114,7 +114,7 @@ export default function AdminPlansPage() {
             href={row.stripePaymentLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-primary hover:underline"
+            className="flex cursor-pointer items-center gap-1 text-primary hover:underline"
           >
             Link <ExternalLink className="size-3" />
           </a>

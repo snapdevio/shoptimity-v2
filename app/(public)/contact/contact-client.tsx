@@ -336,7 +336,7 @@ export function ContactClient() {
               <CardHeader>
                 <a
                   href="mailto:support@shoptimity.com"
-                  className="group flex items-center gap-3"
+                  className="group flex cursor-pointer items-center gap-3"
                 >
                   <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
                     <Mail className="size-5 text-primary" />

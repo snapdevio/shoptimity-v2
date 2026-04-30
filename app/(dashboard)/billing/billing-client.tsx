@@ -363,6 +363,56 @@ export function BillingClient({
 
   const defaultCard = initialCards.find((c) => c.isDefault) || initialCards[0]
 
+  // Single source of truth for the prices shown in the plan-details strip.
+  // Both "Next Payment" and "Subscription" read from this so they can never
+  // disagree. Three layered values:
+  //   - regularAmount: the plan's regular per-cycle price (yearly discount
+  //     baked in for yearly cycles) — what the user pays once retention
+  //     expires.
+  //   - effectiveAmount: regularAmount with any active retention coupon
+  //     applied — what Stripe will actually charge on the upcoming invoice.
+  //   - hasRetention: whether a retention coupon is currently attached AND
+  //     still has cycles left, so the UI can show the discounted amount in
+  //     emerald + render the regular price as struck-through context.
+  const planPriceView = useMemo(() => {
+    const isYearly = activeLicense?.billingCycle === "yearly"
+    const cycleSuffix = isYearly ? "/yr" : "/mo"
+
+    if (!activeLicense?.plan?.finalPrice) {
+      return {
+        hasRetention: false,
+        regularAmount: 0,
+        effectiveAmount: 0,
+        cycleSuffix,
+      }
+    }
+
+    let regularAmount: number
+    if (isYearly) {
+      if (activeLicense.plan?.mode === "yearly") {
+        regularAmount = activeLicense.plan.finalPrice
+      } else {
+        const monthly = activeLicense.plan.finalPrice
+        const yd = (activeLicense.plan.yearlyDiscountPercentage || 0) / 100
+        regularAmount = monthly * 12 * (1 - yd)
+      }
+    } else {
+      regularAmount = activeLicense.plan.finalPrice
+    }
+
+    const hasRetention =
+      !!activeDiscount &&
+      activeDiscount.discountedNextAmount != null &&
+      (activeDiscount.remainingCycles == null ||
+        activeDiscount.remainingCycles > 0)
+
+    const effectiveAmount = hasRetention
+      ? (activeDiscount!.discountedNextAmount as number)
+      : regularAmount
+
+    return { hasRetention, regularAmount, effectiveAmount, cycleSuffix }
+  }, [activeLicense, activeDiscount])
+
   return (
     <Elements stripe={stripePromise}>
       <div className="flex-1 overflow-x-hidden overflow-y-auto">
@@ -396,7 +446,7 @@ export function BillingClient({
                       <button
                         onClick={handleReactivate}
                         disabled={isPending === "reactivate"}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-bold text-emerald-700 transition-all hover:bg-emerald-100 active:scale-95 disabled:opacity-50 sm:w-auto"
+                        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-bold text-emerald-700 transition-all hover:bg-emerald-100 active:scale-95 disabled:opacity-50 sm:w-auto"
                       >
                         {isPending === "reactivate" && (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -522,90 +572,44 @@ export function BillingClient({
                     <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                       Next Payment
                     </p>
-                    {(() => {
-                      if (activeLicense?.cancelAtPeriodEnd) {
-                        return (
-                          <p className="mt-1 text-sm font-bold text-slate-900">
-                            —
-                          </p>
-                        )
-                      }
-
-                      // Retention coupon active → the actual upcoming
-                      // charge (Stripe-computed) is what to surface here.
-                      const hasRetention =
-                        activeDiscount &&
-                        activeDiscount.discountedNextAmount != null &&
-                        (activeDiscount.remainingCycles == null ||
-                          activeDiscount.remainingCycles > 0)
-
-                      if (hasRetention) {
-                        return (
-                          <p className="mt-1 text-sm font-bold text-emerald-600">
-                            $
-                            {(
-                              (activeDiscount!.discountedNextAmount as number) /
-                              100
-                            ).toFixed(2)}
-                          </p>
-                        )
-                      }
-
-                      if (!activeLicense?.plan?.finalPrice) {
-                        return (
-                          <p className="mt-1 text-sm font-bold text-slate-900">
-                            $0.00
-                          </p>
-                        )
-                      }
-
-                      // Plan-based regular charge (with the plan's yearly
-                      // discount applied for yearly cycles). Branches on
-                      // plan.mode so a separate `mode: "yearly"` plan record
-                      // doesn't get double-multiplied.
-                      let regular: number
-                      if (activeLicense.billingCycle === "yearly") {
-                        if (activeLicense.plan?.mode === "yearly") {
-                          regular = activeLicense.plan.finalPrice
-                        } else {
-                          const monthly = activeLicense.plan.finalPrice
-                          const yd =
-                            (activeLicense.plan.yearlyDiscountPercentage || 0) /
-                            100
-                          regular = monthly * 12 * (1 - yd)
-                        }
-                      } else {
-                        regular = activeLicense.plan.finalPrice
-                      }
-
-                      return (
-                        <p className="mt-1 text-sm font-bold text-slate-900">
-                          ${(regular / 100).toFixed(2)}
-                        </p>
-                      )
-                    })()}
+                    {activeLicense?.cancelAtPeriodEnd ? (
+                      <p className="mt-1 text-sm font-bold text-slate-900">—</p>
+                    ) : (
+                      <p
+                        className={cn(
+                          "mt-1 text-sm font-bold",
+                          planPriceView.hasRetention
+                            ? "text-emerald-600"
+                            : "text-slate-900"
+                        )}
+                      >
+                        ${(planPriceView.effectiveAmount / 100).toFixed(2)}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                       Subscription
                     </p>
-                    <div className="mt-1 text-sm font-bold text-slate-900">
-                      {(() => {
-                        if (!activeLicense?.plan?.finalPrice) return "$0.00"
-                        const isYearly = activeLicense.billingCycle === "yearly"
-                        if (isYearly) {
-                          if (activeLicense.plan?.mode === "yearly") {
-                            return `$${(activeLicense.plan.finalPrice / 100).toFixed(2)}/yr`
-                          }
-                          const monthly = activeLicense.plan.finalPrice
-                          const discount =
-                            (activeLicense.plan.yearlyDiscountPercentage || 0) /
-                            100
-                          const yearlyTotal = monthly * 12 * (1 - discount)
-                          return `$${(yearlyTotal / 100).toFixed(2)}/yr`
-                        }
-                        return `$${(activeLicense.plan.finalPrice / 100).toFixed(2)}/mo`
-                      })()}
+                    <div
+                      className={cn(
+                        "mt-1 flex items-baseline justify-center gap-1.5 text-sm font-bold",
+                        planPriceView.hasRetention
+                          ? "text-emerald-600"
+                          : "text-slate-900"
+                      )}
+                    >
+                      <span>
+                        ${(planPriceView.effectiveAmount / 100).toFixed(2)}
+                        {planPriceView.cycleSuffix}
+                      </span>
+                      {planPriceView.hasRetention &&
+                        planPriceView.regularAmount >
+                          planPriceView.effectiveAmount && (
+                          <span className="text-[11px] font-medium text-slate-400 line-through">
+                            ${(planPriceView.regularAmount / 100).toFixed(2)}
+                          </span>
+                        )}
                     </div>
                   </div>
                   <div>
@@ -679,7 +683,7 @@ export function BillingClient({
                   {!isEditingBilling ? (
                     <button
                       onClick={() => setIsEditingBilling(true)}
-                      className="text-sm font-bold text-primary hover:underline"
+                      className="cursor-pointer text-sm font-bold text-primary hover:underline"
                     >
                       Edit
                     </button>
@@ -687,14 +691,14 @@ export function BillingClient({
                     <div className="flex gap-3">
                       <button
                         onClick={() => setIsEditingBilling(false)}
-                        className="text-sm font-bold text-slate-400 hover:text-slate-600"
+                        className="cursor-pointer text-sm font-bold text-slate-400 hover:text-slate-600"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleSaveBilling}
                         disabled={isSavingBilling}
-                        className="flex items-center gap-2 text-sm font-bold text-primary hover:underline disabled:opacity-50"
+                        className="flex cursor-pointer items-center gap-2 text-sm font-bold text-primary hover:underline disabled:opacity-50"
                       >
                         {isSavingBilling && (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -922,7 +926,7 @@ export function BillingClient({
                     <button
                       onClick={handleAddCard}
                       disabled={isInitializingSetup}
-                      className="flex h-9 items-center gap-2 rounded-lg bg-slate-900 px-4 text-xs font-bold text-white transition-all hover:bg-black active:scale-95 disabled:opacity-50"
+                      className="flex h-9 cursor-pointer items-center gap-2 rounded-lg bg-slate-900 px-4 text-xs font-bold text-white transition-all hover:bg-black active:scale-95 disabled:opacity-50"
                     >
                       {isInitializingSetup ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -1000,7 +1004,7 @@ export function BillingClient({
                               {!card.isDefault && (
                                 <button
                                   onClick={() => handleSetDefault(card.id)}
-                                  className="rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-primary"
+                                  className="cursor-pointer rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-primary"
                                   title="Set as Default"
                                 >
                                   <Check className="h-4 w-4" />
@@ -1009,7 +1013,7 @@ export function BillingClient({
                               {initialCards.length > 1 && (
                                 <button
                                   onClick={() => handleRemoveCard(card.id)}
-                                  className="rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-red-500"
+                                  className="cursor-pointer rounded-lg p-2 text-slate-400 transition-all hover:bg-white hover:text-red-500"
                                   title="Remove Card"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -1109,7 +1113,7 @@ export function BillingClient({
                               href={payment.stripeInvoiceUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-[12px] font-bold text-primary hover:underline"
+                              className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-bold text-primary hover:underline"
                             >
                               <FileText className="h-3 w-3" />
                               View
@@ -1205,6 +1209,33 @@ export function BillingClient({
                     You're switching from the{" "}
                     <strong>{upgradePreview.currentPlan}</strong> (Monthly) to
                     the <strong>{upgradePreview.newPlan}</strong>.
+                    {upgradePreview.isTrialUpgrade && (
+                      <>
+                        {" "}
+                        Your free trial continues — no charge today. You'll be
+                        billed{" "}
+                        <strong>
+                          ${(upgradePreview.finalYearlyAmount / 100).toFixed(2)}
+                        </strong>{" "}
+                        when your trial ends
+                        {upgradePreview.trialEndsAt && (
+                          <>
+                            {" "}
+                            on{" "}
+                            <strong>
+                              {new Date(
+                                upgradePreview.trialEndsAt
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </strong>
+                          </>
+                        )}
+                        .
+                      </>
+                    )}
                   </p>
 
                   <div className="mt-6 space-y-4 rounded-xl bg-slate-50 p-4">
@@ -1257,19 +1288,40 @@ export function BillingClient({
                         ${(upgradePreview.chargeAmount / 100).toFixed(2)}
                       </span>
                     </div>
-                    {upgradePreview.nextRenewalDate && (
+                    {upgradePreview.isTrialUpgrade &&
+                    upgradePreview.trialEndsAt ? (
                       <p className="border-t border-slate-200 pt-3 text-center text-[11px] text-slate-500">
-                        Your next yearly renewal will be on{" "}
+                        First yearly charge of{" "}
+                        <span className="font-bold text-slate-700">
+                          ${(upgradePreview.finalYearlyAmount / 100).toFixed(2)}
+                        </span>{" "}
+                        on{" "}
                         <span className="font-bold text-slate-700">
                           {new Date(
-                            upgradePreview.nextRenewalDate
+                            upgradePreview.trialEndsAt
                           ).toLocaleDateString("en-US", {
                             month: "short",
                             day: "numeric",
                             year: "numeric",
                           })}
-                        </span>
+                        </span>{" "}
+                        (when your trial ends).
                       </p>
+                    ) : (
+                      upgradePreview.nextRenewalDate && (
+                        <p className="border-t border-slate-200 pt-3 text-center text-[11px] text-slate-500">
+                          Your next yearly renewal will be on{" "}
+                          <span className="font-bold text-slate-700">
+                            {new Date(
+                              upgradePreview.nextRenewalDate
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </p>
+                      )
                     )}
                   </div>
 

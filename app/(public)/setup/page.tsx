@@ -29,42 +29,42 @@ const steps = [
     title: "Choose a Plan",
     description:
       "Browse our premium plan designed for focused growth. Each account includes a single license slot, which can be used for one Shopify store domain at a time. This ensures optimal performance and dedicated usage for your store.",
-    image: "/assets/setup/step-1.png",
+    image: "/shoptimity-v2/assets/setup/pricing.webp",
   },
   {
     icon: Mail,
     title: "Complete Checkout",
     description:
       "Our checkout process is fast and fully secured by Stripe. Simply enter your payment details, and you'll receive an instant confirmation email and access to your customer portal.",
-    image: "/assets/setup/step-2.png",
+    image: "/shoptimity-v2/assets/setup/checkout.webp",
   },
   {
     icon: LogIn,
     title: "Access Your Dashboard",
     description:
       "Sign in using Google, Microsoft, or your email and password. Once logged in, you can manage your theme licenses and assets from a single dashboard.",
-    image: "/assets/setup/step-3.png",
+    image: "/shoptimity-v2/assets/setup/login.webp",
   },
   {
     icon: Globe,
     title: "Add Your Store Domains",
     description:
       "Enter your Shopify .myshopify.com domain to assign your license. Each account supports one active domain per license slot.",
-    image: "/assets/setup/step-4.png",
+    image: "/shoptimity-v2/assets/setup/assign-domain.webp",
   },
   {
     icon: Download,
     title: "Download Theme Templates",
     description:
       "Access our premium template library and download the latest theme builds in ZIP format. Our themes are optimized for performance and conversion right out of the box.",
-    image: "/assets/setup/step-5.png",
+    image: "/shoptimity-v2/assets/setup/download-template.webp",
   },
   {
     icon: ShieldCheck,
     title: "Final Activation",
     description:
       "Upload the ZIP file to your Shopify Admin. Your license will automatically activate once the theme is installed on a registered domain. You're now ready to build!",
-    image: "/assets/setup/step-6.png",
+    image: "/shoptimity-v2/assets/setup/assign-license.webp",
   },
 ]
 
@@ -141,7 +141,7 @@ export default function SetupPage() {
                   <div className="pt-4">
                     <Link
                       href={index === 0 ? "/plans" : "/contact"}
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
+                      className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
                     >
                       {index === 0 ? "Browse Plans" : "Learn More"}
                       <ArrowRight className="size-4" />
@@ -190,13 +190,13 @@ export default function SetupPage() {
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link
               href="/plans"
-              className="rounded-xl bg-white px-8 py-4 font-bold text-primary shadow-xl transition-all hover:bg-base-100 hover:shadow-2xl"
+              className="cursor-pointer rounded-xl bg-white px-8 py-4 font-bold text-primary shadow-xl transition-all hover:bg-base-100 hover:shadow-2xl"
             >
               Choose Your Plan
             </Link>
             <Link
               href="/contact"
-              className="rounded-xl border-2 border-white/20 px-8 py-4 font-bold text-white transition-all hover:bg-white/5"
+              className="cursor-pointer rounded-xl border-2 border-white/20 px-8 py-4 font-bold text-white transition-all hover:bg-white/5"
             >
               Talk to Our Experts
             </Link>

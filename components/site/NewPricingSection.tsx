@@ -209,7 +209,7 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
     <section className="relative bg-base-100 py-16 md:py-24" id="pricing">
       <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-10">
         <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
-          <div className="scroll-animate relative h-auto justify-center rounded-[38px] border p-2 shadow-[0_10px_50px_rgba(0,0,0,0.05)] lg:sticky lg:top-[120px] lg:p-6">
+          <div className="scroll-animate relative h-auto justify-center rounded-[38px] border p-2 shadow-[0_10px_50px_rgba(0,0,0,0.05)] lg:sticky lg:top-30 lg:p-6">
             <div className="relative z-0 mx-auto h-full w-full rounded-[28px]">
               <img
                 src="/assets/pricing-image.webp"
@@ -241,7 +241,7 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                   onClick={() =>
                     setBillingCycle(isYearly ? "monthly" : "yearly")
                   }
-                  className="relative h-7 w-14 rounded-full bg-base-200 p-1 transition-colors hover:bg-base-200/80"
+                  className="relative h-7 w-14 cursor-pointer rounded-full bg-base-200 p-1 transition-colors hover:bg-base-200/80"
                 >
                   <div
                     className={cn(
@@ -509,7 +509,7 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                 Need more info? Read the full{" "}
                 <a
                   href="/setup"
-                  className="text-primary underline-offset-4 hover:underline"
+                  className="cursor-pointer text-primary underline-offset-4 hover:underline"
                 >
                   Setup Guide
                 </a>

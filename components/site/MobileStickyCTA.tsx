@@ -61,7 +61,7 @@ const MobileStickyCTA = () => {
       <div className="flex flex-col items-center gap-2">
         <button
           onClick={scrollToPricing}
-          className=":scale-[0.98] flex h-[56px] w-full cursor-pointer items-center justify-center rounded-full bg-[linear-gradient(135deg,#FD784E_0%,#F06A42_60%,#D95734_100%)] font-sans text-base font-normal text-white shadow-[0_10px_25px_rgba(253,120,78,0.35)] transition duration-300 hover:-translate-y-[2px] hover:shadow-[0_14px_30px_rgba(253,120,78,0.45)]"
+          className=":scale-[0.98] flex h-14 w-full cursor-pointer items-center justify-center rounded-full bg-[linear-gradient(135deg,#FD784E_0%,#F06A42_60%,#D95734_100%)] font-sans text-base font-normal text-white shadow-[0_10px_25px_rgba(253,120,78,0.35)] transition duration-300 hover:-translate-y-[2px] hover:shadow-[0_14px_30px_rgba(253,120,78,0.45)]"
         >
           Get Shoptimity Now
           <ArrowRight className="ml-2 h-5 w-5" />

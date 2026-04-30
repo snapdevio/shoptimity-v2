@@ -106,8 +106,8 @@ export default function ReviewAppFaqPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-base-100 pt-32 pb-24">
       {/* Background blobs */}
-      <div className="absolute -top-40 -left-20 h-[500px] w-[500px] shrink-0 rounded-full bg-gradient-to-br from-[#ff602e]/5 to-transparent opacity-50 blur-3xl" />
-      <div className="absolute right-0 bottom-0 h-[400px] w-[400px] shrink-0 rounded-full bg-gradient-to-tl from-[#ff6fb5]/5 to-transparent opacity-50 blur-3xl" />
+      <div className="absolute -top-40 -left-20 h-125 w-125 shrink-0 rounded-full bg-gradient-to-br from-[#ff602e]/5 to-transparent opacity-50 blur-3xl" />
+      <div className="absolute right-0 bottom-0 h-100 w-100 shrink-0 rounded-full bg-gradient-to-tl from-[#ff6fb5]/5 to-transparent opacity-50 blur-3xl" />
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <div className="mb-20 text-center">
@@ -185,7 +185,7 @@ export default function ReviewAppFaqPage() {
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
                 href="/contact"
-                className="inline-flex items-center gap-2 rounded-full bg-white px-10 py-4 text-sm font-bold text-[#1a1a1a] shadow-xl transition-all hover:scale-105 active:scale-95"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-10 py-4 text-sm font-bold text-base-content shadow-xl transition-all hover:scale-105 active:scale-95"
               >
                 Let's Talk
                 <MessageCircle className="h-4 w-4" />

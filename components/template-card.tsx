@@ -37,7 +37,7 @@ export function TemplateCard({
 
   return (
     <Card className="group flex flex-col overflow-hidden border-none py-0 shadow-sm transition-all hover:shadow-md">
-      <div className="relative aspect-[16/10] w-full overflow-hidden">
+      <div className="relative aspect-16/10 w-full overflow-hidden">
         <TemplateImage
           src={template.img || ""}
           alt={template.title}
@@ -65,7 +65,7 @@ export function TemplateCard({
             onClick={handleDownload}
             className={cn(
               buttonVariants(),
-              "bg-orange-600 font-semibold text-white shadow-sm hover:bg-orange-700"
+              "cursor-pointer bg-orange-600 font-semibold text-white shadow-sm hover:bg-orange-700"
             )}
           >
             <DownloadIcon className="mr-2 size-4" />
@@ -76,7 +76,7 @@ export function TemplateCard({
             href="/plans"
             className={cn(
               buttonVariants(),
-              "bg-orange-600/10 font-semibold text-orange-600 shadow-none hover:bg-orange-600 hover:text-white"
+              "cursor-pointer bg-orange-600/10 font-semibold text-orange-600 shadow-none hover:bg-orange-600 hover:text-white"
             )}
           >
             <LockIcon className="mr-2 size-4" />
@@ -87,11 +87,14 @@ export function TemplateCard({
           href={template.previewLink || "#"}
           target="_blank"
           rel="noopener noreferrer"
-          className={buttonVariants({
-            variant: "outline",
-            className:
-              "!border !border-slate-400 bg-white/90 backdrop-blur-sm transition-colors hover:bg-white/60",
-          })}
+          className={cn(
+            "cursor-pointer",
+            buttonVariants({
+              variant: "outline",
+              className:
+                "border! border-slate-400! bg-white/90 backdrop-blur-sm transition-colors hover:bg-white/60",
+            })
+          )}
         >
           <ExternalLinkIcon className="mr-2 size-4" />
           Live Demo
