@@ -126,7 +126,7 @@ export async function removeCard(paymentMethodId: string) {
         )) as any
         if (
           customer.invoice_settings?.default_payment_method ===
-            paymentMethodId ||
+          paymentMethodId ||
           !customer.invoice_settings?.default_payment_method
         ) {
           await stripe.customers.update(user.stripeCustomerId, {
@@ -381,8 +381,16 @@ export async function applyRetentionDiscount(
       .limit(1)
 
     if (!license) return { error: "License not found" }
-    if (license.retentionDiscountUsed)
-      return { error: "Retention discount already used for this license" }
+    
+    // Note: we intentionally do NOT block on `license.retentionDiscountUsed`.
+    // The cancel-flow offer is plan-driven — admins control availability via
+    // the plan's `cancelApplyDiscount` toggle, not per-license bookkeeping.
+    // Re-applying overwrites the existing discount on the Stripe sub (the
+    // `discounts: [...]` arg below replaces, not appends), so there's no
+    // stacking. The `retentionDiscountUsed` / `retentionDiscountEndsAt`
+    // columns are kept as informational metadata only.
+    // if (license.retentionDiscountUsed)
+    //   return { error: "Retention discount already used for this license" }
 
     // Trial licenses store a `pm_*` / `seti_*` placeholder in
     // stripeSubscriptionId until the trial converts. Calling
@@ -568,10 +576,10 @@ export async function applyRetentionDiscount(
       success: true,
       nextPaymentDate: nextPaymentDate
         ? nextPaymentDate.toLocaleDateString("en-US", {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })
         : "your next billing date",
       amountDue,
     }
@@ -1197,9 +1205,9 @@ export async function upgradeSubscriptionToYearly(
           typeof (latestInvoice as any).payment_intent === "string"
             ? ((latestInvoice as any).payment_intent as string)
             : (
-                (latestInvoice as any)
-                  .payment_intent as Stripe.PaymentIntent | null
-              )?.id || null
+              (latestInvoice as any)
+                .payment_intent as Stripe.PaymentIntent | null
+            )?.id || null
 
         await db
           .insert(payments)

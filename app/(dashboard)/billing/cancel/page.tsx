@@ -122,10 +122,16 @@ export default async function CancelPlanPage() {
     !!activeLicense.stripeSubscriptionId &&
     activeLicense.stripeSubscriptionId.startsWith("sub_")
 
+  // Offer eligibility is plan-driven, not license-state-driven. We do NOT
+  // check `retentionDiscountUsed` / `retentionDiscountEndsAt` here — if the
+  // admin has the plan configured to extend a retention offer at cancel,
+  // every cancel attempt should surface it. Re-claiming overwrites the
+  // existing coupon on the Stripe subscription via `subscriptions.update`,
+  // so there's no stacking risk.
   const showDiscountOffer =
     hasRealSubscription &&
     plan?.cancelApplyDiscount &&
-    !activeLicense.retentionDiscountUsed &&
+    // !activeLicense.retentionDiscountUsed &&
     discountPercent > 0
 
   // Calculate the full price for the current billing cycle
