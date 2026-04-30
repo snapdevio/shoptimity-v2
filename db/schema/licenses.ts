@@ -55,6 +55,9 @@ export const licenses = pgTable(
     lastTrialReminderSent: varchar("last_trial_reminder_sent", { length: 20 }),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
     revokedReason: varchar("revoked_reason", { length: 50 }),
+    cancellationReason: varchar("cancellation_reason", { length: 100 }),
+    cancellationDetails: text("cancellation_details"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

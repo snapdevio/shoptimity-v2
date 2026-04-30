@@ -6,6 +6,8 @@ import { eq, and, isNull } from "drizzle-orm"
 import { getAppSession } from "@/lib/auth-session"
 import { getStripe } from "@/lib/stripe"
 import { enqueueLicenseMetadataExportJob } from "@/lib/queue"
+import { createAuditLog } from "@/lib/audit"
+import { isKnownCancellationReason } from "@/lib/cancellation-reasons"
 import { revalidatePath } from "next/cache"
 import Stripe from "stripe"
 
@@ -1404,7 +1406,10 @@ export async function upgradeSubscriptionToYearly(
   }
 }
 
-export async function downgradeToFreePlan(licenseId: string) {
+export async function downgradeToFreePlan(
+  licenseId: string,
+  cancellation?: { reason?: string | null; details?: string | null }
+) {
   const session = await getAppSession()
   if (!session) return { error: "Unauthorized" }
 
@@ -1423,6 +1428,23 @@ export async function downgradeToFreePlan(licenseId: string) {
     if (!subscriptionId) return { error: "No active Stripe subscription" }
 
     const stripe = getStripe()
+
+    // Normalize the supplied reason into a known label + free-text details.
+    // The reason column is small (varchar 100); anything unexpected falls
+    // through to "Other" with the raw string preserved in details so we
+    // don't silently lose what the user wrote.
+    const rawReason = cancellation?.reason?.trim() || null
+    const rawDetails = cancellation?.details?.trim() || null
+    const cancellationReason = rawReason
+      ? isKnownCancellationReason(rawReason)
+        ? rawReason
+        : "Other"
+      : null
+    const cancellationDetails =
+      cancellationReason === "Other"
+        ? rawDetails || rawReason
+        : rawDetails || null
+    const cancelledAt = new Date()
 
     //     // Matches anything starting with 'seti_' OR anything NOT starting with 'sub_'
     // const invalidPattern = /^(seti_|(?!sub_))/;
@@ -1453,7 +1475,10 @@ export async function downgradeToFreePlan(licenseId: string) {
             cancelAtPeriodEnd: false,
             trialEndsAt: null,
             nextRenewalDate: null,
-            updatedAt: new Date(),
+            cancellationReason,
+            cancellationDetails,
+            cancelledAt,
+            updatedAt: cancelledAt,
           })
           .where(eq(licenses.id, licenseId))
 
@@ -1461,6 +1486,20 @@ export async function downgradeToFreePlan(licenseId: string) {
         // the Free plan (was Pro/Trial before).
         await refreshLicenseR2(licenseId, session.userId)
       }
+
+      await createAuditLog(
+        session.userId,
+        "license.cancelled",
+        "license",
+        licenseId,
+        {
+          reason: cancellationReason,
+          details: cancellationDetails,
+          previousPlanId: license.planId,
+          previousSubscriptionId: subscriptionId,
+          immediateDowngrade: true,
+        }
+      )
 
       revalidatePath("/billing")
       return {
@@ -1479,9 +1518,27 @@ export async function downgradeToFreePlan(licenseId: string) {
       .update(licenses)
       .set({
         cancelAtPeriodEnd: true,
-        updatedAt: new Date(),
+        cancellationReason,
+        cancellationDetails,
+        cancelledAt,
+        updatedAt: cancelledAt,
       })
       .where(eq(licenses.id, licenseId))
+
+    await createAuditLog(
+      session.userId,
+      "license.cancelled",
+      "license",
+      licenseId,
+      {
+        reason: cancellationReason,
+        details: cancellationDetails,
+        previousPlanId: license.planId,
+        stripeSubscriptionId: subscriptionId,
+        immediateDowngrade: false,
+        cancelAt: (subscription as any).current_period_end,
+      }
+    )
 
     revalidatePath("/billing")
 

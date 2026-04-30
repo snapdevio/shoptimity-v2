@@ -32,6 +32,7 @@ import {
   CreditCard,
   Package,
 } from "lucide-react"
+import type Stripe from "stripe"
 import { getStripe } from "@/lib/stripe"
 import { db } from "@/db"
 import { plans } from "@/db/schema"
@@ -59,9 +60,7 @@ export default async function ThankYouPage({
     redirect("/")
   }
 
-  let session: Awaited<
-    ReturnType<ReturnType<typeof getStripe>["checkout"]["sessions"]["retrieve"]>
-  > | null = null
+  let session: Stripe.Checkout.Session | null = null
   if (sessionId) {
     try {
       const stripe = getStripe()
@@ -70,7 +69,10 @@ export default async function ThankYouPage({
       })
     } catch (error) {
       console.error("Error fetching checkout session:", error)
-      redirect("/")
+      // Don't redirect away if we still have a planId fallback — render the
+      // in-app shape instead. Redirecting here was the symptom of the
+      // free-plan flow ending up on / when the Stripe lookup failed.
+      if (!planIdParam) redirect("/")
     }
   }
 

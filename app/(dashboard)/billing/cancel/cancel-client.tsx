@@ -15,15 +15,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { downgradeToFreePlan, applyRetentionDiscount } from "@/actions/billing"
-
-const CANCELLATION_REASONS = [
-  "Too expensive",
-  "Missing features",
-  "Technical issues",
-  "Switching to a competitor",
-  "No longer need it",
-  "Other",
-]
+import { CANCELLATION_REASONS } from "@/lib/cancellation-reasons"
 
 interface CancelClientProps {
   licenseId: string
@@ -87,7 +79,11 @@ export function CancelClient({
 
     setIsPending(true)
     try {
-      const res = await downgradeToFreePlan(licenseId)
+      const res = await downgradeToFreePlan(licenseId, {
+        reason: selectedReason,
+        details:
+          selectedReason === "Other" ? otherReason.trim() || null : null,
+      })
       if (res.error) {
         toast.error(res.error)
       } else {
