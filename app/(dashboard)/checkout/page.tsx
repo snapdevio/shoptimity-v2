@@ -3,6 +3,9 @@ import { redirect } from "next/navigation"
 import { getActivePlans } from "@/actions/admin-plans"
 import { CheckoutClient } from "./checkout-client"
 import { getAppSession } from "@/lib/auth-session"
+import { db } from "@/db"
+import { licenses } from "@/db/schema"
+import { and, eq, or, isNotNull } from "drizzle-orm"
 
 export const metadata: Metadata = {
   title: "Checkout | Shoptimity",
@@ -60,6 +63,27 @@ export default async function CheckoutPage({
 
   if (!initialPlan) {
     redirect("/plans")
+  }
+
+  // Block free plan activation for users who already have an active paid
+  // subscription. They must use the cancel flow on the billing page instead
+  // of navigating directly to a free plan checkout URL.
+  if (initialPlan!.finalPrice === 0) {
+    const [activePaidLicense] = await db
+      .select({ id: licenses.id })
+      .from(licenses)
+      .where(
+        and(
+          eq(licenses.userId, session!.userId),
+          or(eq(licenses.status, "active"), eq(licenses.status, "trialing")),
+          isNotNull(licenses.stripeSubscriptionId)
+        )
+      )
+      .limit(1)
+
+    if (activePaidLicense) {
+      redirect("/billing")
+    }
   }
 
   // If yearly is requested but the planId points to a monthly plan,

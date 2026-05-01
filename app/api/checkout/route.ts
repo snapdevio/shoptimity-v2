@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { db } from "@/db"
 import { licenses, plans, users, payments, orders } from "@/db/schema"
-import { and, eq } from "drizzle-orm"
+import { and, eq, or, isNotNull } from "drizzle-orm"
 import { z } from "zod"
 import { createAuditLog } from "@/lib/audit"
 import { getAppSession } from "@/lib/auth-session"
@@ -490,6 +490,23 @@ export async function GET(request: NextRequest) {
   try {
     // Free plan — skip Stripe, fulfill directly and redirect to /thank-you
     if (plan.finalPrice === 0) {
+      // Guard: active paid subscribers must use the billing cancel flow
+      const [activePaidLicense] = await db
+        .select({ id: licenses.id })
+        .from(licenses)
+        .where(
+          and(
+            eq(licenses.userId, session.userId),
+            or(eq(licenses.status, "active"), eq(licenses.status, "trialing")),
+            isNotNull(licenses.stripeSubscriptionId)
+          )
+        )
+        .limit(1)
+
+      if (activePaidLicense) {
+        return NextResponse.redirect(new URL("/billing", request.url))
+      }
+
       const [user] = await db
         .select({ stripeCustomerId: users.stripeCustomerId })
         .from(users)
@@ -692,6 +709,33 @@ export async function POST(request: NextRequest) {
   // Doing this before stripe.customers.update() avoids Stripe errors
   // (e.g. test/live customer mismatches) blocking free activation.
   if (plan.finalPrice === 0) {
+    // Guard: block users who already have an active paid subscription from
+    // downgrading to free via a direct URL. They must go through the proper
+    // cancel flow on the billing page.
+    if (session) {
+      const [activePaidLicense] = await db
+        .select({ id: licenses.id })
+        .from(licenses)
+        .where(
+          and(
+            eq(licenses.userId, session.userId),
+            or(eq(licenses.status, "active"), eq(licenses.status, "trialing")),
+            isNotNull(licenses.stripeSubscriptionId)
+          )
+        )
+        .limit(1)
+
+      if (activePaidLicense) {
+        return NextResponse.json(
+          {
+            error:
+              "You already have an active paid subscription. To change your plan, please visit the billing page.",
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     try {
       await activateFreePlan({
         stripe,
@@ -718,7 +762,11 @@ export async function POST(request: NextRequest) {
       stripePaymentMethodId = paymentCardId
     }
 
-    // Sync address to Stripe Customer if possible
+    // Sync address and selected payment method default to Stripe Customer.
+    // Setting invoice_settings.default_payment_method here ensures the
+    // customer-level default stays in sync with whichever card the user
+    // chose at checkout, so Stripe uses the right card for renewals and
+    // the billing page reflects the correct default.
     if (stripeCustomerId && address) {
       try {
         await stripe.customers.update(stripeCustomerId, {
@@ -734,6 +782,13 @@ export async function POST(request: NextRequest) {
           metadata: {
             company: address.company || "",
           },
+          ...(stripePaymentMethodId
+            ? {
+                invoice_settings: {
+                  default_payment_method: stripePaymentMethodId,
+                },
+              }
+            : {}),
         })
       } catch (err) {
         // Non-fatal: a stale/invalid customer should not block checkout
