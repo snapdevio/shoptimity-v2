@@ -21,6 +21,7 @@ export default async function DashboardLayout({
     name: session.user.name,
     email: session.user.email,
     role: (session.user as UserWithRole).role || "user",
+    image: session.user.image ?? null,
   }
 
   return <DashboardShell user={user}>{children}</DashboardShell>

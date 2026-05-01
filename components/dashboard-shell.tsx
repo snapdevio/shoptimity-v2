@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
 
@@ -35,6 +35,7 @@ interface DashboardShellProps {
     name: string
     email: string
     role: string
+    image?: string | null
   }
   children: React.ReactNode
 }
@@ -112,6 +113,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                     className="relative h-9 w-9 cursor-pointer rounded-full ring-offset-background transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                   >
                     <Avatar className="h-9 w-9 border">
+                      {user.image && (
+                        <AvatarImage src={user.image} alt={displayName} />
+                      )}
                       <AvatarFallback className="bg-primary/5 text-xs font-semibold text-primary">
                         {initials}
                       </AvatarFallback>
@@ -244,6 +248,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
                       >
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10 border">
+                            {user.image && (
+                              <AvatarImage src={user.image} alt={displayName} />
+                            )}
                             <AvatarFallback className="bg-primary/5 text-xs font-semibold text-primary">
                               {initials}
                             </AvatarFallback>
