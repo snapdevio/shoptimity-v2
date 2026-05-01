@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import NumberFlow from "@number-flow/react"
-import { CheckCheck } from "lucide-react"
+import { Check, CheckCheck, ShieldCheck } from "lucide-react"
 // import { motion, AnimatePresence } from "motion/react";
 import React, { memo, useRef } from "react"
 // import { VerticalCutReveal } from "./vertical-cut-reveal";
@@ -172,11 +172,10 @@ export const PricingSectionModern = memo(
             return (
               <div key={plan.name} className="h-full">
                 <Card
-                  className={`relative h-full border border-neutral-200 ${
-                    plan.popular
-                      ? "bg-orange-50 shadow-lg ring-2 shadow-orange-100 ring-orange-500"
-                      : "bg-white"
-                  }`}
+                  className={`relative h-full border border-neutral-200 ${plan.popular
+                    ? "bg-orange-50 shadow-lg ring-2 shadow-orange-100 ring-orange-500"
+                    : "bg-white"
+                    }`}
                 >
                   {plan.planBadge && (
                     <div className="absolute -top-3 left-1/2 z-20 -translate-x-1/2">
@@ -281,8 +280,8 @@ export const PricingSectionModern = memo(
                         {plan.isCurrent
                           ? "Current Plan"
                           : !hasUsedTrial &&
-                              plan.trialDays &&
-                              plan.trialDays > 0
+                            plan.trialDays &&
+                            plan.trialDays > 0
                             ? `Start ${plan.trialDays}-Day Free Trial`
                             : plan.buttonText}
                       </span>
@@ -310,6 +309,18 @@ export const PricingSectionModern = memo(
               </div>
             )
           })}
+        </div>
+
+        {/* trust section */}
+        <div className="text-center">
+          <div className="flex flex-wrap items-center justify-center gap-12 opacity-50 grayscale transition-all duration-300 hover:grayscale-0">
+            <div className="flex items-center gap-2 text-xl font-bold text-slate-900">
+              <ShieldCheck className="h-6 w-6" /> Secured Payment
+            </div>
+            <div className="flex items-center gap-2 text-xl font-bold text-slate-900">
+              <Check className="h-6 w-6" /> No Hidden Fees
+            </div>
+          </div>
         </div>
       </div>
     )

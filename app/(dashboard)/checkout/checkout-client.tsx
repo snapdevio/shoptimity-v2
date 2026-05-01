@@ -15,6 +15,7 @@ import {
   createSetupIntent,
   getBillingInfo,
   validateCoupon,
+  setDefaultCard,
 } from "@/actions/billing"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -91,9 +92,13 @@ function CheckoutInner({
     percentOff?: number | null
     amountOff?: number | null
   } | null>(null)
+  // Tracks which billing cycle the coupon was validated for — used as a final
+  // guard in handleSubmit to prevent a coupon from a different cycle being sent
+  const [appliedCouponCycle, setAppliedCouponCycle] = useState<string | null>(null)
   const [isDiscountOpen, setIsDiscountOpen] = useState(false)
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false)
   const [couponError, setCouponError] = useState<string | null>(null)
+  const validationSessionRef = useRef(0)
 
   // Form states
   // const [domains, setDomains] = useState<string[]>([""])
@@ -114,7 +119,7 @@ function CheckoutInner({
       : currentPlan.couponCode
 
     if (targetCoupon && !appliedCoupon && !isValidatingCoupon) {
-      console.log(`Auto-applying coupon from plan: ${targetCoupon}`)
+      const sessionId = ++validationSessionRef.current
       setCouponCode(targetCoupon)
 
       const autoApply = async () => {
@@ -122,6 +127,8 @@ function CheckoutInner({
         setCouponError(null)
         try {
           const res = await validateCoupon(targetCoupon)
+          // Discard result if billing cycle changed while validating
+          if (validationSessionRef.current !== sessionId) return
           if ("id" in res) {
             setAppliedCoupon({
               id: String(res.id),
@@ -129,12 +136,16 @@ function CheckoutInner({
               percentOff: res.percentOff,
               amountOff: res.amountOff,
             })
+            setAppliedCouponCycle(isYearly ? "yearly" : "monthly")
             setIsDiscountOpen(true)
           }
         } catch (err) {
+          if (validationSessionRef.current !== sessionId) return
           console.error("Auto-apply failed", err)
         } finally {
-          setIsValidatingCoupon(false)
+          if (validationSessionRef.current === sessionId) {
+            setIsValidatingCoupon(false)
+          }
         }
       }
 
@@ -221,10 +232,18 @@ function CheckoutInner({
   }
 
   const handleCardSuccess = async (paymentMethodId: string) => {
+    const isFirstCard = savedCards.length === 0
     await loadCards()
     setSelectedCardId(paymentMethodId)
     setIsAddingCard(false)
     setClientSecret(null)
+    if (isFirstCard) {
+      try {
+        await setDefaultCard(paymentMethodId)
+      } catch (err) {
+        console.error("Failed to set first card as default:", err)
+      }
+    }
   }
 
   // Update plan when billing cycle changes
@@ -246,13 +265,17 @@ function CheckoutInner({
       return
     }
 
+    const sessionId = ++validationSessionRef.current
+    const cycleAtApply = isYearly ? "yearly" : "monthly"
     setIsValidatingCoupon(true)
     setCouponError(null)
     try {
-      const res = await validateCoupon(couponCode)
+      const res = await validateCoupon(trimmedCode)
+      if (validationSessionRef.current !== sessionId) return
       if ("error" in res && res.error) {
         setCouponError(res.error)
         setAppliedCoupon(null)
+        setAppliedCouponCycle(null)
       } else if ("id" in res) {
         setAppliedCoupon({
           id: String(res.id),
@@ -260,12 +283,16 @@ function CheckoutInner({
           percentOff: res.percentOff,
           amountOff: res.amountOff,
         })
+        setAppliedCouponCycle(cycleAtApply)
         toast.success("Discount applied!")
       }
     } catch (err) {
+      if (validationSessionRef.current !== sessionId) return
       setCouponError("Failed to apply discount code")
     } finally {
-      setIsValidatingCoupon(false)
+      if (validationSessionRef.current === sessionId) {
+        setIsValidatingCoupon(false)
+      }
     }
   }
 
@@ -314,6 +341,13 @@ function CheckoutInner({
     e.preventDefault()
     setAttemptedSubmit(true)
 
+    if (isValidatingCoupon) {
+      toast.error("Please wait", {
+        description: "Coupon validation is still in progress.",
+      })
+      return
+    }
+
     if (!initialEmail || !initialName) {
       toast.error("Form Incomplete", {
         description: "Please fill in your name and email to proceed.",
@@ -332,6 +366,14 @@ function CheckoutInner({
       return
     }
 
+    // Final safety net: only send the coupon if it was validated for the
+    // current billing cycle, regardless of any prior state
+    const currentCycle = isYearly ? "yearly" : "monthly"
+    const safePromoCode =
+      appliedCoupon && appliedCouponCycle === currentCycle
+        ? appliedCoupon.id
+        : undefined
+
     setIsSubmitting(true)
     try {
       const res = await fetch("/api/checkout", {
@@ -345,7 +387,7 @@ function CheckoutInner({
           // domains: domains.filter((d) => d.trim() !== ""),
           paymentCardId: selectedCardId,
           isYearly: isYearly,
-          promoCode: appliedCoupon?.id,
+          promoCode: safePromoCode,
           address: {
             line1: billingData.line1,
             line2: billingData.line2,
@@ -361,9 +403,12 @@ function CheckoutInner({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Checkout failed")
 
+      // Pass the actual charged amount (cents) so the thank-you page can
+      // show the discounted total instead of recalculating from plan price.
+      const chargedCents = Math.round(price.final * 100)
       const thankYouUrl = `/thank-you?planId=${encodeURIComponent(
         currentPlan.id
-      )}&isYearly=${isYearly ? "true" : "false"}${currentPlan.trialDays > 0 ? "&isTrial=true" : ""}`
+      )}&isYearly=${isYearly ? "true" : "false"}${currentPlan.trialDays > 0 ? "&isTrial=true" : ""}&amount=${chargedCents}`
 
       if (data.url) {
         // Fallback to Stripe Checkout UI if requested
@@ -398,11 +443,14 @@ function CheckoutInner({
   const isFreePlan = currentPlan.finalPrice === 0
 
   const handleBillingChange = (yearly: boolean) => {
+    // Synchronously invalidate any in-flight coupon validation, then clear state
+    validationSessionRef.current += 1
     setIsYearly(yearly)
-    // Reset coupon when switching billing cycles
     setAppliedCoupon(null)
+    setAppliedCouponCycle(null)
     setCouponCode("")
     setCouponError(null)
+    setIsValidatingCoupon(false)
 
     const targetPlan = yearly ? yearlyPlan || monthlyPlan : monthlyPlan
     if (targetPlan) {
@@ -413,7 +461,7 @@ function CheckoutInner({
     }
   }
 
-  const isButtonDisabled = isSubmitting || isAddingCard
+  const isButtonDisabled = isSubmitting || isAddingCard || isValidatingCoupon
 
   return (
     <div className="animate-in duration-500 fade-in">
@@ -993,6 +1041,7 @@ function CheckoutInner({
                         appliedCoupon
                           ? () => {
                               setAppliedCoupon(null)
+                              setAppliedCouponCycle(null)
                               setCouponCode("")
                               setCouponError(null)
                             }

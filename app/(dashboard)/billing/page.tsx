@@ -95,6 +95,7 @@ export default async function BillingPage({
       trialEndsAt: licenses.trialEndsAt,
       nextRenewalDate: licenses.nextRenewalDate,
       cancelAtPeriodEnd: licenses.cancelAtPeriodEnd,
+      retentionDiscountUsed: licenses.retentionDiscountUsed,
     })
     .from(licenses)
     .leftJoin(plans, eq(licenses.planId, plans.id))
@@ -159,6 +160,7 @@ export default async function BillingPage({
     endsAt: number | null
     remainingCycles: number | null
     discountedNextAmount: number | null
+    isRetentionDiscount: boolean
   } | null = null
 
   if (activeLicense?.stripeSubscriptionId) {
@@ -328,6 +330,7 @@ export default async function BillingPage({
           endsAt,
           remainingCycles,
           discountedNextAmount,
+          isRetentionDiscount: activeLicense.retentionDiscountUsed === true,
         }
       }
     } catch (err) {

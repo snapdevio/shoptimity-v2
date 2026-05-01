@@ -229,8 +229,10 @@ export function CancelClient({
             <span className="font-bold text-primary">
               {discountPercent}% discount
             </span>{" "}
-            to your next {discountDuration} {durationUnit} of Shoptimity{" "}
-            {planName}.
+            to your <b>{trialEndDate
+              ? `first charge on ${formatTrialEnd(trialEndDate)}`
+              : `next ${billingCycle === "yearly" ? "year" : "month"}`}</b> of Shoptimity{" "}
+            <b>{planName}</b>.
           </p>
           <button
             onClick={() => router.push("/billing")}

@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -52,6 +51,11 @@ export default async function ThankYouPage({
   const planIdParam = params.planId as string | undefined
   const isYearlyParam = params.isYearly === "true"
   const isTrialParam = params.isTrial === "true"
+  // Actual charged amount in cents, passed from the in-app checkout to
+  // reflect any coupon discount applied at purchase time.
+  const amountParam = params.amount as string | undefined
+  const passedAmountCents =
+    amountParam && /^\d+$/.test(amountParam) ? parseInt(amountParam, 10) : null
 
   // Two entry points:
   // 1. Stripe Checkout (hosted) returns with `?session_id=cs_...`. We resolve
@@ -108,10 +112,14 @@ export default async function ThankYouPage({
 
   // Map display items: use line items if available, or a virtual item built
   // from the resolved plan (free trial via Stripe, or in-app saved-card flow).
+  // planAmount: use the exact amount charged (passed from checkout, includes
+  // any coupon discount). Fall back to the plan's stored price if not present.
   const planAmount = plan
-    ? isYearlyParam && plan.mode === "monthly"
-      ? plan.finalPrice * 12
-      : plan.finalPrice
+    ? passedAmountCents !== null
+      ? passedAmountCents
+      : isYearlyParam && plan.mode === "monthly"
+        ? plan.finalPrice * 12
+        : plan.finalPrice
     : 0
   const displayItems =
     lineItems.length > 0

@@ -90,6 +90,7 @@ interface ActiveDiscount {
   endsAt: number | null
   remainingCycles: number | null
   discountedNextAmount: number | null
+  isRetentionDiscount: boolean
 }
 
 interface BillingClientProps {
@@ -281,9 +282,20 @@ export function BillingClient({
     }
   }
 
-  const handleCardSuccess = async () => {
+  const handleCardSuccess = async (paymentMethodId: string) => {
     setIsAddingCard(false)
     setClientSecret(null)
+
+    // If this is the first card being added, set it as default automatically
+    // so it shows the "Default" badge and is used for future invoices.
+    if (initialCards.length === 0) {
+      try {
+        await setDefaultCard(paymentMethodId)
+      } catch (err) {
+        console.error("Failed to set default card:", err)
+      }
+    }
+
     toast.success("New payment method added")
     router.refresh()
   }
@@ -414,6 +426,18 @@ export function BillingClient({
     return { hasRetention, regularAmount, effectiveAmount, cycleSuffix }
   }, [activeLicense, activeDiscount])
 
+  const isBillingChanged = useMemo(() => {
+    return (
+      billingData.line1 !== initialBillingInfo.line1 ||
+      billingData.line2 !== initialBillingInfo.line2 ||
+      billingData.city !== initialBillingInfo.city ||
+      billingData.state !== initialBillingInfo.state ||
+      billingData.postalCode !== initialBillingInfo.postalCode ||
+      billingData.country !== initialBillingInfo.country ||
+      billingData.company !== initialBillingInfo.company
+    )
+  }, [billingData, initialBillingInfo])
+
   function capitalizeCycle(cycle: string | null | undefined): string {
     const raw = cycle || "monthly"
     return raw.charAt(0).toUpperCase() + raw.slice(1)
@@ -497,6 +521,7 @@ export function BillingClient({
                 </div>
 
                 {activeDiscount &&
+                  activeDiscount.isRetentionDiscount &&
                   (activeDiscount.percentOff != null ||
                     activeDiscount.amountOff != null) &&
                   (activeDiscount.remainingCycles == null ||
@@ -696,15 +721,18 @@ export function BillingClient({
                   ) : (
                     <div className="flex gap-3">
                       <button
-                        onClick={() => setIsEditingBilling(false)}
+                        onClick={() => {
+                          setBillingData(initialBillingInfo)
+                          setIsEditingBilling(false)
+                        }}
                         className="cursor-pointer text-sm font-bold text-slate-400 hover:text-slate-600"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleSaveBilling}
-                        disabled={isSavingBilling}
-                        className="flex cursor-pointer items-center gap-2 text-sm font-bold text-primary hover:underline disabled:opacity-50"
+                        disabled={isSavingBilling || !isBillingChanged}
+                        className="flex cursor-pointer items-center gap-2 text-sm font-bold text-primary hover:underline disabled:opacity-50 disabled:no-underline"
                       >
                         {isSavingBilling && (
                           <Loader2 className="h-3 w-3 animate-spin" />
