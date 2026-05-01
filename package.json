@@ -17,7 +17,7 @@
     "db:reset": "drizzle-kit push --force-reset",
     "db:studio": "drizzle-kit studio",
     "workers": "tsx --env-file=.env workers/index.ts",
-    "db:seed": "tsx --env-file=.env db/seed.ts",
+    "db:seed": "tsx db/seed.ts",
     "make-admin": "tsx scripts/make-admin.ts",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\""
   },
