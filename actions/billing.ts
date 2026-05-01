@@ -117,10 +117,9 @@ export async function setDefaultCard(paymentMethodId: string) {
 
     if (activeLicense?.stripeSubscriptionId?.startsWith("sub_")) {
       try {
-        await stripe.subscriptions.update(
-          activeLicense.stripeSubscriptionId,
-          { default_payment_method: paymentMethodId }
-        )
+        await stripe.subscriptions.update(activeLicense.stripeSubscriptionId, {
+          default_payment_method: paymentMethodId,
+        })
       } catch (err) {
         // Non-fatal: the customer-level default is already updated, so
         // future invoices will still use the correct card

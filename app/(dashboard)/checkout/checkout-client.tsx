@@ -94,7 +94,9 @@ function CheckoutInner({
   } | null>(null)
   // Tracks which billing cycle the coupon was validated for — used as a final
   // guard in handleSubmit to prevent a coupon from a different cycle being sent
-  const [appliedCouponCycle, setAppliedCouponCycle] = useState<string | null>(null)
+  const [appliedCouponCycle, setAppliedCouponCycle] = useState<string | null>(
+    null
+  )
   const [isDiscountOpen, setIsDiscountOpen] = useState(false)
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false)
   const [couponError, setCouponError] = useState<string | null>(null)
@@ -1078,7 +1080,7 @@ function CheckoutInner({
             </div>
             <div className="flex items-center justify-between pt-2">
               <span className="font-heading text-[20px] font-bold text-base-content">
-                Total due today
+                Total due {!isFreePlan && "today"}
               </span>
               <span className="font-heading text-[24px] font-bold text-primary">
                 ${currentPlan.trialDays > 0 ? "0.00" : price.final.toFixed(2)}
@@ -1088,7 +1090,7 @@ function CheckoutInner({
               {isFreePlan ? (
                 <>
                   You'll be charged{" "}
-                  <strong className="text-base-content">$0.00</strong> today. No
+                  <strong className="text-base-content">$0.00</strong>. No
                   future payments will be required for this free plan.
                 </>
               ) : currentPlan.trialDays > 0 ? (

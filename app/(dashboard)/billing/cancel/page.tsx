@@ -133,8 +133,7 @@ export default async function CancelPlanPage() {
   // We re-read the live subscription's trial_end so the modal date can't
   // drift from Stripe (the local `trialEndsAt` column is webhook-driven
   // and could be stale during a brief window after the trial extends).
-  let isTrial =
-    activeLicense.isTrial || activeLicense.status === "trialing"
+  let isTrial = activeLicense.isTrial || activeLicense.status === "trialing"
   let trialEndsAtIso: string | null = activeLicense.trialEndsAt
     ? new Date(activeLicense.trialEndsAt).toISOString()
     : null

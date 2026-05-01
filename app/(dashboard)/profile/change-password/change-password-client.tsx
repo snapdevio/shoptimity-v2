@@ -56,7 +56,9 @@ export function ChangePasswordClient() {
     }
 
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match. Please make sure both fields are identical.")
+      setError(
+        "Passwords do not match. Please make sure both fields are identical."
+      )
       setIsPending(false)
       return
     }

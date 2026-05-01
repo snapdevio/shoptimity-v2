@@ -16,12 +16,7 @@ export const metadata: Metadata = {
 }
 import { buttonVariants } from "@/components/ui/button-variants"
 import { cn } from "@/lib/utils"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   CheckCircle,
   Mail,
@@ -101,9 +96,11 @@ export default async function ThankYouPage({
 
   // Exclude trials from "free plan" detection — a trial session has
   // amount_total=0 but is NOT a free plan.
-  const isFreePlan = !isTrialPlan && (session
-    ? session.amount_total === 0 || session.metadata?.type === "free_plan"
-    : (plan?.finalPrice ?? 0) === 0)
+  const isFreePlan =
+    !isTrialPlan &&
+    (session
+      ? session.amount_total === 0 || session.metadata?.type === "free_plan"
+      : (plan?.finalPrice ?? 0) === 0)
 
   const trialDays = plan?.trialDays ?? 0
   const lineItems = session?.line_items?.data || []
@@ -124,20 +121,20 @@ export default async function ThankYouPage({
   const displayItems =
     lineItems.length > 0
       ? lineItems.map((item) => ({
-        id: item.id,
-        description: item.description,
-        amount: item.amount_total,
-        quantity: item.quantity || 1,
-      }))
+          id: item.id,
+          description: item.description,
+          amount: item.amount_total,
+          quantity: item.quantity || 1,
+        }))
       : plan
         ? [
-          {
-            id: "plan-item",
-            description: `${plan.name}${(isYearlyParam && plan.mode === "monthly") || plan.mode === "yearly" ? " (Yearly)" : ""}`,
-            amount: isFreePlan ? 0 : planAmount,
-            quantity: 1,
-          },
-        ]
+            {
+              id: "plan-item",
+              description: `${plan.name}${(isYearlyParam && plan.mode === "monthly") || plan.mode === "yearly" ? " (Yearly)" : ""}`,
+              amount: isFreePlan ? 0 : planAmount,
+              quantity: 1,
+            },
+          ]
         : []
 
   return (

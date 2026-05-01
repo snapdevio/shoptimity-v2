@@ -229,10 +229,13 @@ export function CancelClient({
             <span className="font-bold text-primary">
               {discountPercent}% discount
             </span>{" "}
-            to your <b>{trialEndDate
-              ? `first charge on ${formatTrialEnd(trialEndDate)}`
-              : `next ${billingCycle === "yearly" ? "year" : "month"}`}</b> of Shoptimity{" "}
-            <b>{planName}</b>.
+            to your{" "}
+            <b>
+              {trialEndDate
+                ? `first charge on ${formatTrialEnd(trialEndDate)}`
+                : `next ${billingCycle === "yearly" ? "year" : "month"}`}
+            </b>{" "}
+            of Shoptimity <b>{planName}</b>.
           </p>
           <button
             onClick={() => router.push("/billing")}
@@ -281,7 +284,7 @@ export function CancelClient({
               </div>
 
               <div className="space-y-6 px-6 py-10 md:p-10">
-                <div className="rounded-2xl border-2 border-dashed border-primary/20 bg-primary/5 p-3 md:p-4 text-center">
+                <div className="rounded-2xl border-2 border-dashed border-primary/20 bg-primary/5 p-3 text-center md:p-4">
                   <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase md:text-sm">
                     Your Special Offer
                   </p>
@@ -375,16 +378,18 @@ export function CancelClient({
                       <button
                         key={reason}
                         onClick={() => setSelectedReason(reason)}
-                        className={`flex cursor-pointer items-center rounded-xl border px-4 py-3.5 text-sm font-medium transition-all ${selectedReason === reason
-                          ? "border-primary bg-primary/5 text-primary ring-2 ring-primary/20"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                          }`}
+                        className={`flex cursor-pointer items-center rounded-xl border px-4 py-3.5 text-sm font-medium transition-all ${
+                          selectedReason === reason
+                            ? "border-primary bg-primary/5 text-primary ring-2 ring-primary/20"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
                       >
                         <div
-                          className={`mr-3 flex h-4 w-4 items-center justify-center rounded-full border-2 transition-all ${selectedReason === reason
-                            ? "border-primary bg-primary"
-                            : "border-slate-200 bg-white"
-                            }`}
+                          className={`mr-3 flex h-4 w-4 items-center justify-center rounded-full border-2 transition-all ${
+                            selectedReason === reason
+                              ? "border-primary bg-primary"
+                              : "border-slate-200 bg-white"
+                          }`}
                         >
                           {selectedReason === reason && (
                             <div className="h-1.5 w-1.5 rounded-full bg-white" />
@@ -426,17 +431,17 @@ export function CancelClient({
                       "Confirm Cancellation"
                     )}
                   </button>
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <button
                       onClick={() => setStep("offer")}
                       className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white py-3.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95"
                     >
                       Keep my plan
                     </button>
-                   
+
                     <Link
                       href="/contact"
-                      className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white py-3.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95 text-center flex items-center justify-center"
+                      className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white py-3.5 text-center text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95"
                     >
                       <MessageCircle className="mr-2 h-4 w-4" />
                       Talk to support

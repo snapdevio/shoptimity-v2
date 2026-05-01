@@ -674,11 +674,11 @@ function LicenseCard({
                   >
                     {(license.status === "active" ||
                       license.status === "trialing") && (
-                        <span className="relative flex h-1.5 w-1.5">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75"></span>
-                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                        </span>
-                      )}
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75"></span>
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                      </span>
+                    )}
                     {license.status === "canceled" ? "Canceled" : "Free Trial"}
                   </div>
                   {license.trialEndsAt && (
@@ -774,7 +774,7 @@ function DomainRow({
       className={cn(
         "group relative flex min-h-18 items-center justify-between rounded-2xl border border-border/50 bg-background/80 p-4 transition-all hover:border-primary/30 hover:bg-background",
         !isActive &&
-        "pointer-events-none border-destructive/20 bg-red-500/5 opacity-60 grayscale select-none"
+          "pointer-events-none border-destructive/20 bg-red-500/5 opacity-60 grayscale select-none"
       )}
     >
       <div className="flex items-center gap-4">
@@ -1486,7 +1486,10 @@ function CollisionErrorModal({
           </DialogDescription>
         </DialogHeader>
         <div className="mt-2 rounded-lg border border-border/50 bg-muted/40 p-4 text-sm leading-relaxed text-muted-foreground">
-          <b>Access Denied:</b> The domain <strong>{domainName}</strong> is already assigned to a different license holder. To prevent data conflicts, it cannot be added to this account while it is active elsewhere.
+          <b>Access Denied:</b> The domain <strong>{domainName}</strong> is
+          already assigned to a different license holder. To prevent data
+          conflicts, it cannot be added to this account while it is active
+          elsewhere.
         </div>
         <DialogFooter className="mt-4 flex flex-row gap-2">
           {onTryAgain && (

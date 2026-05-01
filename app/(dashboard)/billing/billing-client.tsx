@@ -732,7 +732,7 @@ export function BillingClient({
                       <button
                         onClick={handleSaveBilling}
                         disabled={isSavingBilling || !isBillingChanged}
-                        className="flex cursor-pointer items-center gap-2 text-sm font-bold text-primary hover:underline disabled:opacity-50 disabled:no-underline"
+                        className="flex cursor-pointer items-center gap-2 text-sm font-bold text-primary hover:underline disabled:no-underline disabled:opacity-50"
                       >
                         {isSavingBilling && (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -1368,7 +1368,7 @@ export function BillingClient({
                     )}
                   </div>
 
-                  <div className="mt-8 flex gap-3 flex-col-reverse sm:flex-row">
+                  <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row">
                     <button
                       onClick={() => setIsUpgradeModalOpen(false)}
                       disabled={isUpgrading}

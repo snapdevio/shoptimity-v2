@@ -172,10 +172,11 @@ export const PricingSectionModern = memo(
             return (
               <div key={plan.name} className="h-full">
                 <Card
-                  className={`relative h-full border border-neutral-200 ${plan.popular
-                    ? "bg-orange-50 shadow-lg ring-2 shadow-orange-100 ring-orange-500"
-                    : "bg-white"
-                    }`}
+                  className={`relative h-full border border-neutral-200 ${
+                    plan.popular
+                      ? "bg-orange-50 shadow-lg ring-2 shadow-orange-100 ring-orange-500"
+                      : "bg-white"
+                  }`}
                 >
                   {plan.planBadge && (
                     <div className="absolute -top-3 left-1/2 z-20 -translate-x-1/2">
@@ -280,8 +281,8 @@ export const PricingSectionModern = memo(
                         {plan.isCurrent
                           ? "Current Plan"
                           : !hasUsedTrial &&
-                            plan.trialDays &&
-                            plan.trialDays > 0
+                              plan.trialDays &&
+                              plan.trialDays > 0
                             ? `Start ${plan.trialDays}-Day Free Trial`
                             : plan.buttonText}
                       </span>
