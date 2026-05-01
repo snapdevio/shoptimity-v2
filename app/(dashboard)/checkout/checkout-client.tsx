@@ -363,7 +363,7 @@ function CheckoutInner({
 
       const thankYouUrl = `/thank-you?planId=${encodeURIComponent(
         currentPlan.id
-      )}&isYearly=${isYearly ? "true" : "false"}`
+      )}&isYearly=${isYearly ? "true" : "false"}${currentPlan.trialDays > 0 ? "&isTrial=true" : ""}`
 
       if (data.url) {
         // Fallback to Stripe Checkout UI if requested

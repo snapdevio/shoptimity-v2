@@ -447,7 +447,7 @@ export function BillingClient({
                       </h4>
                     </div>
                   </div>
-                  <div className="flex flex-col items-center gap-3 sm:flex-row">
+                  <div className="flex flex-col-reverse items-center gap-3 sm:flex-row">
                     {activeLicense?.cancelAtPeriodEnd ? (
                       <button
                         onClick={handleReactivate}
@@ -1340,7 +1340,7 @@ export function BillingClient({
                     )}
                   </div>
 
-                  <div className="mt-8 flex gap-3">
+                  <div className="mt-8 flex gap-3 flex-col-reverse sm:flex-row">
                     <button
                       onClick={() => setIsUpgradeModalOpen(false)}
                       disabled={isUpgrading}

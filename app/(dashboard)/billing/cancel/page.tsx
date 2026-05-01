@@ -22,6 +22,8 @@ export default async function CancelPlanPage() {
       id: licenses.id,
       billingCycle: licenses.billingCycle,
       retentionDiscountUsed: licenses.retentionDiscountUsed,
+      isTrial: licenses.isTrial,
+      trialEndsAt: licenses.trialEndsAt,
       plan: {
         id: plans.id,
         name: plans.name,
@@ -125,6 +127,37 @@ export default async function CancelPlanPage() {
     !!activeLicense.stripeSubscriptionId &&
     activeLicense.stripeSubscriptionId.startsWith("sub_")
 
+  // Trial users with a real `sub_*` (Stripe-managed trial) still see the
+  // retention offer, but the "Next month/year" copy is wrong for them —
+  // the first charge fires at `trial_end`, not at the next billing cycle.
+  // We re-read the live subscription's trial_end so the modal date can't
+  // drift from Stripe (the local `trialEndsAt` column is webhook-driven
+  // and could be stale during a brief window after the trial extends).
+  let isTrial =
+    activeLicense.isTrial || activeLicense.status === "trialing"
+  let trialEndsAtIso: string | null = activeLicense.trialEndsAt
+    ? new Date(activeLicense.trialEndsAt).toISOString()
+    : null
+  if (hasRealSubscription) {
+    try {
+      const sub = await stripe.subscriptions.retrieve(
+        activeLicense.stripeSubscriptionId!
+      )
+      if (sub.status === "trialing" && sub.trial_end) {
+        isTrial = true
+        trialEndsAtIso = new Date(sub.trial_end * 1000).toISOString()
+      } else if (sub.status !== "trialing") {
+        isTrial = false
+        trialEndsAtIso = null
+      }
+    } catch (err) {
+      console.error(
+        "[cancel/page] subscriptions.retrieve failed; falling back to DB trial state:",
+        err
+      )
+    }
+  }
+
   // Offer eligibility is plan-driven, not license-state-driven. We do NOT
   // check `retentionDiscountUsed` / `retentionDiscountEndsAt` here — if the
   // admin has the plan configured to extend a retention offer at cancel,
@@ -158,6 +191,8 @@ export default async function CancelPlanPage() {
       showOfferInitial={showDiscountOffer}
       offerTimeoutSeconds={cancel_offer_timeout ?? 300}
       couponCode={couponCode}
+      isTrial={isTrial}
+      trialEndsAt={trialEndsAtIso}
     />
   )
 }

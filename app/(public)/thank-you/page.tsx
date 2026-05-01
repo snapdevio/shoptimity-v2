@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   CreditCard,
   Package,
+  Clock,
 } from "lucide-react"
 import type Stripe from "stripe"
 import { getStripe } from "@/lib/stripe"
@@ -50,6 +51,7 @@ export default async function ThankYouPage({
   const sessionId = params.session_id as string | undefined
   const planIdParam = params.planId as string | undefined
   const isYearlyParam = params.isYearly === "true"
+  const isTrialParam = params.isTrial === "true"
 
   // Two entry points:
   // 1. Stripe Checkout (hosted) returns with `?session_id=cs_...`. We resolve
@@ -86,9 +88,20 @@ export default async function ThankYouPage({
     ? await db.select().from(plans).where(eq(plans.id, planId)).limit(1)
     : [null]
 
-  const isFreePlan = session
+  // Trial detection: check Stripe session metadata first (is_trial flag set
+  // by the checkout API), fall back to the URL param (in-app saved-card flow)
+  // or the plan's trialDays column.
+  const isTrialPlan = session
+    ? session.metadata?.is_trial === "true"
+    : isTrialParam || (plan?.trialDays ?? 0) > 0
+
+  // Exclude trials from "free plan" detection — a trial session has
+  // amount_total=0 but is NOT a free plan.
+  const isFreePlan = !isTrialPlan && (session
     ? session.amount_total === 0 || session.metadata?.type === "free_plan"
-    : (plan?.finalPrice ?? 0) === 0
+    : (plan?.finalPrice ?? 0) === 0)
+
+  const trialDays = plan?.trialDays ?? 0
   const lineItems = session?.line_items?.data || []
 
   const slotsPerUnit = plan?.slots || 1
@@ -103,20 +116,20 @@ export default async function ThankYouPage({
   const displayItems =
     lineItems.length > 0
       ? lineItems.map((item) => ({
-          id: item.id,
-          description: item.description,
-          amount: item.amount_total,
-          quantity: item.quantity || 1,
-        }))
+        id: item.id,
+        description: item.description,
+        amount: item.amount_total,
+        quantity: item.quantity || 1,
+      }))
       : plan
         ? [
-            {
-              id: "plan-item",
-              description: `${plan.name}${isYearlyParam ? " (Yearly)" : ""}`,
-              amount: isFreePlan ? 0 : planAmount,
-              quantity: 1,
-            },
-          ]
+          {
+            id: "plan-item",
+            description: `${plan.name}${(isYearlyParam && plan.mode === "monthly") || plan.mode === "yearly" ? " (Yearly)" : ""}`,
+            amount: isFreePlan ? 0 : planAmount,
+            quantity: 1,
+          },
+        ]
         : []
 
   return (
@@ -127,17 +140,21 @@ export default async function ThankYouPage({
             <CheckCircle className="size-8 text-primary" />
           </div>
           <h1 className="mt-6 font-heading text-3xl font-bold tracking-tight sm:text-4xl">
-            {isFreePlan
-              ? "Free Plan Activated Successfully!"
-              : "Thank You for Your Purchase!"}
+            {isTrialPlan
+              ? `Your ${trialDays}-Day Trial Has Started!`
+              : isFreePlan
+                ? "Free Plan Activated Successfully!"
+                : "Thank You for Your Purchase!"}
           </h1>
           <div className="mt-4 space-y-2">
             <p className="text-lg text-muted-foreground">
-              {isFreePlan
-                ? "Your Free Plan has been activated."
-                : "Your order has been successfully processed. You are all set to start managing your Shopify licenses."}
+              {isTrialPlan
+                ? `Enjoy full access free for ${trialDays} days. No charge until your trial ends.`
+                : isFreePlan
+                  ? "Your Free Plan has been activated."
+                  : "Your order has been successfully processed. You are all set to start managing your Shopify licenses."}
             </p>
-            {isFreePlan && (
+            {(isFreePlan || isTrialPlan) && (
               <p className="text-base text-muted-foreground">
                 You can now start managing your Shopify domains.{" "}
                 <Link
@@ -160,7 +177,12 @@ export default async function ThankYouPage({
                   <CardTitle>Order Summary</CardTitle>
                 </div>
                 <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold tracking-wider text-primary uppercase">
-                  {isFreePlan ? (
+                  {isTrialPlan ? (
+                    <>
+                      <Clock className="size-3" />
+                      {trialDays}-Day Trial
+                    </>
+                  ) : isFreePlan ? (
                     <>
                       <ShieldCheck className="size-3" />
                       Free
@@ -202,7 +224,9 @@ export default async function ThankYouPage({
                     <p className="text-lg font-bold text-foreground">
                       {item.amount > 0
                         ? formatCurrency(item.amount, currency)
-                        : "Free"}
+                        : isTrialPlan
+                          ? `Free for ${trialDays} days`
+                          : "Free"}
                     </p>
                   </div>
                 ))}

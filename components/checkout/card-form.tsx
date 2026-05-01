@@ -109,7 +109,7 @@ export function CardForm({ clientSecret, onSuccess, onCancel }: CardFormProps) {
         </div>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
           onClick={handleSubmit}

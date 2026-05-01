@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/db"
 import { users, licenses, templates } from "@/db/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, or } from "drizzle-orm"
 import { z } from "zod"
 import { getAppSession } from "@/lib/auth-session"
 import { getTemplateDownloadUrl } from "@/lib/r2"
@@ -40,11 +40,17 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 })
   }
 
-  // Check for active license
+  // Allow any license that is active (free, paid, cancelled-but-in-period)
+  // or trialing — all plans including free unlock template downloads.
   const activeLicenses = await db
     .select({ id: licenses.id })
     .from(licenses)
-    .where(and(eq(licenses.userId, user.id), eq(licenses.status, "active")))
+    .where(
+      and(
+        eq(licenses.userId, user.id),
+        or(eq(licenses.status, "active"), eq(licenses.status, "trialing"))
+      )
+    )
     .limit(1)
 
   if (activeLicenses.length === 0) {
