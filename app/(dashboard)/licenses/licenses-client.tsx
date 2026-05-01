@@ -1486,7 +1486,7 @@ function CollisionErrorModal({
           </DialogDescription>
         </DialogHeader>
         <div className="mt-2 rounded-lg border border-border/50 bg-muted/40 p-4 text-sm leading-relaxed text-muted-foreground">
-          Access Denied: The domain <strong>{domainName}</strong> is already assigned to a different license holder. To prevent data conflicts, it cannot be added to this account while it is active elsewhere.
+          <b>Access Denied:</b> The domain <strong>{domainName}</strong> is already assigned to a different license holder. To prevent data conflicts, it cannot be added to this account while it is active elsewhere.
         </div>
         <DialogFooter className="mt-4 flex flex-row gap-2">
           {onTryAgain && (

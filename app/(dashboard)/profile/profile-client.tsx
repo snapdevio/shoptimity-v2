@@ -100,6 +100,7 @@ export function ProfileClient({
                 type="text"
                 defaultValue={initialName}
                 required
+                maxLength={100}
                 disabled={isPending}
               />
             </div>
