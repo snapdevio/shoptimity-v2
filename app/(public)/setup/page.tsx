@@ -42,7 +42,7 @@ const steps = [
     icon: LogIn,
     title: "Access Your Dashboard",
     description:
-      "Sign in using Google, Microsoft, or your email and password. Once logged in, you can manage your theme licenses and assets from a single dashboard.",
+      "Sign in using Google or your email and password. Once logged in, you can manage your theme licenses and assets from a single dashboard.",
     image: "/shoptimity-v2/assets/setup/login.webp",
   },
   {

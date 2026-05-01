@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { eq, and } from "drizzle-orm"
+import { eq, and, or } from "drizzle-orm"
 import { LockIcon } from "lucide-react"
 import { Metadata } from "next"
 
@@ -37,7 +37,10 @@ export default async function TemplatesPage() {
       .select({ id: licenses.id })
       .from(licenses)
       .where(
-        and(eq(licenses.userId, session.userId), eq(licenses.status, "active"))
+        and(
+          eq(licenses.userId, session.userId),
+          or(eq(licenses.status, "active"), eq(licenses.status, "trialing"))
+        )
       )
       .limit(1),
     getActiveTemplates(),

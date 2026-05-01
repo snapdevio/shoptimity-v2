@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import {
   ArrowLeft,
   AlertCircle,
@@ -28,6 +29,8 @@ interface CancelClientProps {
   showOfferInitial?: boolean
   offerTimeoutSeconds?: number
   couponCode?: string | null
+  isTrial?: boolean
+  trialEndsAt?: string | null
 }
 
 export function CancelClient({
@@ -41,6 +44,8 @@ export function CancelClient({
   showOfferInitial = true,
   offerTimeoutSeconds = 300,
   couponCode,
+  isTrial = false,
+  trialEndsAt = null,
 }: CancelClientProps) {
   const router = useRouter()
   const [step, setStep] = useState<"offer" | "reasons">(
@@ -129,6 +134,16 @@ export function CancelClient({
   }
 
   const discountedPrice = price * (1 - discountPercent / 100)
+  // For Stripe-managed trials, the next charge fires at `trial_end`, not on
+  // the regular cycle boundary. Surface that date in the copy so the user
+  // doesn't think they'll be charged "next month" while still in trial.
+  const trialEndDate = isTrial && trialEndsAt ? new Date(trialEndsAt) : null
+  const formatTrialEnd = (d: Date) =>
+    d.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    })
   const durationUnit =
     billingCycle === "yearly"
       ? discountDuration === 1
@@ -214,8 +229,13 @@ export function CancelClient({
             <span className="font-bold text-primary">
               {discountPercent}% discount
             </span>{" "}
-            to your next {discountDuration} {durationUnit} of Shoptimity{" "}
-            {planName}.
+            to your{" "}
+            <b>
+              {trialEndDate
+                ? `first charge on ${formatTrialEnd(trialEndDate)}`
+                : `next ${billingCycle === "yearly" ? "year" : "month"}`}
+            </b>{" "}
+            of Shoptimity <b>{planName}</b>.
           </p>
           <button
             onClick={() => router.push("/billing")}
@@ -250,11 +270,11 @@ export function CancelClient({
                   Wait! We have a gift for you
                 </h1>
                 <p className="mx-auto mt-4 max-w-sm text-base text-slate-600 md:text-lg">
-                  Before you go, would you stay for{" "}
-                  <span className="font-bold text-primary">
+                  Stay with us and enjoy{" "}
+                  <span className="text-2xl font-bold text-primary md:text-3xl">
                     {discountPercent}% off
                   </span>{" "}
-                  for the next {discountDuration} {durationUnit}?
+                  for the {discountDuration} {durationUnit}.
                 </p>
 
                 <div className="mt-6 inline-flex animate-pulse items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-xs font-bold text-primary md:text-sm">
@@ -264,43 +284,44 @@ export function CancelClient({
               </div>
 
               <div className="space-y-6 px-6 py-10 md:p-10">
-                <div className="rounded-2xl border-2 border-dashed border-primary/20 bg-primary/5 p-6 text-center">
-                  <p className="text-xs font-medium tracking-wider text-slate-500 uppercase md:text-sm">
+                <div className="rounded-2xl border-2 border-dashed border-primary/20 bg-primary/5 p-3 text-center md:p-4">
+                  <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase md:text-sm">
                     Your Special Offer
                   </p>
-                  <div className="mt-2 flex items-center justify-center gap-3">
-                    <span className="text-2xl font-bold text-slate-400 line-through md:text-3xl">
+
+                  <div className="mt-2 flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1">
+                    {/* Original Price */}
+                    <span className="text-xl font-bold text-slate-400 line-through sm:text-2xl md:text-3xl">
                       ${(price / 100).toFixed(2)}
                     </span>
-                    <span className="text-4xl font-bold text-primary md:text-5xl">
+
+                    {/* Discounted Price */}
+                    <span className="text-3xl font-extrabold text-primary sm:text-4xl md:text-5xl">
                       ${(discountedPrice / 100).toFixed(2)}
                     </span>
-                    <span className="text-base font-bold text-slate-400 md:text-lg">
+
+                    {/* Billing Cycle Unit */}
+                    <span className="text-sm font-semibold text-slate-400 md:text-lg">
                       {priceUnit}
                     </span>
                   </div>
-                  <p className="mt-3 text-sm font-medium text-slate-500">
+
+                  <p className="mt-3 text-xs font-medium text-slate-500 md:text-sm">
                     Valid for the next {discountDuration} {durationUnit}
                   </p>
-                  {couponCode && (
-                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-white px-3 py-1 text-[11px] font-bold text-primary">
-                      <Tag className="h-3 w-3" />
-                      Coupon auto-applied:
-                      <span className="font-mono tracking-widest text-slate-400">
-                        ●●●●●●●●
-                      </span>
-                    </div>
-                  )}
                 </div>
 
-                <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-2 md:p-4">
                   <AlertCircle className="mt-0.5 h-5 w-5 text-slate-400" />
                   <p className="text-xs leading-relaxed text-slate-500">
                     <span className="font-bold text-slate-700">Note:</span> This
-                    exclusive {discountPercent}% discount will be automatically
-                    applied to your next {billingCycle} renewal. You will keep
-                    all your current {planName}
-                    features and your billing cycle will remain unchanged.
+                    exclusive <b>{discountPercent}% discount</b> will be
+                    automatically applied to your{" "}
+                    {trialEndDate
+                      ? `first charge after your trial ends on ${formatTrialEnd(trialEndDate)}`
+                      : `next ${billingCycle} renewal`}
+                    . You will keep all your current <b>{planName}</b> features
+                    and your billing cycle will remain unchanged.
                   </p>
                 </div>
 
@@ -315,8 +336,9 @@ export function CancelClient({
                         Claim {discountPercent}% Discount
                       </span>
                       <span className="text-[13px] font-medium opacity-90">
-                        Pay ${(discountedPrice / 100).toFixed(2)} on your next{" "}
-                        {billingCycle === "yearly" ? "year" : "month"}
+                        {trialEndDate
+                          ? `Pay $${(discountedPrice / 100).toFixed(2)} when your trial ends on ${formatTrialEnd(trialEndDate)}`
+                          : `Pay $${(discountedPrice / 100).toFixed(2)} on your next ${billingCycle === "yearly" ? "year" : "month"}`}
                       </span>
                     </div>
                   </button>
@@ -409,17 +431,21 @@ export function CancelClient({
                       "Confirm Cancellation"
                     )}
                   </button>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <button
                       onClick={() => setStep("offer")}
                       className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white py-3.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95"
                     >
                       Keep my plan
                     </button>
-                    <button className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white py-3.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95">
-                      <MessageCircle className="mr-2 inline-block h-4 w-4" />
+
+                    <Link
+                      href="/contact"
+                      className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white py-3.5 text-center text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95"
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
                       Talk to support
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -464,7 +490,9 @@ export function CancelClient({
                 </div>
                 <div className="flex justify-between border-t border-slate-200 pt-2">
                   <span className="font-bold text-slate-900">
-                    Next {billingCycle === "yearly" ? "year" : "month"}
+                    {trialEndDate
+                      ? `First charge on ${formatTrialEnd(trialEndDate)}`
+                      : `Next ${billingCycle === "yearly" ? "year" : "month"}`}
                   </span>
                   <span className="text-base font-bold text-primary">
                     ${(discountedPrice / 100).toFixed(2)}

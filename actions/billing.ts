@@ -95,11 +95,40 @@ export async function setDefaultCard(paymentMethodId: string) {
     if (!user?.stripeCustomerId) return { error: "Customer not found" }
 
     const stripe = getStripe()
+
+    // 1. Update the customer-level default (used for new subscriptions and
+    //    invoices that have no subscription-level override)
     await stripe.customers.update(user.stripeCustomerId, {
       invoice_settings: {
         default_payment_method: paymentMethodId,
       },
     })
+
+    // 2. Sync the active subscription's default_payment_method so Stripe
+    //    actually uses the newly selected card. Without this, subscriptions
+    //    created with an explicit PM keep that old card at the subscription
+    //    level, overriding the customer-level default — which causes Stripe
+    //    to show the old card after a yearly upgrade or renewal.
+    const [activeLicense] = await db
+      .select({ stripeSubscriptionId: licenses.stripeSubscriptionId })
+      .from(licenses)
+      .where(eq(licenses.userId, session.userId))
+      .limit(1)
+
+    if (activeLicense?.stripeSubscriptionId?.startsWith("sub_")) {
+      try {
+        await stripe.subscriptions.update(activeLicense.stripeSubscriptionId, {
+          default_payment_method: paymentMethodId,
+        })
+      } catch (err) {
+        // Non-fatal: the customer-level default is already updated, so
+        // future invoices will still use the correct card
+        console.error(
+          "[setDefaultCard] Failed to sync subscription payment method:",
+          err
+        )
+      }
+    }
 
     revalidatePath("/billing")
     return { success: true }
@@ -1179,6 +1208,39 @@ export async function upgradeSubscriptionToYearly(
     const isStripeTrial =
       subscription.status === "trialing" && !!subscription.trial_end
 
+    // Resolve the payment method to pin on the upgraded subscription.
+    // Prefer the customer's current invoice_settings default (which
+    // setDefaultCard keeps up-to-date), falling back to whatever the
+    // subscription was originally created with. This prevents Stripe from
+    // continuing to show/charge an old card when the user has since
+    // changed their default payment method.
+    const [userRecord] = await db
+      .select({ stripeCustomerId: users.stripeCustomerId })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1)
+
+    let resolvedDefaultPM: string | undefined
+    if (userRecord?.stripeCustomerId) {
+      try {
+        const customer = await stripe.customers.retrieve(
+          userRecord.stripeCustomerId
+        )
+        if (!customer.deleted) {
+          const pm = (customer as Stripe.Customer).invoice_settings
+            ?.default_payment_method
+          resolvedDefaultPM = typeof pm === "string" ? pm : pm?.id || undefined
+        }
+      } catch {
+        // Non-fatal: fall through to subscription-level PM
+      }
+    }
+    if (!resolvedDefaultPM) {
+      const subPM = subscription.default_payment_method
+      resolvedDefaultPM =
+        typeof subPM === "string" ? subPM : subPM?.id || undefined
+    }
+
     // The yearly discount is baked into `finalYearlyAmount` (the unit_amount
     // sent from the preview), so we don't pass a separate Stripe coupon —
     // doing so would double-discount. We still record the source coupon code
@@ -1212,6 +1274,9 @@ export async function upgradeSubscriptionToYearly(
         ],
         discounts: "",
         proration_behavior: isStripeTrial ? "none" : "always_invoice",
+        ...(resolvedDefaultPM
+          ? { default_payment_method: resolvedDefaultPM }
+          : {}),
         metadata: {
           ...(subscription.metadata || {}),
           plan_id: yearlyPlan.id,

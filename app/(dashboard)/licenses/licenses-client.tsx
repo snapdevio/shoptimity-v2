@@ -1479,15 +1479,17 @@ function CollisionErrorModal({
           <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive ring-8 ring-destructive/5">
             <AlertCircleIcon className="size-6" />
           </div>
-          <DialogTitle className="text-xl">Domain Already Assigned</DialogTitle>
+          <DialogTitle className="text-xl">Domain Already in Use</DialogTitle>
           <DialogDescription className="text-base text-balance text-muted-foreground">
             The domain <strong>{domainName}</strong> is already connected to
-            another license in our system.
+            another license.
           </DialogDescription>
         </DialogHeader>
         <div className="mt-2 rounded-lg border border-border/50 bg-muted/40 p-4 text-sm leading-relaxed text-muted-foreground">
-          A domain can only be assigned to one license at a time. Please verify
-          the domain name or contact support if you believe this is an error.
+          <b>Access Denied:</b> The domain <strong>{domainName}</strong> is
+          already assigned to a different license holder. To prevent data
+          conflicts, it cannot be added to this account while it is active
+          elsewhere.
         </div>
         <DialogFooter className="mt-4 flex flex-row gap-2">
           {onTryAgain && (

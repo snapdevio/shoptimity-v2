@@ -469,6 +469,23 @@ export async function adminResendLoginNotification(userId: string) {
   return { success: true }
 }
 
+export async function adminGetLicenseDomains(licenseId: string) {
+  await requireAdmin()
+
+  const data = await db
+    .select({
+      id: domains.id,
+      domainName: domains.domainName,
+      createdAt: domains.createdAt,
+      deletedAt: domains.deletedAt,
+    })
+    .from(domains)
+    .where(eq(domains.licenseId, licenseId))
+    .orderBy(domains.createdAt)
+
+  return data
+}
+
 export async function adminRevokeLicense(licenseId: string) {
   const session = await requireAdmin()
 

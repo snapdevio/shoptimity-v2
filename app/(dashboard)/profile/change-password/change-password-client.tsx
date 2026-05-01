@@ -43,14 +43,22 @@ export function ChangePasswordClient() {
     const newPassword = formData.get("newPassword") as string
     const confirmPassword = formData.get("confirmPassword") as string
 
-    if (newPassword !== confirmPassword) {
-      setError("New passwords do not match.")
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters long.")
       setIsPending(false)
       return
     }
 
-    if (newPassword.length < 8) {
-      setError("New password must be at least 8 characters long.")
+    if (newPassword === currentPassword) {
+      setError("New password must be different from your current password.")
+      setIsPending(false)
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError(
+        "Passwords do not match. Please make sure both fields are identical."
+      )
       setIsPending(false)
       return
     }

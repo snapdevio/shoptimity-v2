@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import NumberFlow from "@number-flow/react"
-import { CheckCheck } from "lucide-react"
+import { Check, CheckCheck, ShieldCheck } from "lucide-react"
 // import { motion, AnimatePresence } from "motion/react";
 import React, { memo, useRef } from "react"
 // import { VerticalCutReveal } from "./vertical-cut-reveal";
@@ -37,7 +37,7 @@ const PricingSwitch = ({
 
   return (
     <div className={cn("flex w-full justify-center", className)}>
-      <div className="relative z-10 flex w-full max-w-[280px] rounded-full border border-neutral-200 bg-neutral-100/50 p-1 shadow-inner backdrop-blur-sm sm:w-auto md:max-w-none md:p-2">
+      <div className="relative z-10 flex w-full max-w-70 rounded-full border border-neutral-200 bg-neutral-100/50 p-1 shadow-inner backdrop-blur-sm sm:w-auto md:max-w-none md:p-2">
         <div
           className={cn(
             "absolute inset-y-1 left-1 z-0 rounded-full bg-linear-to-br from-orange-500 to-orange-600 shadow-md shadow-orange-500/20 transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] md:inset-y-2 md:left-2",
@@ -310,6 +310,18 @@ export const PricingSectionModern = memo(
               </div>
             )
           })}
+        </div>
+
+        {/* trust section */}
+        <div className="text-center">
+          <div className="flex flex-wrap items-center justify-center gap-12 opacity-50 grayscale transition-all duration-300 hover:grayscale-0">
+            <div className="flex items-center gap-2 text-xl font-bold text-slate-900">
+              <ShieldCheck className="h-6 w-6" /> Secured Payment
+            </div>
+            <div className="flex items-center gap-2 text-xl font-bold text-slate-900">
+              <Check className="h-6 w-6" /> No Hidden Fees
+            </div>
+          </div>
         </div>
       </div>
     )
