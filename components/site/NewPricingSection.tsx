@@ -55,6 +55,8 @@ interface GroupedPlan {
   mode: string
   canBeYearly: boolean
   isFree: boolean
+  monthlyTrialDays: number
+  yearlyTrialDays: number
 }
 
 interface NewPricingSectionProps {
@@ -145,6 +147,8 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
         mode: basePlan?.mode || "",
         canBeYearly: !!canBeYearly,
         isFree,
+        monthlyTrialDays: monthlyPlan?.trialDays || 0,
+        yearlyTrialDays: yearlyPlan?.trialDays || monthlyPlan?.trialDays || 0,
         features: Array.isArray(basePlan?.features)
           ? (basePlan.features as string[]).map((f) => {
               let name = f
@@ -419,7 +423,15 @@ const NewPricingSection: React.FC<NewPricingSectionProps> = ({
                   {currentPlan.buttonText}
                 </span>
               </button>
-              <CTABadges className="items-center justify-center" />
+              <CTABadges
+                className="items-center justify-center"
+                trialDays={
+                  isYearly && currentPlan.canBeYearly
+                    ? currentPlan.yearlyTrialDays
+                    : currentPlan.monthlyTrialDays
+                }
+                isFree={currentPlan.isFree}
+              />
             </div>
           </div>
         </div>

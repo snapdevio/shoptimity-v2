@@ -24,27 +24,32 @@ export async function generateMetadata({
   params: { slug: string }
 }) {
   const { slug } = await params
-  
+
   try {
     console.log("[Metadata] Fetching article for slug:", slug)
     const { article } = await getArticle(slug)
-    
+
     console.log("[Metadata] Article found:", article?.title || "NOT FOUND")
-    
+
     if (!article) {
       console.log("[Metadata] Using generic fallback for:", slug)
       return getMetadata({
         title: "Blog Post",
-        description: "Read insights on Shopify growth, store optimization, and ecommerce strategy.",
+        description:
+          "Read insights on Shopify growth, store optimization, and ecommerce strategy.",
         pathname: `/blogs/${slug}`,
       })
     }
 
     const title = article.title || "Blog Post"
-    const description = (typeof article.body === 'string' ? article.body.replace(/<[^>]+>/g, "").slice(0, 160) : "") || "Read insights on Shopify growth, store optimization, and ecommerce strategy."
+    const description =
+      (typeof article.body === "string"
+        ? article.body.replace(/<[^>]+>/g, "").slice(0, 160)
+        : "") ||
+      "Read insights on Shopify growth, store optimization, and ecommerce strategy."
 
     console.log("[Metadata] Generated metadata with title:", title)
-    
+
     return getMetadata({
       title,
       description,
@@ -55,7 +60,8 @@ export async function generateMetadata({
     console.error("[Metadata] Error generating metadata:", error)
     return getMetadata({
       title: "Blog Post",
-      description: "Read insights on Shopify growth, store optimization, and ecommerce strategy.",
+      description:
+        "Read insights on Shopify growth, store optimization, and ecommerce strategy.",
       pathname: `/blogs/${slug}`,
     })
   }

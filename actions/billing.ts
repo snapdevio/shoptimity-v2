@@ -1022,30 +1022,48 @@ export async function previewSubscriptionUpgrade(licenseId: string) {
     // so the monthly retention deal ends with this charge. The actual
     // `subscriptions.update` below mirrors this clear so the live sub
     // matches what was previewed.
-    const upcomingInvoice = await stripe.invoices.createPreview({
-      customer: subscription.customer as string,
-      subscription: license.stripeSubscriptionId,
-      subscription_details: {
-        items: [
-          {
-            id: subscriptionItem.id,
-            price_data: {
-              currency: yearlyPlan.currency || "usd",
-              product: currentProductId,
-              unit_amount: unitAmount,
-              recurring: { interval: "year" },
+    // Fetch the preview invoice and the customer's current balance in parallel.
+    const [upcomingInvoice, stripeCustomer] = await Promise.all([
+      stripe.invoices.createPreview({
+        customer: subscription.customer as string,
+        subscription: license.stripeSubscriptionId,
+        subscription_details: {
+          items: [
+            {
+              id: subscriptionItem.id,
+              price_data: {
+                currency: yearlyPlan.currency || "usd",
+                product: currentProductId,
+                unit_amount: unitAmount,
+                recurring: { interval: "year" },
+              },
             },
-          },
-        ],
-        proration_behavior: isStripeTrial ? "none" : "always_invoice",
-      },
-      discounts: "",
-    })
+          ],
+          proration_behavior: isStripeTrial ? "none" : "always_invoice",
+        },
+        discounts: "",
+      }),
+      stripe.customers.retrieve(subscription.customer as string),
+    ])
 
+    // Only count lines where proration===true (unused time on current period).
+    // Customer balance credit lives in starting_balance/ending_balance, NOT
+    // in proration lines — filtering by proration keeps the two separate.
     const creditAmount =
       upcomingInvoice.lines.data
-        .filter((line: any) => line.amount < 0)
+        .filter((line: any) => line.amount < 0 && line.proration === true)
         .reduce((sum: number, line: any) => sum + line.amount, 0) || 0
+
+    // The customer's existing Stripe balance (negative = credit).
+    // During the real upgrade this credit is parked and restored afterward,
+    // so the user pays the correct plan price and keeps their credit for renewals.
+    const customerBalanceCents = stripeCustomer.deleted
+      ? 0
+      : (stripeCustomer as Stripe.Customer).balance
+
+    const chargeAmount = isStripeTrial
+      ? 0
+      : Math.max(0, upcomingInvoice.amount_due ?? upcomingInvoice.total)
 
     // Discount amount = full yearly - discounted yearly (what the user saved
     // by being on yearly). Surfaced in the modal as the auto-applied coupon
@@ -1074,7 +1092,8 @@ export async function previewSubscriptionUpgrade(licenseId: string) {
         currentCycle: license.billingCycle,
         newCycle: "yearly" as const,
         creditAmount,
-        chargeAmount: isStripeTrial ? 0 : upcomingInvoice.amount_due,
+        chargeAmount,
+        customerBalanceCents,
         currency: upcomingInvoice.currency,
         yearlyPlanId: yearlyPlan.id,
         // finalYearlyAmount is the actual unit_amount used for the
@@ -1375,16 +1394,15 @@ export async function upgradeSubscriptionToYearly(
           .values({
             userId: session.userId,
             planId: yearlyPlan.id,
-            stripeSessionId: latestInvoice.id, // unique; invoice IDs are unique
+            stripeSessionId: latestInvoice.id,
             stripePaymentIntentId: paymentIntentId,
             stripeCustomerId: customerId,
             stripeSubscriptionId: license.stripeSubscriptionId,
             stripeInvoiceId: latestInvoice.id,
             stripeInvoiceUrl: latestInvoice.hosted_invoice_url || null,
-            amount:
-              latestInvoice.amount_paid > 0
-                ? latestInvoice.amount_paid
-                : latestInvoice.amount_due,
+            // Use amount_paid (always ≥ 0). Never record amount_due which
+            // can be negative when the parked credit was not fully zeroed.
+            amount: Math.max(0, latestInvoice.amount_paid),
             currency: latestInvoice.currency,
             appliedPromoCode: couponCode || null,
             status:
@@ -1396,6 +1414,38 @@ export async function upgradeSubscriptionToYearly(
       } catch (err) {
         console.error(
           "[upgradeSubscriptionToYearly] Failed to pay/record invoice:",
+          err
+        )
+      }
+    }
+
+    // Zero out any remaining customer balance so it doesn't carry over to
+    // future yearly renewals. The balance was auto-applied to this upgrade
+    // invoice by Stripe (reducing what the customer paid today). Any leftover
+    // credit after the invoice settles is cleaned up here.
+    if (userRecord?.stripeCustomerId) {
+      try {
+        const freshCust = await stripe.customers.retrieve(
+          userRecord.stripeCustomerId
+        )
+        if (!freshCust.deleted && (freshCust as Stripe.Customer).balance < 0) {
+          const remaining = Math.abs((freshCust as Stripe.Customer).balance)
+          await stripe.customers.createBalanceTransaction(
+            userRecord.stripeCustomerId,
+            {
+              amount: remaining,
+              currency: yearlyPlan.currency || "usd",
+              description: "Clearing remaining credit after yearly upgrade",
+              metadata: {
+                license_id: licenseId,
+                type: "yearly_upgrade_balance_cleanup",
+              },
+            }
+          )
+        }
+      } catch (err) {
+        console.error(
+          "[upgradeSubscriptionToYearly] Failed to clean up customer balance:",
           err
         )
       }
@@ -1614,6 +1664,416 @@ export async function downgradeToFreePlan(
     return { error: error.message || "Failed to downgrade plan" }
   }
 }
+export type DowngradePreview = {
+  freeMonths: number
+  unusedCreditCents: number
+  unusedCreditFormatted: string
+  nextChargeDate: string
+  monthlyPriceCents: number
+  monthlyPriceFormatted: string
+  currency: string
+  isTrial: boolean
+  trialEndsAt: string | null
+}
+
+export async function previewYearlyToMonthlyDowngrade(
+  licenseId: string
+): Promise<{ success: true; preview: DowngradePreview } | { error: string }> {
+  const session = await getAppSession()
+  if (!session) return { error: "Unauthorized" }
+
+  try {
+    const stripe = getStripe()
+
+    const [license] = await db
+      .select()
+      .from(licenses)
+      .where(
+        and(eq(licenses.id, licenseId), eq(licenses.userId, session.userId))
+      )
+      .limit(1)
+
+    if (!license) return { error: "License not found" }
+    if (license.billingCycle !== "yearly")
+      return { error: "Already on monthly billing" }
+    if (license.isLifetime) return { error: "Lifetime plans cannot be changed" }
+    if (license.cancelAtPeriodEnd)
+      return {
+        error:
+          "Subscription is already scheduled to cancel. Reactivate it first.",
+      }
+    if (license.status !== "active" && license.status !== "trialing")
+      return { error: "Subscription is not active" }
+    if (!license.stripeSubscriptionId?.startsWith("sub_"))
+      return { error: "No active subscription found" }
+
+    const [currentPlan] = await db
+      .select()
+      .from(plans)
+      .where(eq(plans.id, license.planId))
+      .limit(1)
+
+    if (!currentPlan) return { error: "Plan not found" }
+
+    let monthlyUnitAmount: number
+    if (currentPlan.hasYearlyPlan) {
+      monthlyUnitAmount = currentPlan.finalPrice
+    } else {
+      const [monthlyPlan] = await db
+        .select()
+        .from(plans)
+        .where(and(eq(plans.name, currentPlan.name), eq(plans.mode, "monthly")))
+        .limit(1)
+      if (!monthlyPlan) return { error: "Monthly equivalent plan not found" }
+      monthlyUnitAmount = monthlyPlan.finalPrice
+    }
+
+    const currency = currentPlan.currency || "usd"
+    const formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    })
+    const isTrial = license.isTrial
+
+    // During a trial no payment has been made, so there is no proration credit.
+    // Show a simplified preview: trial continues unchanged, billing switches to
+    // monthly after the trial ends.
+    if (isTrial) {
+      const trialEndsAt = license.trialEndsAt?.toISOString() ?? null
+      return {
+        success: true,
+        preview: {
+          freeMonths: 0,
+          unusedCreditCents: 0,
+          unusedCreditFormatted: formatter.format(0),
+          nextChargeDate:
+            trialEndsAt ?? new Date(Date.now() + 30 * 86400000).toISOString(),
+          monthlyPriceCents: monthlyUnitAmount,
+          monthlyPriceFormatted: formatter.format(monthlyUnitAmount / 100),
+          currency,
+          isTrial: true,
+          trialEndsAt,
+        },
+      }
+    }
+
+    const [user] = await db
+      .select({ stripeCustomerId: users.stripeCustomerId })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1)
+
+    if (!user?.stripeCustomerId) return { error: "Stripe customer not found" }
+
+    const [subscription, stripeCustomer] = await Promise.all([
+      stripe.subscriptions.retrieve(license.stripeSubscriptionId),
+      stripe.customers.retrieve(user.stripeCustomerId),
+    ])
+    if (!subscription.items.data.length)
+      return { error: "No subscription items found" }
+
+    const subscriptionItem = subscription.items.data[0]
+    const subAny = subscription as any
+
+    // Prorate unused time on the current yearly period
+    const yearlyAmountPaid = subscriptionItem.price.unit_amount ?? 0
+    const periodStart: number =
+      subscriptionItem.current_period_start ?? subAny.current_period_start
+    const periodEnd: number =
+      subscriptionItem.current_period_end ?? subAny.current_period_end
+    const nowUnix = Math.floor(Date.now() / 1000)
+    const totalPeriodSecs = Math.max(1, periodEnd - periodStart)
+    const remainingSecs = Math.max(0, periodEnd - nowUnix)
+    const currentPeriodUnused = Math.round(
+      yearlyAmountPaid * (remainingSecs / totalPeriodSecs)
+    )
+
+    // Add any existing Stripe customer balance credit (from old downgrade flows)
+    const existingBalanceCents = stripeCustomer.deleted
+      ? 0
+      : (stripeCustomer as Stripe.Customer).balance
+    const legacyCreditCents =
+      existingBalanceCents < 0 ? Math.abs(existingBalanceCents) : 0
+    const unusedCreditCents = currentPeriodUnused + legacyCreditCents
+
+    // Convert total unused credit into full free monthly billing cycles
+    const freeMonths =
+      monthlyUnitAmount > 0
+        ? Math.floor(unusedCreditCents / monthlyUnitAmount)
+        : 0
+
+    // First real charge fires after all free cycles complete (~30d per cycle)
+    const nextChargeDate = new Date(
+      Date.now() + (freeMonths + 1) * 30 * 86400000
+    ).toISOString()
+
+    return {
+      success: true,
+      preview: {
+        freeMonths,
+        unusedCreditCents,
+        unusedCreditFormatted: formatter.format(unusedCreditCents / 100),
+        nextChargeDate,
+        monthlyPriceCents: monthlyUnitAmount,
+        monthlyPriceFormatted: formatter.format(monthlyUnitAmount / 100),
+        currency,
+        isTrial: false,
+        trialEndsAt: null,
+      },
+    }
+  } catch (error: any) {
+    const msg =
+      error?.raw?.message || error?.message || "Failed to preview downgrade"
+    console.error("[previewYearlyToMonthlyDowngrade]", msg, error)
+    return { error: msg }
+  }
+}
+
+export async function downgradeYearlyToMonthly(
+  licenseId: string
+): Promise<
+  | { success: true; freeMonths: number; nextRenewalDate: string | null }
+  | { error: string }
+> {
+  const session = await getAppSession()
+  if (!session) return { error: "Unauthorized" }
+
+  try {
+    const stripe = getStripe()
+
+    const [license] = await db
+      .select()
+      .from(licenses)
+      .where(
+        and(eq(licenses.id, licenseId), eq(licenses.userId, session.userId))
+      )
+      .limit(1)
+
+    if (!license) return { error: "License not found" }
+    if (license.billingCycle !== "yearly")
+      return { error: "Already on monthly billing" }
+    if (license.isLifetime) return { error: "Lifetime plans cannot be changed" }
+    if (license.cancelAtPeriodEnd)
+      return {
+        error:
+          "Subscription is already scheduled to cancel. Reactivate it first.",
+      }
+    if (license.status !== "active" && license.status !== "trialing")
+      return { error: "Subscription is not active" }
+    if (!license.stripeSubscriptionId?.startsWith("sub_"))
+      return { error: "No active subscription found" }
+
+    // Skip open-invoice check for trialing subscriptions — no payment is due yet.
+    if (!license.isTrial) {
+      const openInvoices = await stripe.invoices.list({
+        subscription: license.stripeSubscriptionId,
+        status: "open",
+        limit: 1,
+      })
+      if (openInvoices.data.length > 0) {
+        return {
+          error:
+            "You have an outstanding invoice. Please pay it before changing your billing cycle.",
+        }
+      }
+    }
+
+    const [currentPlan] = await db
+      .select()
+      .from(plans)
+      .where(eq(plans.id, license.planId))
+      .limit(1)
+
+    if (!currentPlan) return { error: "Plan not found" }
+
+    let targetPlanId: string = currentPlan.id
+    let monthlyUnitAmount: number
+
+    if (currentPlan.hasYearlyPlan) {
+      monthlyUnitAmount = currentPlan.finalPrice
+    } else {
+      const [monthlyPlan] = await db
+        .select()
+        .from(plans)
+        .where(and(eq(plans.name, currentPlan.name), eq(plans.mode, "monthly")))
+        .limit(1)
+      if (!monthlyPlan) return { error: "Monthly equivalent plan not found" }
+      targetPlanId = monthlyPlan.id
+      monthlyUnitAmount = monthlyPlan.finalPrice
+    }
+
+    const currency = currentPlan.currency || "usd"
+
+    const [subscription, userRecord] = await Promise.all([
+      stripe.subscriptions.retrieve(license.stripeSubscriptionId),
+      db
+        .select({ stripeCustomerId: users.stripeCustomerId })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1)
+        .then((r) => r[0]),
+    ])
+    if (!subscription.items.data.length)
+      return { error: "No subscription items found" }
+
+    const subscriptionItem = subscription.items.data[0]
+    const currentProductId = subscriptionItem.price.product as string
+    const subAny = subscription as any
+
+    // ─── Step 1: Calculate total unused credit → free months ─────────────────
+    // Two sources of credit are combined:
+    //   a) Unused time on the current yearly period (prorated)
+    //   b) Any existing Stripe customer balance credit left over from a
+    //      previous downgrade that used the old createBalanceTransaction approach
+    // Both are converted to full free monthly billing cycles via a coupon.
+    // The existing balance is then zeroed out so it can never silently reduce
+    // a future yearly renewal invoice.
+    let freeMonths = 0
+    if (!license.isTrial && userRecord?.stripeCustomerId) {
+      const yearlyAmountPaid = subscriptionItem.price.unit_amount ?? 0
+      const periodStart: number =
+        subscriptionItem.current_period_start ?? subAny.current_period_start
+      const periodEnd: number =
+        subscriptionItem.current_period_end ?? subAny.current_period_end
+      const nowUnix = Math.floor(Date.now() / 1000)
+      const totalPeriodSecs = Math.max(1, periodEnd - periodStart)
+      const remainingSecs = Math.max(0, periodEnd - nowUnix)
+      const currentPeriodUnused = Math.round(
+        yearlyAmountPaid * (remainingSecs / totalPeriodSecs)
+      )
+
+      // Read any leftover customer balance credit (negative = credit on Stripe)
+      const stripeCustomer = await stripe.customers.retrieve(
+        userRecord.stripeCustomerId
+      )
+      const existingBalanceCents = stripeCustomer.deleted
+        ? 0
+        : (stripeCustomer as Stripe.Customer).balance
+      const legacyCreditCents =
+        existingBalanceCents < 0 ? Math.abs(existingBalanceCents) : 0
+
+      // Combined: current period unused + any existing balance credit
+      const totalUnusedCents = currentPeriodUnused + legacyCreditCents
+      freeMonths =
+        monthlyUnitAmount > 0
+          ? Math.floor(totalUnusedCents / monthlyUnitAmount)
+          : 0
+
+      // ─── Step 2: Apply total unused credit as negative Stripe customer balance ─
+      // Stripe auto-deducts a negative balance from each upcoming monthly invoice
+      // ($0 charge per free month). The balance is zeroed before any yearly upgrade
+      // fires (in upgradeSubscriptionToYearly), so it never reduces a yearly charge.
+      if (legacyCreditCents > 0) {
+        // Debit out the old balance entry so we replace it with one clean entry
+        await stripe.customers.createBalanceTransaction(
+          userRecord.stripeCustomerId,
+          {
+            amount: legacyCreditCents,
+            currency,
+            description: "Consolidating existing balance into new credit entry",
+            metadata: { license_id: licenseId, type: "legacy_balance_debit" },
+          }
+        )
+      }
+      if (totalUnusedCents > 0) {
+        await stripe.customers.createBalanceTransaction(
+          userRecord.stripeCustomerId,
+          {
+            amount: -totalUnusedCents,
+            currency,
+            description: `Unused yearly credit — ${freeMonths} free month${freeMonths !== 1 ? "s" : ""} on monthly billing`,
+            metadata: {
+              license_id: licenseId,
+              type: "yearly_to_monthly_credit",
+              free_months: String(freeMonths),
+            },
+          }
+        )
+      }
+    }
+
+    // ─── Step 3: Switch subscription to monthly ───────────────────────────────
+    // billing_cycle_anchor "now": resets the billing period to today so the
+    // next invoice fires in exactly 30 days, giving the customer a clean
+    // monthly cycle from the downgrade date.
+    await stripe.subscriptions.update(license.stripeSubscriptionId, {
+      items: [
+        {
+          id: subscriptionItem.id,
+          price_data: {
+            currency,
+            product: currentProductId,
+            unit_amount: monthlyUnitAmount,
+            recurring: { interval: "month" },
+          },
+        },
+      ],
+      discounts: "" as any,
+      proration_behavior: "none",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      billing_cycle_anchor: "now" as any,
+      metadata: {
+        ...(subscription.metadata || {}),
+        plan_id: targetPlanId,
+        is_yearly: "false",
+        downgraded_from_yearly: "true",
+      },
+    })
+
+    // Next renewal is today + 30 days (billing anchor just reset to now).
+    // For trials the renewal date stays at trial end.
+    let nextRenewalDate: Date
+    if (license.isTrial && license.trialEndsAt) {
+      nextRenewalDate = new Date(license.trialEndsAt)
+    } else {
+      nextRenewalDate = new Date(Date.now() + 30 * 86400000)
+    }
+
+    await db
+      .update(licenses)
+      .set({
+        planId: targetPlanId,
+        billingCycle: "monthly",
+        nextRenewalDate,
+        retentionDiscountEndsAt: null,
+        cancelAtPeriodEnd: false,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(licenses.id, licenseId), eq(licenses.userId, session.userId))
+      )
+
+    await refreshLicenseR2(licenseId, session.userId)
+
+    await createAuditLog(
+      session.userId,
+      "subscription.downgrade_yearly_to_monthly",
+      "license",
+      licenseId,
+      {
+        fromPlanId: license.planId,
+        toPlanId: targetPlanId,
+        fromBillingCycle: "yearly",
+        toBillingCycle: "monthly",
+        stripeSubscriptionId: license.stripeSubscriptionId,
+        freeMonths,
+        nextRenewalDate: nextRenewalDate?.toISOString(),
+      }
+    )
+
+    revalidatePath("/billing")
+    return {
+      success: true,
+      freeMonths,
+      nextRenewalDate: nextRenewalDate?.toISOString() ?? null,
+    }
+  } catch (error: any) {
+    const msg = error?.raw?.message || error?.message || "Failed to downgrade"
+    console.error("[downgradeYearlyToMonthly]", msg, error)
+    return { error: msg }
+  }
+}
+
 export async function validateCoupon(code: string) {
   const session = await getAppSession()
   if (!session) return { error: "Unauthorized" }

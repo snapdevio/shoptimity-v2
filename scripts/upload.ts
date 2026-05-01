@@ -49,6 +49,30 @@ function sanitizeFilename(name: string): string {
 }
 
 /**
+ * Returns the content type based on the file extension.
+ */
+function getContentType(filename: string): string {
+  const ext = path.extname(filename).toLowerCase()
+  const mimeTypes: Record<string, string> = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".zip": "application/zip",
+    ".pdf": "application/pdf",
+    ".mp4": "video/mp4",
+    ".html": "text/html",
+    ".txt": "text/plain",
+  }
+  return mimeTypes[ext] || "application/octet-stream"
+}
+
+/**
  * Purges Cloudflare cache for a list of URLs.
  */
 async function purgeCloudflareCache(urls: string[]) {
@@ -151,7 +175,7 @@ async function uploadTemplates(purgeQueue: string[]) {
     }
 
     const fileBuffer = fs.readFileSync(filePath)
-    const key = `templates/${currentFile}`
+    const key = `shoptimity-v2/templates/${currentFile}`
     const sizeKB = (fileBuffer.byteLength / 1024).toFixed(1)
 
     console.log(
@@ -199,46 +223,62 @@ async function uploadAsset(
 }
 
 /**
- * Handle setup asset image uploads.
+ * Handle setup asset uploads for any file type (images, js, zip, etc.).
  */
 async function uploadSetupAssets(purgeQueue: string[]) {
   const setupDir = path.join(process.cwd(), "public", "new")
 
   if (!fs.existsSync(setupDir)) {
-    console.warn(":warning:  public/assets/setup/ directory not found.")
+    console.warn(":warning:  public/new/ directory not found.")
     return
   }
 
   const files = fs
     .readdirSync(setupDir)
-    .filter((f) => /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(f))
+    .filter((f) => !f.startsWith(".") && f !== "Thumbs.db")
 
   if (files.length === 0) {
-    console.warn(":warning:  No image files found in public/assets/setup/.")
+    console.warn(":warning:  No files found in public/new/.")
     return
   }
 
-  console.log(
-    `\n:camera_with_flash: Processing ${files.length} setup asset(s)...\n`
-  )
+  console.log(`\n:file_folder: Processing ${files.length} setup asset(s)...\n`)
 
   for (const file of files) {
-    const filePath = path.join(setupDir, file)
+    const sanitized = sanitizeFilename(file)
+    let currentFile = file
+    let filePath = path.join(setupDir, file)
+
+    // Rename local file if not standardized
+    if (file !== sanitized) {
+      const newPath = path.join(setupDir, sanitized)
+      console.log(
+        `   :arrows_counterclockwise: Renaming: "${file}" → "${sanitized}"`
+      )
+      try {
+        fs.renameSync(filePath, newPath)
+        currentFile = sanitized
+        filePath = newPath
+      } catch (err) {
+        console.error(`   :x: Failed to rename ${file}:`, err)
+      }
+    }
+
     const fileBuffer = fs.readFileSync(filePath)
-    const key = `shoptimity-v2/assets/setup/${file}`
-    const ext = path.extname(file).toLowerCase()
-    const contentType =
-      ext === ".svg" ? "image/svg+xml" : `image/${ext.replace(".", "")}`
+    const key = `shoptimity-v2/assets/${currentFile}`
+    const contentType = getContentType(currentFile)
     const sizeKB = (fileBuffer.byteLength / 1024).toFixed(1)
 
-    console.log(`:rocket: Uploading ${file} (${sizeKB} KB) → R2 Key: ${key}`)
+    console.log(
+      `:rocket: Uploading ${currentFile} (${sizeKB} KB) → R2 Key: ${key}`
+    )
 
     try {
       await uploadToR2(key, fileBuffer, contentType)
-      console.log(`   :white_check_mark: Success!`)
-      purgeQueue.push(`${SETUP_ASSETS_BASE_URL}/${file}`)
+      console.log(`   :white_check_mark: Success!`)
+      purgeQueue.push(`${SETUP_ASSETS_BASE_URL}/${currentFile}`)
     } catch (error) {
-      console.error(`   :x: Failed to upload ${file}:`, error)
+      console.error(`   :x: Failed to upload ${currentFile}:`, error)
     }
   }
 }

@@ -90,7 +90,7 @@ const Hero: React.FC<HeroProps> = ({
             <div className="flex w-full flex-col items-center gap-3 sm:w-auto lg:items-start">
               <button
                 onClick={scrollToPricing}
-                className="btn-orange flex min-h-[60px] w-full cursor-pointer items-center justify-center gap-2 rounded-full px-8 py-4 font-sans text-lg sm:w-auto"
+                className="btn-orange flex min-h-15 w-full cursor-pointer items-center justify-center gap-2 rounded-full px-8 py-4 font-sans text-lg sm:w-auto"
               >
                 {ctaText ? (
                   ctaText
@@ -132,7 +132,7 @@ const Hero: React.FC<HeroProps> = ({
             alt="Main banner"
           />
 
-          <div className="scroll-animate absolute top-1/2 left-[-20px] z-20 hidden h-[260px] w-[50px] md:block lg:left-[-40px] lg:w-[75px]">
+          <div className="scroll-animate absolute top-1/2 -left-5 z-20 hidden h-65 w-[50px] md:block lg:-left-10 lg:w-[75px]">
             <div className="animate-vertical-loop flex flex-col">
               <img
                 src="/assets/vertical-banner.png"

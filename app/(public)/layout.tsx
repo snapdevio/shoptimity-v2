@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import Navbar from "@/components/site/Navbar"
+import OfferBar from "@/components/site/AnnouncementBar"
 import {
   DiscordIcon,
   FacebookIcon,
@@ -21,6 +22,7 @@ export default async function PublicLayout({
 
   return (
     <div className="flex min-h-svh flex-col">
+      <OfferBar />
       <Navbar isLoggedIn={!!session} />
 
       <main className="flex-1">{children}</main>

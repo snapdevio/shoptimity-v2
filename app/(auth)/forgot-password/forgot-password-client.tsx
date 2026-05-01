@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Spinner } from "@/components/ui/spinner"
 import { authClient } from "@/lib/auth-client"
+import Image from "next/image"
 
 function getInboxDetails(email: string) {
   const domain = email.split("@")[1]?.toLowerCase()
@@ -104,10 +105,12 @@ export function ForgotPasswordClient() {
             className="inline-flex cursor-pointer items-center gap-2"
           >
             <div className="relative h-10 w-auto">
-              <img
+              <Image
                 src={`${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT || ""}/assets/logo.svg`}
                 alt="Shoptimity Logo"
                 className="h-10 w-auto object-contain"
+                width={160}
+                height={48}
               />
             </div>
           </Link>

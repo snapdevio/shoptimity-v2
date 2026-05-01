@@ -248,25 +248,38 @@ export function PlansClient({
       // doesn't matter, but for paid plans we must compare both — otherwise
       // a user on Pro Monthly would see "Current Plan" on the Pro Yearly tab
       // when the plan uses inline `hasYearlyPlan` (same plan record).
-      // Exception: yearly subscribers viewing the monthly tab also see their
-      // tier as "Current Plan" — switching to monthly mid-cycle would spawn
-      // a brand-new Stripe subscription and waste their prepaid yearly time.
       const planMatches = !!finalPlan && finalPlan.id === activePlanId
       const cycleMatches =
         finalPlan?.mode === "free" ||
         finalPlan?.mode === "lifetime" ||
-        billingCycle === activeBillingCycle ||
-        (activeBillingCycle === "yearly" && billingCycle === "monthly")
+        billingCycle === activeBillingCycle
       const isCurrent = planMatches && cycleMatches
 
-      // When the user is on this same plan but a different cycle (e.g.
-      // monthly → viewing yearly), surface "Upgrade" instead of the default
-      // CTA so the action is clear. The yearly→monthly direction is handled
-      // above (treated as Current Plan), so only the monthly→yearly upgrade
-      // ever reaches this branch.
+      // Yearly subscriber viewing the monthly tab — any paid plan is a
+      // potential downgrade, not a new purchase.
+      const isYearlyViewingMonthly =
+        activeBillingCycle === "yearly" && billingCycle === "monthly"
+
       let buttonText = "Get Started"
+      let isDowngrade = false
+
       if (planMatches && !cycleMatches) {
-        buttonText = "Upgrade to Yearly"
+        // Same plan, different cycle
+        if (isYearlyViewingMonthly) {
+          buttonText = "Switch to Monthly"
+          isDowngrade = true
+        } else {
+          buttonText = "Upgrade to Yearly"
+        }
+      } else if (
+        !planMatches &&
+        !isCurrent &&
+        isYearlyViewingMonthly &&
+        finalPlan?.mode !== "free"
+      ) {
+        // Different paid plan on monthly tab while subscriber is yearly
+        buttonText = "Downgrade"
+        isDowngrade = true
       }
 
       return {
@@ -289,6 +302,7 @@ export function PlansClient({
         includes: Array.isArray(tierFeatures) ? tierFeatures : [],
         planBadge: planBadge,
         isCurrent,
+        isDowngrade,
         trialDays: finalPlan?.trialDays || 0,
       }
     })
@@ -357,21 +371,24 @@ export function PlansClient({
           return
         }
 
-        // Defensive: a yearly subscriber should never reach /checkout for
-        // any monthly plan card — it would create a parallel subscription
-        // and discard their prepaid yearly time. The button is also
-        // disabled in the UI for the same-plan case, but this guards
-        // against stale client state.
+        // Yearly subscribers clicking any monthly plan card must go through
+        // /billing — never /checkout — to avoid creating a parallel subscription
+        // that discards their prepaid yearly time.
         const isYearlyCustomerPickingMonthly =
           isOnPaidPlan &&
           activeBillingCycle === "yearly" &&
           billingCycle === "monthly"
 
         if (isYearlyCustomerPickingMonthly) {
-          toast.info(
-            "You're already on the yearly plan. Manage your subscription from the billing page."
-          )
-          router.push("/billing")
+          const isSamePlan = activePlanId === finalPlan?.id
+          if (isSamePlan) {
+            router.push("/billing?action=switch-month")
+          } else {
+            toast.info(
+              "To change your plan, manage your subscription from the billing page."
+            )
+            router.push("/billing")
+          }
           return
         }
 

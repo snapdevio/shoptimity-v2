@@ -96,7 +96,7 @@ export default function SetupPage() {
                 preload="metadata"
                 src={
                   process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT
-                    ? `${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT}/video/step.mp4`
+                    ? `${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT}/shoptimity-v2/video/step.mp4`
                     : ""
                 }
               >

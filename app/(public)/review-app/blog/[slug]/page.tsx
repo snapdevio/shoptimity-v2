@@ -24,13 +24,16 @@ export async function generateMetadata({
   params: { slug: string }
 }) {
   const { slug } = await params
-  
+
   try {
     console.log("[Review Metadata] Fetching article for slug:", slug)
     const { article } = await getArticle(slug)
-    
-    console.log("[Review Metadata] Article found:", article?.title || "NOT FOUND")
-    
+
+    console.log(
+      "[Review Metadata] Article found:",
+      article?.title || "NOT FOUND"
+    )
+
     if (!article) {
       console.log("[Review Metadata] Using generic fallback for:", slug)
       return getMetadata({
@@ -41,10 +44,13 @@ export async function generateMetadata({
     }
 
     const title = article.title || "Blog Post"
-    const description = (typeof article.body === 'string' ? article.body.replace(/<[^>]+>/g, "").slice(0, 160) : "") || "Read insights on Shopify marketing and app reviews."
+    const description =
+      (typeof article.body === "string"
+        ? article.body.replace(/<[^>]+>/g, "").slice(0, 160)
+        : "") || "Read insights on Shopify marketing and app reviews."
 
     console.log("[Review Metadata] Generated metadata with title:", title)
-    
+
     return getMetadata({
       title,
       description,

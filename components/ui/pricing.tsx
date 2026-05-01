@@ -97,6 +97,7 @@ export interface PricingPlan {
   badge?: string
   includes: string[]
   isCurrent?: boolean
+  isDowngrade?: boolean
   planBadge?: string
   trialDays?: number
 }
@@ -251,7 +252,10 @@ export const PricingSectionModern = memo(
                       }
                       disabled={plan.isCurrent || !!loadingPlanName}
                       className={cn(
-                        "mb-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-orange-400 bg-linear-to-t from-orange-500 to-orange-600 px-4 py-3.5 text-base font-bold whitespace-nowrap text-white shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed sm:text-lg lg:text-xl",
+                        "mb-6 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-base font-bold whitespace-nowrap shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed sm:text-lg lg:text-xl",
+                        plan.isDowngrade && !plan.isCurrent
+                          ? "border border-slate-300 bg-white text-slate-700 shadow-slate-200/60 hover:bg-slate-50"
+                          : "border border-orange-400 bg-linear-to-t from-orange-500 to-orange-600 text-white shadow-orange-500/20",
                         isLoading && "opacity-90"
                       )}
                     >
