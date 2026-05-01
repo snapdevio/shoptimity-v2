@@ -9,7 +9,7 @@ export const user = pgTable("user", {
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
   role: text("role").notNull().default("user"),
-  loginMode: text("login_mode"), // email, google, microsoft
+  loginMode: text("login_mode"), // email, google
   stripeCustomerId: text("stripe_customer_id"),
   addressLine1: text("address_line1"),
   addressLine2: text("address_line2"),

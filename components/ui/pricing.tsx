@@ -37,7 +37,7 @@ const PricingSwitch = ({
 
   return (
     <div className={cn("flex w-full justify-center", className)}>
-      <div className="relative z-10 flex w-full max-w-[280px] rounded-full border border-neutral-200 bg-neutral-100/50 p-1 shadow-inner backdrop-blur-sm sm:w-auto md:max-w-none md:p-2">
+      <div className="relative z-10 flex w-full max-w-70 rounded-full border border-neutral-200 bg-neutral-100/50 p-1 shadow-inner backdrop-blur-sm sm:w-auto md:max-w-none md:p-2">
         <div
           className={cn(
             "absolute inset-y-1 left-1 z-0 rounded-full bg-linear-to-br from-orange-500 to-orange-600 shadow-md shadow-orange-500/20 transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] md:inset-y-2 md:left-2",
