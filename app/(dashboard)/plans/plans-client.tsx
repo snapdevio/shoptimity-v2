@@ -353,7 +353,7 @@ export function PlansClient({
           buttonText = "Switch to Monthly"
           isDowngrade = true
         } else {
-        buttonText = "Upgrade to Yearly"
+          buttonText = "Upgrade to Yearly"
         }
       } else if (
         !planMatches &&
@@ -468,10 +468,10 @@ export function PlansClient({
           if (isSamePlan) {
             router.push("/billing?action=switch-month")
           } else {
-          toast.info(
+            toast.info(
               "To change your plan, manage your subscription from the billing page."
-          )
-          router.push("/billing")
+            )
+            router.push("/billing")
           }
           return
         }

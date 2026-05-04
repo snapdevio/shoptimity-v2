@@ -167,7 +167,7 @@ export function AdminWebhookEventsClient({
         open={!!selectedEvent}
         onOpenChange={(open) => !open && setSelectedEvent(null)}
       >
-        <DialogContent className="max-h-[90vh] max-w-3xl flex flex-col overflow-hidden p-0">
+        <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col overflow-hidden p-0">
           <DialogHeader className="px-6 pt-6">
             <DialogTitle className="flex items-center gap-2">
               Webhook Event Detail
@@ -182,7 +182,7 @@ export function AdminWebhookEventsClient({
           </DialogHeader>
 
           {selectedEvent && (
-            <div className="px-6 flex-1 min-h-0">
+            <div className="min-h-0 flex-1 px-6">
               <div className="h-[60vh] overflow-auto rounded-md border bg-muted/50 p-4">
                 <div className="space-y-4">
                   {selectedEvent.processingError && (
@@ -206,10 +206,12 @@ export function AdminWebhookEventsClient({
                       </div>
                     ) : payloadError ? (
                       <div className="rounded-md bg-destructive/5 p-4 text-center">
-                        <p className="text-sm text-destructive">{payloadError}</p>
+                        <p className="text-sm text-destructive">
+                          {payloadError}
+                        </p>
                       </div>
                     ) : (
-                      <pre className="font-mono text-xs whitespace-pre-wrap break-all">
+                      <pre className="font-mono text-xs break-all whitespace-pre-wrap">
                         {JSON.stringify(payload, null, 2)}
                       </pre>
                     )}
@@ -219,7 +221,7 @@ export function AdminWebhookEventsClient({
             </div>
           )}
 
-          <div className="px-6 pb-6 pt-2 flex justify-end">
+          <div className="flex justify-end px-6 pt-2 pb-6">
             <Button variant="outline" onClick={() => setSelectedEvent(null)}>
               Close
             </Button>
