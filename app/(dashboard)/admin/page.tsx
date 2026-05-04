@@ -1,3 +1,4 @@
+import { getMetadata } from "@/lib/metadata"
 import {
   Users,
   KeyRound,
@@ -15,6 +16,14 @@ import {
   Layers,
 } from "lucide-react"
 import { db } from "@/db"
+
+export const metadata = getMetadata({
+  title: "Admin Overview",
+  description:
+    "Monitor key performance metrics, revenue, and activity across Shoptimity from the admin dashboard.",
+  pathname: "/admin",
+  robots: { index: false, follow: false },
+})
 import {
   users,
   licenses,

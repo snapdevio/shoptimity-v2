@@ -1,7 +1,16 @@
 export const dynamic = "force-dynamic"
 
+import { getMetadata } from "@/lib/metadata"
 import { adminGetOrders } from "@/actions/admin"
 import { AdminOrdersClient } from "./admin-orders-client"
+
+export const metadata = getMetadata({
+  title: "Orders",
+  description:
+    "Review all customer orders and order processing status in the Shoptimity admin dashboard.",
+  pathname: "/admin/orders",
+  robots: { index: false, follow: false },
+})
 
 export default async function AdminOrdersPage({
   searchParams,

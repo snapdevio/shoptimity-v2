@@ -1,3 +1,4 @@
+import { getMetadata } from "@/lib/metadata"
 import { getContacts, updateContactStatus } from "@/actions/contact"
 import {
   Table,
@@ -8,6 +9,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+
+export const metadata = getMetadata({
+  title: "Contact Requests",
+  description:
+    "Manage incoming support requests and customer inquiries from the Shoptimity website.",
+  pathname: "/admin/contacts",
+  robots: { index: false, follow: false },
+})
 import {
   Card,
   CardContent,

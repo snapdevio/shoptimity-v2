@@ -1,5 +1,6 @@
 import { Metadata } from "next"
 import { getActivePlans } from "@/actions/admin-plans"
+import { getMetadata } from "@/lib/metadata"
 import { Geist_Mono, Lexend } from "next/font/google"
 import Script from "next/script"
 import { BasePriceProvider } from "@/hooks/use-base-price"
@@ -29,11 +30,8 @@ export async function generateMetadata(): Promise<Metadata> {
       ? `$${(plans[0].finalPrice / 100).toFixed(0)}`
       : "$79"
 
-  return {
-    metadataBase: new URL(
-      process.env.NEXT_PUBLIC_APP_URL || "https://shoptimity.com"
-    ),
-    title: `Shoptimity | High-Converting Shopify Theme for Just ${basePrice}`,
+  return getMetadata({
+    title: `High-Converting Shopify Theme for Just ${basePrice}`,
     description: `Get Shoptimity – a premium Shopify theme designed to boost conversions, increase AOV, and eliminate app costs. Starting at just ${basePrice}. Build a high-performing store today.`,
     keywords: [
       "Shoptimity",
@@ -45,62 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
       "Shopify store design",
       "conversion optimized theme",
     ],
-    authors: [{ name: "Shoptimity", url: "https://shoptimity.com" }],
-    creator: "Shoptimity",
-    publisher: "Shoptimity",
-    formatDetection: {
-      email: false,
-      address: false,
-      telephone: false,
-    },
-    openGraph: {
-      type: "website",
-      locale: "en_US",
-      url: "https://shoptimity.com",
-      siteName: "Shoptimity",
-      title: `Shoptimity | Premium Shopify Theme for ${basePrice}`,
-      description: `Launch a high-converting Shopify store with Shoptimity. No monthly apps, powerful features, and full access – all for just ${basePrice}.`,
-      images: [
-        {
-          url: "https://license.shoptimity.com/assets/og.png",
-          width: 1200,
-          height: 630,
-          alt: `Shoptimity - Premium Shopify Theme for ${basePrice}`,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: "Shoptimity | Shopify Theme That Boosts Sales",
-      description: `Increase conversions and save on app costs with Shoptimity – a powerful Shopify theme for just ${basePrice}.`,
-      images: ["https://license.shoptimity.com/assets/og.png"],
-      creator: "@shoptimity",
-    },
-    icons: {
-      icon: [
-        { url: "/shoptimity-favicon.ico" },
-        { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-        { url: "/favicon-48.png", sizes: "48x48", type: "image/png" },
-        { url: "/favicon-128.png", sizes: "128x128", type: "image/png" },
-      ],
-      shortcut: "/favicon-128.png",
-      apple: "/favicon-180.png",
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        "max-video-preview": -1,
-        "max-image-preview": "large",
-        "max-snippet": -1,
-      },
-    },
-    alternates: {
-      canonical: "https://shoptimity.com",
-    },
-  }
+  })
 }
 
 export default async function RootLayout({

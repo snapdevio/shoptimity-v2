@@ -1,7 +1,16 @@
 export const dynamic = "force-dynamic"
 
+import { getMetadata } from "@/lib/metadata"
 import { adminGetLicenses } from "@/actions/admin"
 import { AdminLicensesClient } from "./admin-licenses-client"
+
+export const metadata = getMetadata({
+  title: "Licenses",
+  description:
+    "View and manage active and expired licenses for Shoptimity store access.",
+  pathname: "/admin/licenses",
+  robots: { index: false, follow: false },
+})
 
 export default async function AdminLicensesPage({
   searchParams,

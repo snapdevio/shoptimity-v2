@@ -1,6 +1,14 @@
+import { getMetadata } from "@/lib/metadata"
 import Link from "next/link"
 import { ArrowRight, Calendar, Clock, Search, Tag } from "lucide-react"
 import { getShopifyArticles } from "@/lib/shopify"
+
+export const metadata = getMetadata({
+  title: "Blogs",
+  description:
+    "Read Shoptimity's latest blog posts on Shopify growth, conversion optimization, and e-commerce strategy.",
+  pathname: "/blogs",
+})
 import { formatDate } from "@/lib/format"
 import BlogSearch from "./BlogSearch"
 

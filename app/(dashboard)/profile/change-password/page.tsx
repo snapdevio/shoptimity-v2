@@ -2,11 +2,14 @@ import { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { getAppSession } from "@/lib/auth-session"
 import { ChangePasswordClient } from "./change-password-client"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata: Metadata = {
-  title: "Change Password | Shoptimity",
+export const metadata = getMetadata({
+  title: "Change Password",
   description: "Update your account password.",
-}
+  pathname: "/profile/change-password",
+  robots: { index: false, follow: false },
+})
 
 export default async function ChangePasswordPage() {
   const session = await getAppSession()

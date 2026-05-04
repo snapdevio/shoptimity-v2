@@ -1,19 +1,6 @@
 import { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-
-export const metadata: Metadata = {
-  title: "Thank You for Your Purchase | Shoptimity",
-  description:
-    "Your order is complete. Welcome to Shoptimity! Follow the instructions to download and install your new theme.",
-  alternates: {
-    canonical: "https://shoptimity.com/thank-you",
-  },
-  robots: {
-    index: false,
-    follow: false,
-  },
-}
 import { buttonVariants } from "@/components/ui/button-variants"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,9 +20,17 @@ import { db } from "@/db"
 import { plans } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { formatCurrency } from "@/lib/format"
+import { getMetadata } from "@/lib/metadata"
+
+export const metadata = getMetadata({
+  title: "Thank You for Your Purchase",
+  description:
+    "Your order is complete. Welcome to Shoptimity! Follow the instructions to download and install your new theme.",
+  pathname: "/thank-you",
+})
 
 interface ThankYouPageProps {
-  searchParams: { [key: string]: string | string[] | undefined }
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 export default async function ThankYouPage({

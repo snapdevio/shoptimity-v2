@@ -1,15 +1,14 @@
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { ShieldCheck, Lock, Eye, FileText, Mail } from "lucide-react"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata = {
-  title: "Review App Privacy Policy | Shoptimity",
+export const metadata = getMetadata({
+  title: "Review App Privacy Policy",
   description:
     "Privacy Policy for the Shoptimity Review App. Learn how we handle your data and protect your privacy.",
-  alternates: {
-    canonical: "https://shoptimity.com/review-app/privacy",
-  },
-}
+  pathname: "/review-app/privacy",
+})
 
 export default function ReviewAppPrivacyPage() {
   return (

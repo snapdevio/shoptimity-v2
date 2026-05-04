@@ -1,8 +1,17 @@
 export const dynamic = "force-dynamic"
 
+import { getMetadata } from "@/lib/metadata"
 import { getAllTemplates } from "@/actions/admin-templates"
 import { AdminTemplatesClient } from "./admin-templates-client"
 import { Template } from "@/components/admin/template-edit-dialog"
+
+export const metadata = getMetadata({
+  title: "Admin Templates",
+  description:
+    "Create, edit, and manage Shopify theme templates and demo storefronts in Shoptimity.",
+  pathname: "/admin/templates",
+  robots: { index: false, follow: false },
+})
 
 export default async function AdminTemplatesPage({
   searchParams,

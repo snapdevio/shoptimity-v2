@@ -1,15 +1,15 @@
 import { Metadata } from "next"
 import Link from "next/link"
 
-export const metadata: Metadata = {
-  title: "Privacy Policy | Shoptimity",
+export const metadata = getMetadata({
+  title: "Privacy Policy",
   description:
     "Read Shoptimity's privacy policy to understand how we collect, use, and protect your personal information.",
-  alternates: {
-    canonical: "https://shoptimity.com/privacy-policy",
-  },
-}
+  pathname: "/privacy-policy",
+})
+
 import { Separator } from "@/components/ui/separator"
+import { getMetadata } from "@/lib/metadata"
 
 export default function PrivacyPolicyPage() {
   return (

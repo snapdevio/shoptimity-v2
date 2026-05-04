@@ -6,17 +6,12 @@ import { eq, and, or } from "drizzle-orm"
 import { LockIcon } from "lucide-react"
 import { Metadata } from "next"
 
-export const metadata: Metadata = {
-  title: "Templates | Shoptimity",
+export const metadata = getMetadata({
+  title: "Templates",
   description: "Download Shopify theme templates and optimization packs.",
-  alternates: {
-    canonical: "https://shoptimity.com/templates",
-  },
-  robots: {
-    index: false,
-    follow: false,
-  },
-}
+  pathname: "/templates",
+  robots: { index: false, follow: false },
+})
 
 import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"
@@ -27,6 +22,7 @@ import { Card } from "@/components/ui/card"
 
 import { getActiveTemplates } from "@/actions/admin-templates"
 import { TemplateCard } from "@/components/template-card"
+import { getMetadata } from "@/lib/metadata"
 
 export default async function TemplatesPage() {
   const session = await getAppSession()

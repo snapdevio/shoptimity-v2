@@ -9,18 +9,14 @@ import { licenses, plans, domains, orders, payments } from "@/db/schema"
 import { Metadata } from "next"
 import { LicensesClient } from "./licenses-client"
 import { VideoTutorialModal } from "./video-tutorial-modal"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata: Metadata = {
-  title: "Licenses | Shoptimity",
+export const metadata = getMetadata({
+  title: "Licenses",
   description: "Manage your Shopify theme licenses and domain assignments.",
-  alternates: {
-    canonical: "https://shoptimity.com/licenses",
-  },
-  robots: {
-    index: false,
-    follow: false,
-  },
-}
+  pathname: "/licenses",
+  robots: { index: false, follow: false },
+})
 
 export default async function LicensesPage() {
   const session = await getAppSession()

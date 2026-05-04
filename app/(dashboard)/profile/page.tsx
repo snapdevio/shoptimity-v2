@@ -8,18 +8,14 @@ import { db } from "@/db"
 import { users } from "@/db/schema"
 import { Metadata } from "next"
 import { ProfileClient } from "./profile-client"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata: Metadata = {
-  title: "Profile | Shoptimity",
+export const metadata = getMetadata({
+  title: "Profile",
   description: "Manage your account settings and profile information.",
-  alternates: {
-    canonical: "https://shoptimity.com/profile",
-  },
-  robots: {
-    index: false,
-    follow: false,
-  },
-}
+  pathname: "/profile",
+  robots: { index: false, follow: false },
+})
 
 export default async function ProfilePage() {
   const session = await getAppSession()

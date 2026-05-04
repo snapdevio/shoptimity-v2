@@ -1,7 +1,16 @@
 export const dynamic = "force-dynamic"
 
+import { getMetadata } from "@/lib/metadata"
 import { adminGetPayments } from "@/actions/admin"
 import { AdminPaymentsClient } from "./admin-payments-client"
+
+export const metadata = getMetadata({
+  title: "Payments",
+  description:
+    "View payment transactions, receipts, and payment status details for your Shoptimity customers.",
+  pathname: "/admin/payments",
+  robots: { index: false, follow: false },
+})
 
 export default async function AdminPaymentsPage({
   searchParams,

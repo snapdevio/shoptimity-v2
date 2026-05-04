@@ -1,15 +1,15 @@
 import { Metadata } from "next"
 import Link from "next/link"
 
-export const metadata: Metadata = {
-  title: "Terms of Service | Shoptimity",
+export const metadata = getMetadata({
+  title: "Terms of Service",
   description:
     "Review the terms and conditions for using Shoptimity Shopify theme and our services.",
-  alternates: {
-    canonical: "https://shoptimity.com/terms",
-  },
-}
+  pathname: "/terms",
+})
+
 import { Separator } from "@/components/ui/separator"
+import { getMetadata } from "@/lib/metadata"
 
 export default function TermsPage() {
   return (

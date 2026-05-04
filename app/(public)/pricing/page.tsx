@@ -9,12 +9,14 @@ import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"
 import { licenses, plans, users } from "@/db/schema"
 import { and, eq } from "drizzle-orm"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata: Metadata = {
-  title: "Pricing | Shoptimity",
+export const metadata = getMetadata({
+  title: "Pricing",
   description:
     "Affordable, transparent pricing for high-converting Shopify store templates.",
-}
+  pathname: "/pricing",
+})
 
 export default async function PublicPricingPage() {
   const [dbPlans, groupedFeatures, settings] = await Promise.all([
