@@ -1,7 +1,16 @@
+import { getMetadata } from "@/lib/metadata"
 import { getAppSession } from "@/lib/auth-session"
 import { redirect } from "next/navigation"
 import { db } from "@/db"
 import { licenses, plans } from "@/db/schema"
+
+export const metadata = getMetadata({
+  title: "Cancel Subscription",
+  description:
+    "View cancellation details and retention offers before you cancel your Shoptimity subscription.",
+  pathname: "/billing/cancel",
+  robots: { index: false, follow: false },
+})
 import { and, eq, or } from "drizzle-orm"
 import { CancelClient } from "./cancel-client"
 import { getSettings } from "@/actions/admin-settings"

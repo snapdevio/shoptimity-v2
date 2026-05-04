@@ -4,18 +4,14 @@ import { redirect } from "next/navigation"
 import { eq, desc, count } from "drizzle-orm"
 import { CreditCardIcon, FileText } from "lucide-react"
 import { Metadata } from "next"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata: Metadata = {
-  title: "Payments History | Shoptimity",
+export const metadata = getMetadata({
+  title: "Payments History",
   description: "View your payment history and transaction details.",
-  alternates: {
-    canonical: "https://shoptimity.com/payments",
-  },
-  robots: {
-    index: false,
-    follow: false,
-  },
-}
+  pathname: "/payments",
+  robots: { index: false, follow: false },
+})
 
 import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"

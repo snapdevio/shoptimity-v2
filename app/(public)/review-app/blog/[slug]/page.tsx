@@ -1,8 +1,65 @@
+import { getMetadata } from "@/lib/metadata"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft, Clock, Tag } from "lucide-react"
 import { getShopifyArticleBySlug, getShopifyArticles } from "@/lib/shopify"
 import { formatDate } from "@/lib/format"
+
+// Shared function to fetch article from both sections
+async function getArticle(slug: string) {
+  let article = await getShopifyArticleBySlug(slug, "app")
+  let section: "shoptimity-vtwo" | "app" = "app"
+
+  if (!article) {
+    article = await getShopifyArticleBySlug(slug, "shoptimity-vtwo")
+    section = "shoptimity-vtwo"
+  }
+
+  return { article, section }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}) {
+  const { slug } = await params
+  
+  try {
+    console.log("[Review Metadata] Fetching article for slug:", slug)
+    const { article } = await getArticle(slug)
+    
+    console.log("[Review Metadata] Article found:", article?.title || "NOT FOUND")
+    
+    if (!article) {
+      console.log("[Review Metadata] Using generic fallback for:", slug)
+      return getMetadata({
+        title: "Blog Post",
+        description: "Read insights on Shopify marketing and app reviews.",
+        pathname: `/review-app/blog/${slug}`,
+      })
+    }
+
+    const title = article.title || "Blog Post"
+    const description = (typeof article.body === 'string' ? article.body.replace(/<[^>]+>/g, "").slice(0, 160) : "") || "Read insights on Shopify marketing and app reviews."
+
+    console.log("[Review Metadata] Generated metadata with title:", title)
+    
+    return getMetadata({
+      title,
+      description,
+      pathname: `/review-app/blog/${slug}`,
+      image: article.image?.url,
+    })
+  } catch (error) {
+    console.error("[Review Metadata] Error generating metadata:", error)
+    return getMetadata({
+      title: "Blog Post",
+      description: "Read insights on Shopify marketing and app reviews.",
+      pathname: `/review-app/blog/${slug}`,
+    })
+  }
+}
 
 export default async function BlogDetailPage({
   params,
@@ -10,14 +67,7 @@ export default async function BlogDetailPage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  // Try app blog first, then fallback to theme blog
-  let article = await getShopifyArticleBySlug(slug, "shoptimity-vtwo")
-  let section: "shoptimity-vtwo" | "app" = "shoptimity-vtwo"
-
-  if (!article) {
-    article = await getShopifyArticleBySlug(slug, "app")
-    section = "app"
-  }
+  const { article, section } = await getArticle(slug)
 
   if (!article) {
     notFound()

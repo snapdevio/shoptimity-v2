@@ -13,15 +13,14 @@ import {
   Sparkles,
   ArrowRight,
 } from "lucide-react"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata = {
-  title: "Review App FAQ | Shoptimity",
+export const metadata = getMetadata({
+  title: "Review App FAQ",
   description:
     "Frequently Asked Questions for the Shoptimity Review App. Get help with setup, customization, and billing.",
-  alternates: {
-    canonical: "https://shoptimity.com/review-app/faq",
-  },
-}
+  pathname: "/review-app/faq",
+})
 
 const faqs = [
   {

@@ -1,8 +1,17 @@
 export const dynamic = "force-dynamic"
 
+import { getMetadata } from "@/lib/metadata"
 import { getAppSession } from "@/lib/auth-session"
 import { redirect } from "next/navigation"
 import { db } from "@/db"
+
+export const metadata = getMetadata({
+  title: "Billing",
+  description:
+    "Manage payment methods, invoices, and billing information for your Shoptimity subscription.",
+  pathname: "/billing",
+  robots: { index: false, follow: false },
+})
 import { licenses, plans, users } from "@/db/schema"
 import { and, eq, desc, or, count } from "drizzle-orm"
 import { BillingClient } from "./billing-client"

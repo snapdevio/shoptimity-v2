@@ -9,16 +9,15 @@ import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"
 import { licenses, plans, users } from "@/db/schema"
 import { eq, and } from "drizzle-orm"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata: Metadata = {
-  title: "Upgrade Plans | Shoptimity",
+export const metadata = getMetadata({
+  title: "Upgrade Plans",
   description:
     "Choose the best plan for your business. Affordable pricing for Shoptimity Shopify theme licenses.",
-  robots: {
-    index: false,
-    follow: false,
-  },
-}
+  pathname: "/plans",
+  robots: { index: false, follow: false },
+})
 
 export default async function PlansPage() {
   const [dbPlans, groupedFeatures, settings] = await Promise.all([

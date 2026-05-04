@@ -1,16 +1,12 @@
+import { getMetadata } from "@/lib/metadata"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft, ArrowRight, Calendar, Clock } from "lucide-react"
 import { getShopifyArticleBySlug, getShopifyArticles } from "@/lib/shopify"
 import { formatDate } from "@/lib/format"
 
-export default async function BlogDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>
-}) {
-  const { slug } = await params
-  // Try shoptimity-vtwo blog first, then fallback to app blog
+// Shared function to fetch article from both sections
+async function getArticle(slug: string) {
   let article = await getShopifyArticleBySlug(slug, "shoptimity-vtwo")
   let section: "shoptimity-vtwo" | "app" = "shoptimity-vtwo"
 
@@ -18,6 +14,60 @@ export default async function BlogDetailPage({
     article = await getShopifyArticleBySlug(slug, "app")
     section = "app"
   }
+
+  return { article, section }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}) {
+  const { slug } = await params
+  
+  try {
+    console.log("[Metadata] Fetching article for slug:", slug)
+    const { article } = await getArticle(slug)
+    
+    console.log("[Metadata] Article found:", article?.title || "NOT FOUND")
+    
+    if (!article) {
+      console.log("[Metadata] Using generic fallback for:", slug)
+      return getMetadata({
+        title: "Blog Post",
+        description: "Read insights on Shopify growth, store optimization, and ecommerce strategy.",
+        pathname: `/blogs/${slug}`,
+      })
+    }
+
+    const title = article.title || "Blog Post"
+    const description = (typeof article.body === 'string' ? article.body.replace(/<[^>]+>/g, "").slice(0, 160) : "") || "Read insights on Shopify growth, store optimization, and ecommerce strategy."
+
+    console.log("[Metadata] Generated metadata with title:", title)
+    
+    return getMetadata({
+      title,
+      description,
+      pathname: `/blogs/${slug}`,
+      image: article.image?.url,
+    })
+  } catch (error) {
+    console.error("[Metadata] Error generating metadata:", error)
+    return getMetadata({
+      title: "Blog Post",
+      description: "Read insights on Shopify growth, store optimization, and ecommerce strategy.",
+      pathname: `/blogs/${slug}`,
+    })
+  }
+}
+
+export default async function BlogDetailPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const { article, section } = await getArticle(slug)
 
   if (!article) {
     notFound()

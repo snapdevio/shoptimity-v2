@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { getMetadata } from "@/lib/metadata"
 import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, ArrowRight, CheckCircle2, Quote } from "lucide-react"
@@ -6,49 +7,70 @@ import { caseStudies } from "../data"
 import { formatTypography } from "@/lib/typography"
 import { Badge } from "@/components/ui/badge"
 
-const renderWithBlackNumbers = (text: string | string[]) => {
-  if (typeof text !== "string") return text
-  return text.split(/(^\s*\d+\..*$|!\[.*?\]\(.*?\))/m).map((part, i) => {
-    if (!part) return null
+const renderFormattedText = (text: string) => {
+  if (!text) return null
 
-    if (/^\s*\d+\..*$/.test(part)) {
+  // Split by lines to handle formatting
+  const lines = text.split("\n")
+
+  return lines.map((line, index) => {
+    // Check if line starts with number (numbered list)
+    if (/^\s*\d+\./.test(line)) {
       return (
-        <span key={i} className="font-bold text-black dark:text-white">
-          {part}
-        </span>
+        <div key={index} className="mb-4">
+          <span className="font-bold text-black dark:text-white">{line}</span>
+        </div>
       )
     }
 
-    const imageMatch = part.match(/^!\[(.*?)\]\((.*?)\)$/)
+    // Check for image markdown
+    const imageMatch = line.match(/^!\[(.*?)\]\((.*?)\)$/)
     if (imageMatch) {
-      const alt = imageMatch[1]
-      const src = imageMatch[2]
+      const [, alt, src] = imageMatch
       return (
         <div
-          key={i}
-          className="relative h-100 w-full overflow-hidden rounded-2xl shadow-sm sm:h-103.5"
+          key={index}
+          className="relative mb-6 h-100 w-full overflow-hidden rounded-2xl shadow-sm sm:h-103.5"
         >
           <Image src={src} alt={alt} fill className="object-cover" />
         </div>
       )
     }
 
-    return <span key={i}>{part}</span>
+    // Regular text
+    if (line.trim()) {
+      return (
+        <p key={index} className="mb-4 leading-relaxed">
+          {line}
+        </p>
+      )
+    }
+
+    return null
   })
 }
 
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: { slug: string }
 }) {
-  const resolvedParams = await params
-  const study = caseStudies.find((s) => s.slug === resolvedParams.slug)
-  if (!study) return { title: "Case Study Not Found" }
-  return {
-    title: `${study.title} | Shoptimity Case Study`,
-    description: study.summary,
+  const { slug } = params
+  const study = caseStudies.find((s) => s.slug === slug)
+
+  if (!study) {
+    return getMetadata({
+      title: "Case Study Not Found",
+      description: "The requested case study could not be found.",
+      pathname: "/case-study",
+    })
   }
+
+  return getMetadata({
+    title: study.title,
+    description: study.summary,
+    pathname: `/case-study/${slug}`,
+  })
 }
 
 export default async function CaseStudyPage({
@@ -120,7 +142,7 @@ export default async function CaseStudyPage({
                 Our Solution
               </h2>
               <div className="text-lg leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                {renderWithBlackNumbers(study.solution)}
+                {renderFormattedText(study.solution)}
               </div>
             </section>
 

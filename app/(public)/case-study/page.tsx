@@ -11,11 +11,14 @@ import {
 import { caseStudies } from "./data"
 import { formatTypography } from "@/lib/typography"
 import { Badge } from "@/components/ui/badge"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata = {
-  title: "Case Studies | Shoptimity",
-  description: "Explore how we've helped e-commerce brands scale and succeed.",
-}
+export const metadata = getMetadata({
+  title: "Case Studies",
+  description:
+    "Explore how we've helped e-commerce brands scale and succeed. Read our in-depth case studies showcasing real results and transformations.",
+  pathname: "/case-study",
+})
 
 const categoryIcons: Record<string, React.ReactNode> = {
   "E-commerce Optimization": <ShoppingBag className="h-5 w-5" />,

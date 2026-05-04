@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import Image from "next/image"
+import { getMetadata } from "@/lib/metadata"
 import {
   CreditCard,
   Mail,
@@ -14,14 +15,12 @@ import {
   ArrowRight,
 } from "lucide-react"
 
-export const metadata: Metadata = {
-  title: "Theme Setup Guide | Shoptimity",
+export const metadata = getMetadata({
+  title: "Theme Setup Guide",
   description:
     "Learn how to set up and customize your Shoptimity Shopify theme with our easy-to-follow guide.",
-  alternates: {
-    canonical: "https://shoptimity.com/setup",
-  },
-}
+  pathname: "/setup",
+})
 
 const steps = [
   {
@@ -111,7 +110,7 @@ export default function SetupPage() {
       <section className="mt-5 py-20">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="space-y-32">
-            {steps.map((step, index) => (
+            {steps.map((step, index: number) => (
               <div
                 key={step.title}
                 className={cn(

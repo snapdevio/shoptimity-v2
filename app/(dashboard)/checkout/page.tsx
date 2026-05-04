@@ -6,25 +6,24 @@ import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"
 import { licenses } from "@/db/schema"
 import { and, eq, or, isNotNull } from "drizzle-orm"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata: Metadata = {
-  title: "Checkout | Shoptimity",
+export const metadata = getMetadata({
+  title: "Checkout",
   description: "Complete your purchase and start using Shoptimity today.",
-  robots: {
-    index: false,
-    follow: false,
-  },
-}
+  pathname: "/checkout",
+  robots: { index: false, follow: false },
+})
 
 interface CheckoutPageProps {
-  searchParams: Promise<Record<string, string | undefined>>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 export default async function CheckoutPage({
   searchParams,
 }: CheckoutPageProps) {
   const params = await searchParams
-  const planId = params["planId"]
+  const planId = params["planId"] as string | undefined
   // Single flag — matches ?isyearly=true or ?isYearly=true (case-insensitive)
   const isYearly = Object.entries(params).some(
     ([k, v]) => k.toLowerCase() === "isyearly" && v === "true"

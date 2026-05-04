@@ -1,16 +1,13 @@
 import { Metadata } from "next"
-import { getActivePlans } from "@/actions/admin-plans"
 import dynamic from "next/dynamic"
+import { getMetadata } from "@/lib/metadata"
 
-export const metadata: Metadata = {
-  title:
-    "Shoptimity | Build a High-Converting Shopify Store Without Paying for 10+ Apps",
+export const metadata = getMetadata({
+  title: "Build a High-Converting Shopify Store",
   description:
     "Build a high-converting Shopify store without paying for 10+ separate apps. Shoptimity is the all-in-one theme designed to boost AOV and cut monthly costs.",
-  alternates: {
-    canonical: "https://shoptimity.com/landing-page",
-  },
-}
+  pathname: "/",
+})
 
 import LandingHero from "@/components/site/LandingHero"
 import LandingPageTicker from "@/components/site/LandingPageTicker"

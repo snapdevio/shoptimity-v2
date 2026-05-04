@@ -1,7 +1,16 @@
 export const dynamic = "force-dynamic"
 
+import { getMetadata } from "@/lib/metadata"
 import { adminGetWebhookEvents } from "@/actions/admin"
 import { AdminWebhooksClient } from "./admin-webhooks-client"
+
+export const metadata = getMetadata({
+  title: "Webhooks",
+  description:
+    "Review recent webhook events, delivery status, and retry logic in the Shoptimity admin.",
+  pathname: "/admin/webhooks",
+  robots: { index: false, follow: false },
+})
 
 export default async function AdminWebhooksPage({
   searchParams,

@@ -1,15 +1,15 @@
 import { Metadata } from "next"
 import Link from "next/link"
 
-export const metadata: Metadata = {
-  title: "Refund Policy | Shoptimity",
+export const metadata = getMetadata({
+  title: "Refund Policy",
   description:
     "Learn about Shoptimity's refund policy and our commitment to customer satisfaction.",
-  alternates: {
-    canonical: "https://shoptimity.com/refund-policy",
-  },
-}
+  pathname: "/refund-policy",
+})
+
 import { Separator } from "@/components/ui/separator"
+import { getMetadata } from "@/lib/metadata"
 
 export default function RefundPolicyPage() {
   return (

@@ -1,7 +1,16 @@
 export const dynamic = "force-dynamic"
 
+import { getMetadata } from "@/lib/metadata"
 import { adminGetDomains } from "@/actions/admin"
 import { AdminDomainsClient } from "./admin-domains-client"
+
+export const metadata = getMetadata({
+  title: "Domains",
+  description:
+    "View and manage all registered domains and their connection status for your Shoptimity installs.",
+  pathname: "/admin/domains",
+  robots: { index: false, follow: false },
+})
 
 export default async function AdminDomainsPage({
   searchParams,

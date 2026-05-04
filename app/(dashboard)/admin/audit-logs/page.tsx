@@ -1,7 +1,16 @@
 export const dynamic = "force-dynamic"
 
+import { getMetadata } from "@/lib/metadata"
 import { adminGetAuditLogs } from "@/actions/admin"
 import { AdminAuditLogsClient } from "./admin-audit-logs-client"
+
+export const metadata = getMetadata({
+  title: "Audit Logs",
+  description:
+    "Review administrative activity, system events, and platform audit history in Shoptimity.",
+  pathname: "/admin/audit-logs",
+  robots: { index: false, follow: false },
+})
 
 export default async function AdminAuditLogsPage({
   searchParams,

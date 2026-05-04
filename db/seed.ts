@@ -910,7 +910,8 @@ async function main() {
       bg: "bg-[#F4F9F4]",
       status: "active" as const,
       previewLink: "https://aaurevia.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/zenvyaara.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/zenvyaara.zip",
       cro: "+24%",
       aov: "+18%",
       rev: "+80%",
@@ -928,7 +929,8 @@ async function main() {
       bg: "bg-[#FFF8F2]",
       status: "active" as const,
       previewLink: "https://pawzzone.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/pawzzone.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/pawzzone.zip",
       cro: "+15%",
       aov: "+10%",
       rev: "+45%",
@@ -946,7 +948,8 @@ async function main() {
       bg: "bg-[#FFF3F5]",
       status: "active" as const,
       previewLink: "https://kiidzo.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/kiidzo.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/kiidzo.zip",
       cro: "+20%",
       aov: "+12%",
       rev: "+55%",
@@ -964,7 +967,8 @@ async function main() {
       bg: "bg-[#F0F5FD]",
       status: "active" as const,
       previewLink: "https://velmmora.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/velmmora.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/velmmora.zip",
       cro: "+22%",
       aov: "+15%",
       rev: "+65%",
@@ -982,7 +986,8 @@ async function main() {
       bg: "bg-[#F2FBFB]",
       status: "active" as const,
       previewLink: "https://fittcore.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/fittcore.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/fittcore.zip",
       cro: "+28%",
       aov: "+20%",
       rev: "+90%",
@@ -1001,7 +1006,8 @@ async function main() {
       bg: "bg-[#F9F6F2]",
       status: "active" as const,
       previewLink: "https://panorahome.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/panorahome.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/panorahome.zip",
       cro: "+52%",
       aov: "+9%",
       rev: "+78%",
@@ -1020,7 +1026,8 @@ async function main() {
       bg: "bg-[#F2F8FF]",
       status: "active" as const,
       previewLink: "https://aquaspacee.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/aquaspacee.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/aquaspacee.zip",
       cro: "+55%",
       aov: "+9%",
       rev: "+76%",
@@ -1038,7 +1045,8 @@ async function main() {
       bg: "bg-[#FFF6F8]",
       status: "active" as const,
       previewLink: "https://creamelle.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/creamelle.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/creamelle.zip",
       cro: "+46%",
       aov: "+11%",
       rev: "+72%",
@@ -1057,7 +1065,8 @@ async function main() {
       bg: "bg-[#e8f1e9]",
       status: "active" as const,
       previewLink: "https://glasssie.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/glasssie.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/glasssie.zip",
       cro: "+57%",
       aov: "+7%",
       rev: "+74%",
@@ -1075,7 +1084,8 @@ async function main() {
       bg: "bg-[#F3F3F7]",
       status: "active" as const,
       previewLink: "https://auddify.myshopify.com/",
-      downloadLink: "https://license.shoptimity.com/shoptimity-v2/templates/auddify.zip",
+      downloadLink:
+        "https://license.shoptimity.com/shoptimity-v2/templates/auddify.zip",
       cro: "+63%",
       aov: "+14%",
       rev: "+88%",

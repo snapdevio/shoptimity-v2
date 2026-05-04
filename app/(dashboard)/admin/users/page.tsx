@@ -1,8 +1,17 @@
 export const dynamic = "force-dynamic"
 
+import { getMetadata } from "@/lib/metadata"
 import { adminGetUsers } from "@/actions/admin"
 import { getAppSession } from "@/lib/auth-session"
 import { AdminUsersClient } from "./admin-users-client"
+
+export const metadata = getMetadata({
+  title: "Admin Users",
+  description:
+    "Manage Shoptimity user accounts, access, and authentication details.",
+  pathname: "/admin/users",
+  robots: { index: false, follow: false },
+})
 
 export default async function AdminUsersPage({
   searchParams,
