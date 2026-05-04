@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useMemo, useState, useCallback } from "react"
+import React, { useMemo, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Check, X } from "lucide-react"
+import { Check, X, Search, Plus, Minus } from "lucide-react"
 import { PricingSectionModern, PricingPlan } from "@/components/ui/pricing"
 import { toast } from "sonner"
 
@@ -20,6 +20,7 @@ interface PricingClientProps {
   hasUsedTrial?: boolean
 }
 
+// Feature Row Component (Table Row Format)
 function FeatureRow({
   name,
   plans,
@@ -37,7 +38,7 @@ function FeatureRow({
     <tr className="transition-colors hover:bg-slate-50/50">
       <td
         className={cn(
-          "p-3 text-sm font-medium md:p-6",
+          "p-4 text-sm font-medium md:p-6",
           highlight ? "text-slate-900" : "text-slate-600"
         )}
       >
@@ -60,7 +61,7 @@ function FeatureRow({
         )
 
         return (
-          <td key={activePlan.id} className="p-3 text-center md:p-6">
+          <td key={activePlan.id} className="p-4 text-center md:p-6">
             <div className="flex justify-center">
               {isEnabled ? (
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white shadow-sm">
@@ -76,6 +77,54 @@ function FeatureRow({
         )
       })}
     </tr>
+  )
+}
+
+// Card-Based Accordion with Table Inside
+function AccordionWithTable({
+  category,
+  children,
+  isOpen,
+  onToggle,
+  featureCount,
+}: {
+  category: any
+  children: React.ReactNode
+  isOpen: boolean
+  onToggle: () => void
+  featureCount: number
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:shadow-md">
+      {/* Accordion Header - Card Style */}
+      <button
+        onClick={onToggle}
+        className="flex w-full cursor-pointer items-center justify-between px-6 py-5 text-left transition-colors hover:bg-slate-50/50"
+      >
+        <div className="flex items-center gap-3">
+          <h3 className="text-base font-semibold text-slate-900 md:text-lg">
+            {category.name}
+          </h3>
+          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+            {featureCount} features
+          </span>
+        </div>
+        <div className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-transform duration-200">
+          {isOpen ? <Minus className="size-4" /> : <Plus className="size-4" />}
+        </div>
+      </button>
+
+      {/* Accordion Content - Table Format */}
+      {isOpen && (
+        <div className="border-t border-slate-100">
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed border-collapse text-left">
+              <tbody className="divide-y divide-slate-100">{children}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -96,6 +145,41 @@ export function PlansClient({
     "monthly" | "yearly" | "lifetime"
   >("yearly")
   const [loadingPlanName, setLoadingPlanName] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState<string>("")
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set())
+
+  // Use ref to track if initial state has been set
+  const isInitialized = useRef(false)
+
+  // Initialize ONLY the first category as open, all others closed (runs only once)
+  React.useEffect(() => {
+    if (!isInitialized.current && groupedFeatures.length > 0) {
+      // Only open the first category
+      setOpenCategories(new Set([groupedFeatures[0].id]))
+      isInitialized.current = true
+    }
+  }, [groupedFeatures]) // Only depends on groupedFeatures, not on openCategories
+
+  const toggleCategory = useCallback((categoryId: string) => {
+    setOpenCategories((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId)
+      } else {
+        newSet.add(categoryId)
+      }
+      return newSet
+    })
+  }, [])
+
+  // Calculate feature counts for each category
+  const categoryFeatureCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    groupedFeatures.forEach((category) => {
+      counts[category.id] = category.features?.length || 0
+    })
+    return counts
+  }, [groupedFeatures])
 
   const availableCycles = useMemo(() => {
     const cycles = new Set<string>()
@@ -459,6 +543,38 @@ export function PlansClient({
     )
   }, [dbPlans])
 
+  // Filter features based on search term (minimum 3 characters)
+  const hasValidSearch = searchTerm.length >= 3
+  const filteredGroupedFeatures = useMemo(() => {
+    if (!hasValidSearch) return groupedFeatures
+
+    return groupedFeatures
+      .map((category) => ({
+        ...category,
+        features: category.features.filter((feature: any) =>
+          feature.name.toLowerCase().includes(searchTerm.toLowerCase())
+        ),
+      }))
+      .filter((category) => category.features.length > 0)
+  }, [groupedFeatures, searchTerm, hasValidSearch])
+
+  // Auto-open categories when searching (using useEffect with stable dependencies)
+  React.useEffect(() => {
+    if (hasValidSearch) {
+      // When searching, open ALL categories that have matching features
+      const categoriesToOpen = filteredGroupedFeatures.map((cat) => cat.id)
+      if (categoriesToOpen.length > 0) {
+        setOpenCategories(new Set(categoriesToOpen))
+      }
+    } else if (!hasValidSearch && isInitialized.current) {
+      // When search is cleared, revert to only first category open
+      if (groupedFeatures.length > 0) {
+        setOpenCategories(new Set([groupedFeatures[0].id]))
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasValidSearch]) // Only depend on hasValidSearch, not on filteredGroupedFeatures
+
   return (
     <>
       {settings.enable_discount &&
@@ -505,68 +621,90 @@ export function PlansClient({
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm md:rounded-[32px]">
-          <table className="w-full min-w-150 table-fixed border-collapse text-left">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="w-1/4 p-4 text-xs font-bold tracking-widest text-slate-400 uppercase md:w-1/2 md:p-6">
-                  Features & Components
-                </th>
-                {allTiersForTable.map((plan) => (
-                  <th
-                    key={plan.id}
-                    className={cn(
-                      "w-1/4 p-4 text-center font-bold md:p-6",
-                      plan.name.toLowerCase().includes("pro")
-                        ? "bg-orange-50/30 text-orange-500"
-                        : "text-slate-900"
-                    )}
-                  >
-                    {plan.name}
+        {/* Search Bar */}
+        <div className="mb-8">
+          <div className="relative mx-auto">
+            <Search className="absolute top-1/2 left-4 size-5 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search features..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-full border border-slate-200 bg-white py-3 pr-4 pl-12 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-300 focus:ring-2 focus:ring-orange-200 focus:outline-none"
+            />
+          </div>
+          {searchTerm.length > 0 && searchTerm.length < 3 && (
+            <p className="mt-2 text-center text-xs text-amber-600">
+              Please enter at least 3 characters to search
+            </p>
+          )}
+          {hasValidSearch && filteredGroupedFeatures.length === 0 && (
+            <p className="mt-4 text-center text-sm text-slate-500">
+              No features found matching "{searchTerm}"
+            </p>
+          )}
+        </div>
+
+        {/* Accordion with Table Inside */}
+        <div className="space-y-4">
+          {filteredGroupedFeatures.map((category, index) => {
+            const isOpen = openCategories.has(category.id)
+
+            return (
+              <AccordionWithTable
+                key={category.id}
+                category={category}
+                isOpen={isOpen}
+                onToggle={() => toggleCategory(category.id)}
+                featureCount={categoryFeatureCounts[category.id] || 0}
+              >
+                {/* Table Header Row - Plan Names */}
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="w-1/4 p-4 text-xs font-bold tracking-widest text-slate-400 uppercase md:w-1/2 md:p-6">
+                    Features & Components
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {groupedFeatures.map((category) => (
-                <React.Fragment key={category.id}>
-                  <tr className="bg-slate-50/50">
-                    <td
-                      colSpan={1 + allTiersForTable.length}
-                      className="border-t border-slate-200 px-6 py-4 text-xs font-bold tracking-wider text-slate-900 uppercase"
+                  {allTiersForTable.map((plan) => (
+                    <th
+                      key={plan.id}
+                      className={cn(
+                        "w-1/4 p-4 text-center font-bold md:p-6",
+                        plan.name.toLowerCase().includes("pro")
+                          ? "text-orange-500"
+                          : "text-slate-900"
+                      )}
                     >
-                      {category.name}
-                    </td>
-                  </tr>
-                  {category.features
-                    .slice()
-                    .sort((a: any, b: any) => {
-                      const aFree = a.plans.some(
-                        (p: any) =>
-                          freePlanIds.includes(p.planId) && p.isEnabled
-                      )
-                      const bFree = b.plans.some(
-                        (p: any) =>
-                          freePlanIds.includes(p.planId) && p.isEnabled
-                      )
-                      if (aFree && !bFree) return -1
-                      if (!aFree && bFree) return 1
-                      return 0
-                    })
-                    .map((feature: any) => (
-                      <FeatureRow
-                        key={feature.id}
-                        name={feature.name}
-                        plans={feature.plans}
-                        activePlans={allTiersForTable}
-                        dbPlans={dbPlans}
-                        highlight={feature.isHighlight}
-                      />
-                    ))}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                      {plan.name}
+                    </th>
+                  ))}
+                </tr>
+
+                {/* Sort features: Free features first, then others */}
+                {category.features
+                  .slice()
+                  .sort((a: any, b: any) => {
+                    const aFree = a.plans.some(
+                      (p: any) => freePlanIds.includes(p.planId) && p.isEnabled
+                    )
+                    const bFree = b.plans.some(
+                      (p: any) => freePlanIds.includes(p.planId) && p.isEnabled
+                    )
+                    if (aFree && !bFree) return -1
+                    if (!aFree && bFree) return 1
+                    return 0
+                  })
+                  .map((feature: any) => (
+                    <FeatureRow
+                      key={feature.id}
+                      name={feature.name}
+                      plans={feature.plans}
+                      activePlans={allTiersForTable}
+                      dbPlans={dbPlans}
+                      highlight={feature.isHighlight}
+                    />
+                  ))}
+              </AccordionWithTable>
+            )
+          })}
         </div>
       </div>
     </>
