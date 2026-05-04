@@ -1,20 +1,21 @@
 "use client"
 
-import * as React from "react"
 import { useRouter } from "next/navigation"
-import { ChevronDown, ChevronRight, Search } from "lucide-react"
 import { formatDate } from "@/lib/format"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
+import { CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react"
+
+import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { adminGetWebhookEventPayload } from "@/actions/admin"
 
 interface WebhookEvent {
   id: string
@@ -27,7 +28,7 @@ interface WebhookEvent {
   createdAt: Date
 }
 
-interface AdminWebhooksClientProps {
+interface AdminWebhookEventsClientProps {
   data: WebhookEvent[]
   total: number
   page: number
@@ -36,33 +37,46 @@ interface AdminWebhooksClientProps {
   initialSearch: string
 }
 
-export function AdminWebhooksClient({
+export function AdminWebhookEventsClient({
   data,
   total,
   page,
   pageSize,
   totalPages,
   initialSearch,
-}: AdminWebhooksClientProps) {
+}: AdminWebhookEventsClientProps) {
   const router = useRouter()
-  const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set())
-  const [localSearch, setLocalSearch] = React.useState(initialSearch)
-  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<WebhookEvent | null>(null)
+  const [payload, setPayload] = useState<any>(null)
+  const [loadingPayload, setLoadingPayload] = useState(false)
+  const [payloadError, setPayloadError] = useState<string | null>(null)
 
-  React.useEffect(() => {
-    setLocalSearch(initialSearch)
-  }, [initialSearch])
+  useEffect(() => {
+    if (selectedEvent) {
+      setLoadingPayload(true)
+      setPayloadError(null)
+      adminGetWebhookEventPayload(selectedEvent.eventId)
+        .then((res) => {
+          if (res.error) {
+            setPayloadError(res.error)
+          } else {
+            setPayload(res.payload)
+          }
+        })
+        .catch(() => setPayloadError("An unexpected error occurred"))
+        .finally(() => setLoadingPayload(false))
+    } else {
+      setPayload(null)
+      setPayloadError(null)
+    }
+  }, [selectedEvent])
 
   function handleSearchChange(value: string) {
-    setLocalSearch(value)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      const params = new URLSearchParams()
-      if (value) params.set("search", value)
-      if (pageSize !== 10) params.set("limit", String(pageSize))
-      params.set("page", "1")
-      router.push(`/admin/webhooks?${params.toString()}`)
-    }, 300)
+    const params = new URLSearchParams()
+    if (value) params.set("search", value)
+    if (pageSize !== 10) params.set("limit", String(pageSize))
+    params.set("page", "1")
+    router.push(`/admin/webhooks?${params.toString()}`)
   }
 
   function handlePageChange(newPage: number) {
@@ -73,169 +87,145 @@ export function AdminWebhooksClient({
     router.push(`/admin/webhooks?${params.toString()}`)
   }
 
-  function toggleRow(id: string) {
-    setExpandedRows((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by customer email, event id, type, or status..."
-            value={localSearch}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-        <p className="ml-auto text-sm text-muted-foreground">
-          {total} {total === 1 ? "event" : "events"}
-        </p>
-      </div>
-
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10" />
-              <TableHead>Date</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Event ID</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Processed At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No webhook events found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.map((row) => {
-                const isExpanded = expandedRows.has(row.id)
-                const hasError = !!row.processingError
-                return (
-                  <React.Fragment key={row.id}>
-                    <TableRow>
-                      <TableCell>
-                        {hasError && (
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => toggleRow(row.id)}
-                            aria-label={
-                              isExpanded ? "Collapse error" : "Expand error"
-                            }
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="size-3" />
-                            ) : (
-                              <ChevronRight className="size-3" />
-                            )}
-                          </Button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {formatDate(row.createdAt, "MMM d, yyyy HH:mm")}
-                      </TableCell>
-                      <TableCell>
-                        {row.customerEmail ? (
-                          <span className="font-medium">
-                            {row.customerEmail}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-xs">{row.type}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="block max-w-65 truncate font-mono text-xs">
-                          {row.eventId}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {row.processed ? (
-                          <Badge
-                            variant={hasError ? "destructive" : "default"}
-                            className="capitalize"
-                          >
-                            {hasError ? "Failed" : "Processed"}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="capitalize">
-                            Pending
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {row.processedAt
-                          ? formatDate(row.processedAt, "MMM d, yyyy HH:mm")
-                          : "-"}
-                      </TableCell>
-                    </TableRow>
-                    {isExpanded && hasError && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="bg-muted/30 p-0">
-                          <div className="px-4 py-3">
-                            <span className="mb-2 block text-xs font-medium text-muted-foreground">
-                              Error
-                            </span>
-                            <pre className="max-h-48 overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
-                              {row.processingError}
-                            </pre>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {total > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </p>
-          {totalPages > 1 && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(page - 1)}
-                disabled={page <= 1}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(page + 1)}
-                disabled={page >= totalPages}
-              >
-                Next
-              </Button>
-            </div>
+  const columns: DataTableColumn<WebhookEvent>[] = [
+    {
+      key: "createdAt",
+      header: "Received At",
+      render: (row) => formatDate(row.createdAt, "MMM d, HH:mm:ss"),
+    },
+    {
+      key: "type",
+      header: "Event Type",
+      render: (row) => (
+        <button
+          onClick={() => setSelectedEvent(row)}
+          className="text-left font-medium text-primary hover:underline"
+        >
+          {row.type}
+        </button>
+      ),
+    },
+    {
+      key: "customerEmail",
+      header: "Customer",
+      render: (row) => (
+        <span className="text-xs">{row.customerEmail || "-"}</span>
+      ),
+    },
+    {
+      key: "eventId",
+      header: "Stripe ID",
+      render: (row) => (
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {row.eventId}
+        </span>
+      ),
+    },
+    {
+      key: "processed",
+      header: "Status",
+      render: (row) => (
+        <div className="flex items-center gap-1.5">
+          {row.processed ? (
+            <Badge variant="default" className="gap-1 px-1.5">
+              <CheckCircle2 className="size-3" />
+              Processed
+            </Badge>
+          ) : row.processingError ? (
+            <Badge variant="destructive" className="gap-1 px-1.5">
+              <XCircle className="size-3" />
+              Failed
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="gap-1 px-1.5">
+              <Clock className="size-3" />
+              Pending
+            </Badge>
           )}
         </div>
-      )}
-    </div>
+      ),
+    },
+  ]
+
+  return (
+    <>
+      <DataTable<WebhookEvent>
+        columns={columns}
+        data={data}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        searchValue={initialSearch}
+        searchPlaceholder="Search by type or ID..."
+        onSearchChange={handleSearchChange}
+        onPageChange={handlePageChange}
+        emptyMessage="No webhook events recorded."
+      />
+
+      <Dialog
+        open={!!selectedEvent}
+        onOpenChange={(open) => !open && setSelectedEvent(null)}
+      >
+        <DialogContent className="max-h-[90vh] max-w-3xl flex flex-col overflow-hidden p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle className="flex items-center gap-2">
+              Webhook Event Detail
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {selectedEvent?.eventId}
+              </Badge>
+            </DialogTitle>
+            <DialogDescription>
+              Full payload received from Stripe for{" "}
+              <strong>{selectedEvent?.type}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedEvent && (
+            <div className="px-6 flex-1 min-h-0">
+              <div className="h-[60vh] overflow-auto rounded-md border bg-muted/50 p-4">
+                <div className="space-y-4">
+                  {selectedEvent.processingError && (
+                    <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                      <p className="flex items-center gap-1.5 font-semibold">
+                        <XCircle className="size-4" /> Processing Error
+                      </p>
+                      <p className="mt-1 font-mono text-xs">
+                        {selectedEvent.processingError}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">
+                      Event Payload
+                    </p>
+                    {loadingPayload ? (
+                      <div className="flex h-32 items-center justify-center">
+                        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : payloadError ? (
+                      <div className="rounded-md bg-destructive/5 p-4 text-center">
+                        <p className="text-sm text-destructive">{payloadError}</p>
+                      </div>
+                    ) : (
+                      <pre className="font-mono text-xs whitespace-pre-wrap break-all">
+                        {JSON.stringify(payload, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="px-6 pb-6 pt-2 flex justify-end">
+            <Button variant="outline" onClick={() => setSelectedEvent(null)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

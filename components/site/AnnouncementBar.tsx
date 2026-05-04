@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
@@ -33,13 +32,14 @@ const OfferBar: React.FC<OfferBarProps> = ({ basePrice = "$1" }) => {
           asChild
           className="ms-2 rounded-full bg-primary-foreground text-primary hover:bg-primary-foreground/90 hover:text-primary"
         >
-          <Link
+          <a
             href="https://shopify.pxf.io/c/2789899/1101159/13624"
             className="inline-flex items-center gap-1.5"
+            target="_blank"
           >
             Start Free Trial
             <ArrowRight className="ms-1 h-3.5 w-3.5" />
-          </Link>
+          </a>
         </Button>
       </div>
     </div>

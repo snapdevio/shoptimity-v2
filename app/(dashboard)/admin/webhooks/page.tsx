@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 
 import { getMetadata } from "@/lib/metadata"
 import { adminGetWebhookEvents } from "@/actions/admin"
-import { AdminWebhooksClient } from "./admin-webhooks-client"
+import { AdminWebhookEventsClient } from "./admin-webhooks-client"
 
 export const metadata = getMetadata({
   title: "Webhooks",
@@ -35,7 +35,7 @@ export default async function AdminWebhooksPage({
         </p>
       </div>
 
-      <AdminWebhooksClient
+      <AdminWebhookEventsClient
         data={result.data}
         total={result.total}
         page={result.page}

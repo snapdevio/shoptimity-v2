@@ -16,6 +16,7 @@ import { getAppSession } from "@/lib/auth-session"
 import { enqueueEmailJob, enqueueLicenseMetadataExportJob } from "@/lib/queue"
 import { createAuditLog } from "@/lib/audit"
 import { revalidatePath } from "next/cache"
+import Stripe from "stripe"
 
 async function requireAdmin() {
   const session = await getAppSession()
@@ -310,7 +311,16 @@ export async function adminGetWebhookEvents(
 
   const [data, total] = await Promise.all([
     db
-      .select()
+      .select({
+        id: webhookEvents.id,
+        eventId: webhookEvents.eventId,
+        type: webhookEvents.type,
+        customerEmail: webhookEvents.customerEmail,
+        processed: webhookEvents.processed,
+        processingError: webhookEvents.processingError,
+        processedAt: webhookEvents.processedAt,
+        createdAt: webhookEvents.createdAt,
+      })
       .from(webhookEvents)
       .where(whereClause)
       .orderBy(desc(webhookEvents.createdAt))
@@ -325,6 +335,41 @@ export async function adminGetWebhookEvents(
     page,
     pageSize,
     totalPages: Math.ceil((total[0]?.value || 0) / pageSize),
+  }
+}
+
+export async function adminGetWebhookEvent(id: string) {
+  await requireAdmin()
+
+  const [event] = await db
+    .select()
+    .from(webhookEvents)
+    .where(eq(webhookEvents.id, id))
+    .limit(1)
+
+  if (!event) {
+    return { error: "Webhook event not found" as const }
+  }
+
+  return { event }
+}
+
+export async function adminGetWebhookEventPayload(eventId: string) {
+  await requireAdmin()
+
+  const { default: Stripe } = await import("stripe")
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+
+  try {
+    const event = await stripe.events.retrieve(eventId)
+    // Serialize to a plain object — Stripe SDK returns class instances
+    // which cannot be passed from Server to Client Components directly.
+    return {
+      payload: JSON.parse(JSON.stringify(event)) as Record<string, unknown>,
+    }
+  } catch (error) {
+    console.error("Error fetching stripe event:", error)
+    return { error: "Failed to fetch event from Stripe" }
   }
 }
 

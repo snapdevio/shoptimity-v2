@@ -831,7 +831,7 @@ async function main() {
       hasYearlyPlan: true,
       yearlyDiscountPercentage: 30,
       yearlyDiscountCouponCode: "SAVE30",
-      couponCode: "WELCOME20",
+      couponCode: "",
       badge: "Most Popular",
       cancelApplyDiscount: true,
       monthlyCancelDiscount: 50,
