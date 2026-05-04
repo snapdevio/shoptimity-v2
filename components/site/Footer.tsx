@@ -1,10 +1,8 @@
 "use client"
 import React from "react"
-import { useBasePrice } from "@/hooks/use-base-price"
 import CTABadges from "./CTABadges"
 
 const Footer: React.FC = () => {
-  const { basePrice, trialDays } = useBasePrice()
   const scrollToPricing = () => {
     document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })
   }

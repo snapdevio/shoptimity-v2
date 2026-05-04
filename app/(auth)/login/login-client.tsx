@@ -66,6 +66,7 @@ import {
   FieldLabel,
   FieldSeparator,
 } from "@/components/ui/field"
+import Image from "next/image"
 
 function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
   const searchParams = useSearchParams()
@@ -232,7 +233,16 @@ function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
       <Card className="overflow-hidden border-none p-0 shadow-2xl">
         <CardContent className="grid p-0 md:grid-cols-2">
           <form onSubmit={handleSignIn} className="p-6 md:p-8">
-            <FieldGroup>
+            <Link href="/" className="mb-3 flex justify-center">
+              <Image
+                src={`${process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT || ""}/assets/logo.svg`}
+                alt="Shoptimity logo"
+                className="mx-auto"
+                width={160}
+                height={48}
+              />
+            </Link>
+            <FieldGroup className="gap-2 md:gap-4">
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-2xl font-bold">Welcome back</h1>
                 <p className="text-balance text-muted-foreground">

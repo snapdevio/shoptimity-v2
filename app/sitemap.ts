@@ -38,7 +38,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }))
 
   // Fetch dynamic blog posts from Shopify
-  const themeArticles = await getShopifyArticles("theme")
+  const themeArticles = await getShopifyArticles("shoptimity-vtwo")
   const appArticles = await getShopifyArticles("app")
 
   const themeBlogRoutes = themeArticles.map((article) => ({

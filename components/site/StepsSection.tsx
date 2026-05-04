@@ -11,12 +11,13 @@ interface StepItem {
 }
 
 const StepsSection: React.FC = () => {
+  const R2_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_ENDPOINT || ""
   const steps: StepItem[] = [
     {
       id: "01",
       title: "Choose Your Template",
       desc: "Choose from our selection of proven high-performing templates.",
-      video: "/assets/store-to-brand-step-one.mp4",
+      video: `${R2_URL}/shoptimity-v2/assets/store-to-brand-step-one.mp4`,
       bg: "bg-[#FFF0F3]",
       iconColor: "text-[#FF6FB5]",
     },

@@ -8,7 +8,7 @@ import { PlansClient } from "./plans-client"
 import { getAppSession } from "@/lib/auth-session"
 import { db } from "@/db"
 import { licenses, plans, users } from "@/db/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, or } from "drizzle-orm"
 import { getMetadata } from "@/lib/metadata"
 
 export const metadata = getMetadata({
@@ -40,17 +40,26 @@ export default async function PlansPage() {
         planMode: plans.mode,
         billingCycle: licenses.billingCycle,
         stripeSubscriptionId: licenses.stripeSubscriptionId,
+        isTrial: licenses.isTrial,
       })
       .from(licenses)
       .leftJoin(plans, eq(licenses.planId, plans.id))
       .where(
-        and(eq(licenses.userId, session.userId), eq(licenses.status, "active"))
+        and(
+          eq(licenses.userId, session.userId),
+          or(eq(licenses.status, "active"), eq(licenses.status, "trialing"))
+        )
       )
       .limit(1)
 
     activePlanId = activeLicense?.planId || undefined
     activePlanMode = activeLicense?.planMode || undefined
-    activeBillingCycle = activeLicense?.billingCycle || undefined
+    // Prefer the license's own billingCycle field; fall back to deriving it
+    // from the plan mode for cases where the DB defaulted to "monthly" but
+    // the user is actually on a yearly plan row (mode === "yearly").
+    activeBillingCycle =
+      activeLicense?.billingCycle ||
+      (activeLicense?.planMode === "yearly" ? "yearly" : undefined)
     hasStripeSubscription = !!activeLicense?.stripeSubscriptionId
 
     const [userTrialState] = await db

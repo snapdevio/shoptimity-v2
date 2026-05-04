@@ -11,7 +11,7 @@ import {
   webhookEvents,
   plans,
 } from "@/db/schema"
-import { eq, and, isNull, sql } from "drizzle-orm"
+import { eq, and, or, isNull, sql } from "drizzle-orm"
 import { normalizeDomain, validateDomain } from "@/lib/domains"
 import { enqueueEmailJob, enqueueLicenseMetadataExportJob } from "@/lib/queue"
 import { createAuditLog } from "@/lib/audit"
@@ -1347,24 +1347,35 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   if (pi || subscriptionId) {
     const conditions = []
     if (pi) conditions.push(eq(payments.stripePaymentIntentId, pi))
+    // Match by subscriptionId ONLY for trialing/pending rows. Matching any
+    // "paid" row by subscriptionId would overwrite prior payments (e.g. the
+    // original $19 monthly row) with the new invoice amount when an upgrade
+    // or renewal invoice fires — producing duplicate entries in billing history.
     if (subscriptionId)
-      conditions.push(eq(payments.stripeSubscriptionId, subscriptionId))
+      conditions.push(
+        and(
+          eq(payments.stripeSubscriptionId, subscriptionId),
+          or(eq(payments.status, "trialing"), eq(payments.status, "pending"))
+        )
+      )
 
     // Sync amount + currency from the invoice too. When a trial converts
     // (or after an in-trial upgrade), the original `trialing` payment row
     // may have a stale amount; this brings it in line with what was
     // actually charged.
-    await db
-      .update(payments)
-      .set({
-        status: invoice.status || "paid",
-        amount: invoice.amount_paid || invoice.amount_due,
-        currency: invoice.currency,
-        stripeInvoiceId: invoice.id,
-        stripeInvoiceUrl: invoice.hosted_invoice_url,
-        updatedAt: new Date(),
-      })
-      .where(sql`${sql.join(conditions, sql` OR `)}`)
+    if (conditions.length > 0) {
+      await db
+        .update(payments)
+        .set({
+          status: invoice.status || "paid",
+          amount: invoice.amount_paid || invoice.amount_due,
+          currency: invoice.currency,
+          stripeInvoiceId: invoice.id,
+          stripeInvoiceUrl: invoice.hosted_invoice_url,
+          updatedAt: new Date(),
+        })
+        .where(sql`${sql.join(conditions, sql` OR `)}`)
+    }
   }
 
   // Determine next renewal date from the invoice line items

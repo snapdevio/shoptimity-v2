@@ -51,6 +51,7 @@ export default async function BillingPage({
     country: "",
     company: "",
   }
+  let creditBalanceCents = 0
 
   if (userRecord?.stripeCustomerId) {
     const stripe = getStripe()
@@ -75,6 +76,8 @@ export default async function BillingPage({
         country: c.address?.country || "",
         company: c.metadata?.company || "",
       }
+      // Stripe stores credit as a negative integer (e.g. -14493 = $144.93 credit)
+      creditBalanceCents = (c.balance as number) ?? 0
     }
 
     cards = paymentMethods.data.map((pm) => ({
@@ -105,6 +108,8 @@ export default async function BillingPage({
       nextRenewalDate: licenses.nextRenewalDate,
       cancelAtPeriodEnd: licenses.cancelAtPeriodEnd,
       retentionDiscountUsed: licenses.retentionDiscountUsed,
+      isTrial: licenses.isTrial,
+      isLifetime: licenses.isLifetime,
     })
     .from(licenses)
     .leftJoin(plans, eq(licenses.planId, plans.id))
@@ -171,6 +176,12 @@ export default async function BillingPage({
     discountedNextAmount: number | null
     isRetentionDiscount: boolean
   } | null = null
+
+  // Stripe's amount_due accounts for customer balance credit (e.g. from a
+  // yearly→monthly downgrade). Passed separately so the "Next Payment" cell
+  // can show the real charge without touching the retention-discount display.
+  // Null for trialing subs where amount_due is 0 by design (charged at trial end).
+  let upcomingAmountDueCents: number | null = null
 
   if (activeLicense?.stripeSubscriptionId) {
     const stripe = getStripe()
@@ -342,6 +353,13 @@ export default async function BillingPage({
           isRetentionDiscount: activeLicense.retentionDiscountUsed === true,
         }
       }
+
+      // amount_due reflects customer balance credit (e.g. proration from a
+      // yearly→monthly downgrade). Only set for non-trialing subs — trialing
+      // subs intentionally show amount_due=0 until the trial ends.
+      if (!activeLicense.isTrial && upcomingPreview?.amount_due != null) {
+        upcomingAmountDueCents = upcomingPreview.amount_due
+      }
     } catch (err) {
       console.error(
         "[billing/page] Failed to fetch subscription for renewal/discount:",
@@ -366,6 +384,8 @@ export default async function BillingPage({
       userPayments={userPayments}
       nextPaymentDate={nextPaymentDate}
       activeDiscount={activeDiscount}
+      creditBalanceCents={creditBalanceCents}
+      upcomingAmountDueCents={upcomingAmountDueCents}
       paymentsPagination={{
         currentPage,
         totalPages,

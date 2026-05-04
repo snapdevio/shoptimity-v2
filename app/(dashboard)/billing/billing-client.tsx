@@ -22,7 +22,10 @@ import {
   reactivateSubscription,
   previewSubscriptionUpgrade,
   upgradeSubscriptionToYearly,
+  previewYearlyToMonthlyDowngrade,
+  downgradeYearlyToMonthly,
 } from "@/actions/billing"
+import type { DowngradePreview } from "@/actions/billing"
 import { toast } from "sonner"
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements } from "@stripe/react-stripe-js"
@@ -100,6 +103,8 @@ interface BillingClientProps {
   userPayments: Payment[]
   nextPaymentDate: number | null
   activeDiscount?: ActiveDiscount | null
+  creditBalanceCents?: number
+  upcomingAmountDueCents?: number | null
   paymentsPagination: PaymentsPagination
 }
 
@@ -132,6 +137,8 @@ export function BillingClient({
   userPayments,
   nextPaymentDate,
   activeDiscount,
+  creditBalanceCents = 0,
+  upcomingAmountDueCents,
   paymentsPagination,
 }: BillingClientProps) {
   const [isAddingCard, setIsAddingCard] = useState(false)
@@ -149,6 +156,13 @@ export function BillingClient({
   const [upgradePreview, setUpgradePreview] = useState<any>(null)
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [isUpgrading, setIsUpgrading] = useState(false)
+
+  // Downgrade Modal States
+  const [isDowngradeModalOpen, setIsDowngradeModalOpen] = useState(false)
+  const [downgradePreview, setDowngradePreview] =
+    useState<DowngradePreview | null>(null)
+  const [isPreviewingDowngrade, setIsPreviewingDowngrade] = useState(false)
+  const [isDowngrading, setIsDowngrading] = useState(false)
 
   const router = useRouter()
   const [hasShownToast, setHasShownToast] = useState(false)
@@ -193,6 +207,31 @@ export function BillingClient({
     router.replace(window.location.pathname, { scroll: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLicense, autoUpgradeHandled])
+
+  // Auto-open the downgrade modal when the user lands here from the Plans
+  // page after clicking "Switch to Monthly" on their current plan card.
+  const [autoDowngradeHandled, setAutoDowngradeHandled] = useState(false)
+  useEffect(() => {
+    if (autoDowngradeHandled) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("action") !== "switch-month") return
+    setAutoDowngradeHandled(true)
+
+    const eligible =
+      activeLicense?.billingCycle === "yearly" &&
+      activeLicense?.plan?.mode !== "free" &&
+      !activeLicense?.isLifetime &&
+      !!activeLicense?.stripeSubscriptionId?.startsWith("sub_") &&
+      !activeLicense?.cancelAtPeriodEnd
+
+    if (eligible) {
+      handlePreviewDowngrade()
+    } else {
+      toast.info("Your subscription can't be switched to monthly right now.")
+    }
+    router.replace(window.location.pathname, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLicense, autoDowngradeHandled])
 
   // Location Data
   const countries = useMemo(() => Country.getAllCountries(), [])
@@ -374,6 +413,42 @@ export function BillingClient({
     }
   }
 
+  const handlePreviewDowngrade = async () => {
+    if (!activeLicense?.id) return
+    setIsPreviewingDowngrade(true)
+    try {
+      const res = await previewYearlyToMonthlyDowngrade(activeLicense.id)
+      if ("error" in res) throw new Error(res.error)
+      setDowngradePreview(res.preview)
+      setIsDowngradeModalOpen(true)
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setIsPreviewingDowngrade(false)
+    }
+  }
+
+  const handleConfirmDowngrade = async () => {
+    if (!activeLicense?.id) return
+    setIsDowngrading(true)
+    try {
+      const res = await downgradeYearlyToMonthly(activeLicense.id)
+      if ("error" in res) throw new Error(res.error)
+      setIsDowngradeModalOpen(false)
+      setDowngradePreview(null)
+      toast.success(
+        res.freeMonths > 0
+          ? `Switched to monthly billing. ${res.freeMonths} free month${res.freeMonths !== 1 ? "s" : ""} applied!`
+          : "Switched to monthly billing successfully."
+      )
+      router.refresh()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setIsDowngrading(false)
+    }
+  }
+
   const defaultCard = initialCards.find((c) => c.isDefault) || initialCards[0]
 
   // Single source of truth for the prices shown in the plan-details strip.
@@ -413,8 +488,13 @@ export function BillingClient({
       regularAmount = activeLicense.plan.finalPrice
     }
 
+    // Only treat the discount as a "retention" discount (affects Subscription
+    // cell and shows the green banner) when it was applied via the cancel flow.
+    // Free-months coupons (yearly→monthly downgrade) have isRetentionDiscount=false
+    // and should only affect the "Next Payment" cell via upcomingAmountDueCents.
     const hasRetention =
       !!activeDiscount &&
+      activeDiscount.isRetentionDiscount === true &&
       activeDiscount.discountedNextAmount != null &&
       (activeDiscount.remainingCycles == null ||
         activeDiscount.remainingCycles > 0)
@@ -460,6 +540,30 @@ export function BillingClient({
           </div>
 
           <div className="grid gap-6">
+            {/* Credit Balance Banner — visible only when customer has Stripe credit */}
+            {/* {creditBalanceCents < 0 && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-800 dark:bg-emerald-950">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-emerald-800">
+                      Account Credit:{" "}
+                      {new Intl.NumberFormat("en-US", {
+                        style: "currency",
+                        currency: "usd",
+                      }).format(Math.abs(creditBalanceCents) / 100)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-emerald-700">
+                      Automatically deducted from your future invoices — no action
+                      required.
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-emerald-200 bg-white px-3 py-1 text-[11px] font-bold text-emerald-700">
+                    Applied at next invoice
+                  </span>
+                </div>
+              </div>
+            )} */}
+
             {/* Plan Details Card */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md">
               <div className="p-4 md:p-6">
@@ -494,10 +598,25 @@ export function BillingClient({
                         Cancel Plan
                       </button>
                     ) : null}
-                    {activeLicense?.billingCycle === "monthly" &&
+                    {activeLicense?.billingCycle === "yearly" &&
                     activeLicense?.plan?.mode !== "free" &&
                     !activeLicense?.isLifetime &&
-                    activeLicense?.stripeSubscriptionId ? (
+                    activeLicense?.stripeSubscriptionId?.startsWith("sub_") &&
+                    !activeLicense?.cancelAtPeriodEnd ? (
+                      <button
+                        onClick={handlePreviewDowngrade}
+                        disabled={isPreviewingDowngrade}
+                        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95 disabled:opacity-50 sm:w-auto"
+                      >
+                        {isPreviewingDowngrade && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
+                        Switch to Monthly
+                      </button>
+                    ) : activeLicense?.billingCycle === "monthly" &&
+                      activeLicense?.plan?.mode !== "free" &&
+                      !activeLicense?.isLifetime &&
+                      activeLicense?.stripeSubscriptionId ? (
                       <button
                         onClick={handlePreviewUpgrade}
                         disabled={isPreviewing}
@@ -571,7 +690,12 @@ export function BillingClient({
                     </div>
                   )}
 
-                <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-6 rounded-2xl bg-slate-50 p-6 text-center sm:grid-cols-3 lg:grid-cols-7">
+                <div
+                  className={cn(
+                    "mt-8 grid grid-cols-2 gap-x-4 gap-y-6 rounded-2xl bg-slate-50 p-6 text-center sm:grid-cols-3",
+                    creditBalanceCents < 0 ? "lg:grid-cols-8" : "lg:grid-cols-7"
+                  )}
+                >
                   <div>
                     <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                       Plan name
@@ -605,6 +729,11 @@ export function BillingClient({
                     </p>
                     {activeLicense?.cancelAtPeriodEnd ? (
                       <p className="mt-1 text-sm font-bold text-slate-900">—</p>
+                    ) : upcomingAmountDueCents != null &&
+                      upcomingAmountDueCents < planPriceView.effectiveAmount ? (
+                      <p className="mt-1 text-sm font-bold text-emerald-600">
+                        ${(upcomingAmountDueCents / 100).toFixed(2)}
+                      </p>
                     ) : (
                       <p
                         className={cn(
@@ -618,6 +747,22 @@ export function BillingClient({
                       </p>
                     )}
                   </div>
+                  {creditBalanceCents < 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                        Credit Balance
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-emerald-600">
+                        {new Intl.NumberFormat("en-US", {
+                          style: "currency",
+                          currency: "usd",
+                        }).format(Math.abs(creditBalanceCents) / 100)}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400">
+                        Unused balance
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                       Subscription
@@ -1228,6 +1373,170 @@ export function BillingClient({
             )}
           </div>
 
+          {/* Downgrade Modal */}
+          {isDowngradeModalOpen && downgradePreview && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+                <div className="p-6 md:p-8">
+                  <h3 className="font-heading text-xl font-bold text-slate-900">
+                    Switch to Monthly Billing
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {downgradePreview.isTrial ? (
+                      "Your free trial continues unchanged. After it ends, you'll be billed monthly instead of yearly — no charge today."
+                    ) : (
+                      <>
+                        Your unused yearly plan time is converted to{" "}
+                        <strong>free months</strong> of monthly billing. No
+                        charge today.
+                      </>
+                    )}
+                  </p>
+
+                  {downgradePreview.isTrial ? (
+                    /* Trial-specific summary */
+                    <div className="mt-6 space-y-3 rounded-xl bg-slate-50 p-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Trial ends</span>
+                        <span className="font-bold text-slate-900">
+                          {downgradePreview.trialEndsAt
+                            ? new Date(
+                                downgradePreview.trialEndsAt
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-200 pt-3 text-sm">
+                        <span className="text-slate-500">
+                          First charge after trial
+                        </span>
+                        <span className="font-bold text-slate-900">
+                          {downgradePreview.monthlyPriceFormatted}/mo
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Due today</span>
+                        <span className="font-bold text-emerald-600">
+                          $0.00
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Paid plan — free months breakdown */
+                    <div className="mt-6 space-y-3 rounded-xl bg-slate-50 p-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">
+                          Unused yearly credit
+                        </span>
+                        <span className="font-bold text-emerald-600">
+                          {downgradePreview.unusedCreditFormatted}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">
+                          Monthly plan price
+                        </span>
+                        <span className="font-bold text-slate-900">
+                          {downgradePreview.monthlyPriceFormatted}/mo
+                        </span>
+                      </div>
+                      {downgradePreview.freeMonths > 0 ? (
+                        <>
+                          <div className="flex justify-between border-t border-slate-200 pt-3 text-sm font-bold">
+                            <span className="text-slate-900">
+                              Free months applied
+                            </span>
+                            <span className="text-emerald-600">
+                              {downgradePreview.freeMonths} month
+                              {downgradePreview.freeMonths !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-500">
+                              Billing resumes on
+                            </span>
+                            <span className="font-bold text-slate-900">
+                              {new Date(
+                                downgradePreview.nextChargeDate
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between border-t border-slate-200 pt-3 text-sm">
+                          <span className="text-slate-500">
+                            First monthly invoice
+                          </span>
+                          <span className="font-bold text-slate-900">
+                            {new Date(
+                              downgradePreview.nextChargeDate
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between border-t border-slate-200 pt-3 text-sm">
+                        <span className="text-slate-500">Due today</span>
+                        <span className="font-bold text-emerald-600">
+                          $0.00
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Free months callout — only for paid plan downgrades */}
+                  {!downgradePreview.isTrial &&
+                    downgradePreview.freeMonths > 0 && (
+                      <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-700">
+                        Your credit covers{" "}
+                        <strong>
+                          {downgradePreview.freeMonths} free month
+                          {downgradePreview.freeMonths !== 1 ? "s" : ""}
+                        </strong>{" "}
+                        of {downgradePreview.monthlyPriceFormatted}/month
+                        billing — applied automatically. No action needed.
+                      </p>
+                    )}
+
+                  <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row">
+                    <button
+                      onClick={() => {
+                        setIsDowngradeModalOpen(false)
+                        setDowngradePreview(null)
+                      }}
+                      disabled={isDowngrading}
+                      className="flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95"
+                    >
+                      Keep Yearly Plan
+                    </button>
+                    <button
+                      onClick={handleConfirmDowngrade}
+                      disabled={isDowngrading}
+                      className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-800 py-3 text-sm font-bold text-white shadow-lg shadow-slate-800/20 transition-all hover:bg-slate-900 active:scale-95 disabled:opacity-50"
+                    >
+                      {isDowngrading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Switch to Monthly"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Upgrade Modal */}
           {isUpgradeModalOpen && upgradePreview && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
@@ -1312,13 +1621,26 @@ export function BillingClient({
                       )}
                     {Math.abs(upgradePreview.creditAmount) > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">
-                          Unused Monthly Credit
-                        </span>
+                        <span className="text-slate-500">Proration Credit</span>
                         <span className="font-bold text-emerald-600">
                           -$
                           {(
                             Math.abs(upgradePreview.creditAmount) / 100
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {(upgradePreview as any).customerBalanceCents < 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">
+                          Account Credit Applied
+                        </span>
+                        <span className="font-bold text-emerald-600">
+                          -$
+                          {(
+                            Math.abs(
+                              (upgradePreview as any).customerBalanceCents
+                            ) / 100
                           ).toFixed(2)}
                         </span>
                       </div>
@@ -1328,7 +1650,10 @@ export function BillingClient({
                         Due Today
                       </span>
                       <span className="text-lg font-bold text-primary">
-                        ${(upgradePreview.chargeAmount / 100).toFixed(2)}
+                        $
+                        {(
+                          Math.max(0, upgradePreview.chargeAmount) / 100
+                        ).toFixed(2)}
                       </span>
                     </div>
                     {upgradePreview.isTrialUpgrade &&
