@@ -230,6 +230,10 @@ export async function createSetupSession() {
       customer_email: user?.stripeCustomerId ? undefined : user?.email,
       success_url: `${appUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/billing`,
+      metadata: {
+        app_url: appUrl,
+        type: "setup",
+      },
     })
 
     return { url: checkoutSession.url }
@@ -1765,9 +1769,14 @@ export async function previewYearlyToMonthlyDowngrade(
 
     if (!user?.stripeCustomerId) return { error: "Stripe customer not found" }
 
-    const [subscription, stripeCustomer] = await Promise.all([
+    const [subscription, stripeCustomer, paidInvoices] = await Promise.all([
       stripe.subscriptions.retrieve(license.stripeSubscriptionId),
       stripe.customers.retrieve(user.stripeCustomerId),
+      stripe.invoices.list({
+        subscription: license.stripeSubscriptionId,
+        status: "paid",
+        limit: 1,
+      }),
     ])
     if (!subscription.items.data.length)
       return { error: "No subscription items found" }
@@ -1776,7 +1785,10 @@ export async function previewYearlyToMonthlyDowngrade(
     const subAny = subscription as any
 
     // Prorate unused time on the current yearly period
-    const yearlyAmountPaid = subscriptionItem.price.unit_amount ?? 0
+    // Use actual amount paid from the latest invoice (includes discounts)
+    // instead of price.unit_amount (which is the list price before discount)
+    const latestPaidInvoice = paidInvoices.data[0]
+    const amountActuallyPaid = latestPaidInvoice?.amount_paid ?? subscriptionItem.price.unit_amount ?? 0
     const periodStart: number =
       subscriptionItem.current_period_start ?? subAny.current_period_start
     const periodEnd: number =
@@ -1785,7 +1797,7 @@ export async function previewYearlyToMonthlyDowngrade(
     const totalPeriodSecs = Math.max(1, periodEnd - periodStart)
     const remainingSecs = Math.max(0, periodEnd - nowUnix)
     const currentPeriodUnused = Math.round(
-      yearlyAmountPaid * (remainingSecs / totalPeriodSecs)
+      amountActuallyPaid * (remainingSecs / totalPeriodSecs)
     )
 
     // Add any existing Stripe customer balance credit (from old downgrade flows)
@@ -1930,7 +1942,15 @@ export async function downgradeYearlyToMonthly(
     // a future yearly renewal invoice.
     let freeMonths = 0
     if (!license.isTrial && userRecord?.stripeCustomerId) {
-      const yearlyAmountPaid = subscriptionItem.price.unit_amount ?? 0
+      // Use actual amount paid from latest invoice (includes discounts applied)
+      const paidInvoices = await stripe.invoices.list({
+        subscription: license.stripeSubscriptionId,
+        status: "paid",
+        limit: 1,
+      })
+      const latestPaidInvoice = paidInvoices.data[0]
+      const amountActuallyPaid = latestPaidInvoice?.amount_paid ?? subscriptionItem.price.unit_amount ?? 0
+
       const periodStart: number =
         subscriptionItem.current_period_start ?? subAny.current_period_start
       const periodEnd: number =
@@ -1939,7 +1959,7 @@ export async function downgradeYearlyToMonthly(
       const totalPeriodSecs = Math.max(1, periodEnd - periodStart)
       const remainingSecs = Math.max(0, periodEnd - nowUnix)
       const currentPeriodUnused = Math.round(
-        yearlyAmountPaid * (remainingSecs / totalPeriodSecs)
+        amountActuallyPaid * (remainingSecs / totalPeriodSecs)
       )
 
       // Read any leftover customer balance credit (negative = credit on Stripe)

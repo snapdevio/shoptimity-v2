@@ -287,6 +287,8 @@ async function createCheckoutSession(props: {
     is_yearly: isYearlyPlan ? "true" : "false",
     is_lifetime: plan.mode === "lifetime" ? "true" : "false",
     final_amount: String(finalAmount),
+    // Store app_url for webhook domain validation
+    app_url: appUrl,
     // Trials are real Stripe subscriptions in the new flow, so they
     // route through the same `fulfillOrder` webhook path. Keeping
     // `is_trial: "true"` is enough for the webhook to set trial state
@@ -816,6 +818,10 @@ export async function POST(request: NextRequest) {
         plan.mode === "monthly" || plan.mode === "yearly" || isTrial
           ? "subscription"
           : "lifetime_purchase",
+      // Required for webhook domain validation: Stripe copies subscription
+      // metadata into invoice.parent.subscription_details.metadata, so
+      // app_url must be present here for invoice.* events to pass validation.
+      app_url: appUrl,
       // Address Metadata
       address_line1: address?.line1 || "",
       address_line2: address?.line2 || "",

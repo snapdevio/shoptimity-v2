@@ -58,7 +58,7 @@ export default async function LandingPage() {
       <ThemeBlockSection />
       <DifferenceSection
         headline="Everything You Need <span class='text-gradient-orange-pink'>Built In</span>"
-        subheadline="Stop paying for 10+ separate apps. Shoptimity includes everything you need to convert customers at one low price."
+        subheadline="Stop paying for 10+ separate apps. Shoptimity includes everything you need to convert customers at one place."
       />
       <StepsSection />
       <TransformationSection />

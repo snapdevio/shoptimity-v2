@@ -145,7 +145,7 @@ export default async function LicensesPage() {
           <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
             Licenses
           </h1>
-          <VideoTutorialModal />
+          {/* <VideoTutorialModal /> */}
         </div>
         <p className="text-sm text-muted-foreground">
           Manage your licenses and domain assignments.

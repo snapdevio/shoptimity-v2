@@ -34,7 +34,7 @@ const OfferBar: React.FC<OfferBarProps> = ({ basePrice = "$1" }) => {
         >
           <a
             href="https://shopify.pxf.io/c/2789899/1101159/13624"
-            className="inline-flex items-center gap-1.5"
+            className="inline-flex items-center gap-1.5 border-0"
             target="_blank"
           >
             Start Free Trial

@@ -21,6 +21,106 @@ function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!)
 }
 
+// Validate that the webhook event belongs to this project's domain.
+//
+// Definitive hostname checks (app_url is available):
+//   checkout.session.* — metadata.app_url set by createCheckoutSession & POST checkout
+//   customer.subscription.* — metadata.app_url on the subscription object (POST checkout sets it)
+//   payment_intent.* (direct) — metadata.app_url on the PI object
+//   invoice.* — parent.subscription_details.metadata.app_url (Stripe mirrors sub metadata)
+//
+// DB-validated passes (no app_url available; handler filters via DB lookup):
+//   invoice.* with no app_url — handler is a no-op if subscriptionId not in DB
+//   charge.* — handler looks up by payment_intent_id; unknown PIs are no-ops
+//   payment_intent.* backed by an invoice — invoice.* is the authoritative path;
+//     PI handler only syncs payment status and exits early for these
+function isValidDomainForThisProject(event: Stripe.Event): boolean {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) {
+    console.warn("[stripe-webhook] NEXT_PUBLIC_APP_URL not set, skipping domain validation")
+    return true
+  }
+
+  const projectHostname = new URL(appUrl).hostname
+  const obj = event.data.object as Record<string, any>
+  const metadata = obj?.metadata || {}
+
+  // Priority 1: metadata.app_url / metadata.domain — present on checkout sessions,
+  // subscription objects, and payment intents created through our checkout routes.
+  if (metadata.app_url) {
+    try {
+      const metaHostname = new URL(metadata.app_url).hostname
+      if (metaHostname === projectHostname) return true
+      console.warn(`[stripe-webhook] Metadata app_url mismatch: ${metaHostname} !== ${projectHostname}`)
+      return false
+    } catch {
+      // Invalid URL in metadata — fall through
+    }
+  }
+  if (metadata.domain) {
+    if (metadata.domain === projectHostname || metadata.domain.includes(projectHostname)) return true
+    console.warn(`[stripe-webhook] Metadata domain mismatch: ${metadata.domain} !== ${projectHostname}`)
+    return false
+  }
+
+  // Priority 2: invoice.* events — Stripe mirrors subscription metadata into
+  // parent.subscription_details.metadata on every generated invoice.
+  // If app_url is absent (subscription pre-dates the field), allow through:
+  // the handler is a no-op when the subscriptionId is not in our DB.
+  if (event.type.startsWith("invoice.")) {
+    const subMeta: Record<string, any> =
+      obj?.parent?.subscription_details?.metadata ||
+      obj?.subscription_details?.metadata ||
+      {}
+    if (subMeta.app_url) {
+      try {
+        const metaHostname = new URL(subMeta.app_url).hostname
+        if (metaHostname === projectHostname) return true
+        console.warn(
+          `[stripe-webhook] Invoice sub metadata app_url mismatch: ${metaHostname} !== ${projectHostname}`
+        )
+        return false
+      } catch {
+        // Invalid URL — fall through to allow
+      }
+    }
+    return true
+  }
+
+  // Priority 3: success_url / cancel_url — present on checkout.session objects.
+  const successUrl: string = obj?.success_url || ""
+  const cancelUrl: string = obj?.cancel_url || ""
+  try {
+    if (successUrl && new URL(successUrl).hostname === projectHostname) return true
+    if (cancelUrl && new URL(cancelUrl).hostname === projectHostname) return true
+  } catch {
+    // Invalid URL
+  }
+
+  // Priority 4: customer.subscription.* — subscription object carries app_url in
+  // metadata when created via our checkout routes. Also allow as DB-validated
+  // fallback: handler looks up license by subscriptionId and is a no-op if absent.
+  if (event.type.startsWith("customer.subscription.")) return true
+
+  // Priority 5: charge.* — charge objects carry no app_url. Handler looks up by
+  // payment_intent_id; events for unknown PIs are silent no-ops.
+  if (event.type.startsWith("charge.")) return true
+
+  // Priority 6: payment_intent.* backed by an invoice — Stripe auto-creates these
+  // PIs from subscription invoices without copying session metadata, so app_url is
+  // unavailable. invoice.* is the authoritative fulfillment path; the PI handler
+  // only syncs payment status and exits early for invoice-backed PIs.
+  if (event.type.startsWith("payment_intent.")) {
+    const invoiceRef: unknown = obj?.invoice ?? obj?.payment_details?.order_reference
+    if (typeof invoiceRef === "string" && invoiceRef.startsWith("in_")) return true
+  }
+
+  console.warn(
+    `[stripe-webhook] Event ${event.id} (${event.type}) missing domain identifier. Expected hostname: ${projectHostname}`
+  )
+  return false
+}
+
 // Best-effort customer email extraction from a Stripe event for display in
 // the admin webhooks list. Different event types carry the email in
 // different fields; subscription events only carry a customer ID, so fall
@@ -66,18 +166,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing signature" }, { status: 400 })
   }
 
+  const secret = process.env.STRIPE_WEBHOOK_SECRET
+  if (!secret) {
+    console.error("[stripe-webhook] STRIPE_WEBHOOK_SECRET not configured")
+    return NextResponse.json(
+      { error: "Webhook secret not configured" },
+      { status: 500 }
+    )
+  }
+
   const stripe = getStripe()
   let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    )
+    event = stripe.webhooks.constructEvent(body, signature, secret)
   } catch (err) {
     const message = err instanceof Error ? err.message : "Invalid signature"
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.warn(`[stripe-webhook] Signature verification failed: ${message}`)
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
   if (process.env.NODE_ENV === "development") {
     console.log(`${Date.now()} event webhook Main=>`, JSON.stringify(event))
@@ -93,6 +199,12 @@ export async function POST(request: NextRequest) {
       `[stripe-webhook] Rejecting stale event ${event.id} (${event.type}), age=${eventAgeSeconds}s`
     )
     return NextResponse.json({ error: "Event too old" }, { status: 400 })
+  }
+
+  // Domain validation: ensure event belongs to this project
+  if (!isValidDomainForThisProject(event)) {
+    console.warn(`[stripe-webhook] Event ${event.id} rejected - domain mismatch for this project`)
+    return NextResponse.json({ received: true, skipped: true, reason: "domain_mismatch" })
   }
 
   const customerEmail = await extractCustomerEmail(event)
