@@ -26,8 +26,8 @@ import {
   uploadTemplateImage,
   uploadTemplateZip,
 } from "@/actions/admin-templates"
-import { Loader2 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import { Spinner } from "@/components/ui/spinner"
 
 export interface Template {
   id: string
@@ -852,7 +852,7 @@ export function TemplateEditDialog({
           <DialogFooter className="flex-col pt-4 sm:flex-col sm:justify-end sm:space-x-0">
             {status.progress && (
               <div className="mb-3 flex w-full animate-pulse items-center justify-end gap-2 text-[10px] font-bold text-primary">
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <Spinner className="h-3 w-3" />
                 {status.progress}
               </div>
             )}
@@ -875,9 +875,7 @@ export function TemplateEditDialog({
                 disabled={status.loading}
                 className="min-w-32"
               >
-                {status.loading && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
+                {status.loading && <Spinner className="mr-2 h-4 w-4" />}
                 {isEditing ? "Save Changes" : "Create Template"}
               </Button>
             </div>

@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation"
 import { formatDate } from "@/lib/format"
 import { useState, useEffect } from "react"
-import { CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react"
+import { CheckCircle2, XCircle, Clock } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
 import { Badge } from "@/components/ui/badge"
@@ -202,7 +203,7 @@ export function AdminWebhookEventsClient({
                     </p>
                     {loadingPayload ? (
                       <div className="flex h-32 items-center justify-center">
-                        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                        <Spinner className="size-6 text-muted-foreground" />
                       </div>
                     ) : payloadError ? (
                       <div className="rounded-md bg-destructive/5 p-4 text-center">

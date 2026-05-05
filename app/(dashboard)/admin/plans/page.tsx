@@ -155,6 +155,8 @@ export default function AdminPlansPage() {
         onSortChange={(f, o) =>
           setParams((p) => ({ ...p, sortField: f, sortOrder: o }))
         }
+        loading={loading}
+        skeletonRows={5}
         actions={(row) => (
           <div className="flex justify-end gap-2">
             <Button

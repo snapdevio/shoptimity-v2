@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
 function getPageNumbers(page: number, totalPages: number): (number | "...")[] {
@@ -53,6 +54,8 @@ interface DataTableProps<T> {
   onSortChange?: (field: string, order: "asc" | "desc") => void
   actions?: (row: T) => React.ReactNode
   emptyMessage?: string
+  loading?: boolean
+  skeletonRows?: number
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -71,6 +74,8 @@ export function DataTable<T extends Record<string, any>>({
   onSortChange,
   actions,
   emptyMessage = "No results found.",
+  loading = false,
+  skeletonRows = 5,
 }: DataTableProps<T>) {
   const [localSearch, setLocalSearch] = React.useState(searchValue)
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -151,7 +156,25 @@ export function DataTable<T extends Record<string, any>>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.length === 0 ? (
+            {loading ? (
+              Array.from({ length: skeletonRows }).map((_, idx) => (
+                <TableRow key={`loading-${idx}`} className="animate-pulse">
+                  {columns.map((col) => (
+                    <TableCell
+                      key={`${col.key}-${idx}`}
+                      className={cn("py-4", col.className)}
+                    >
+                      <Skeleton className="h-4 w-full rounded-md" />
+                    </TableCell>
+                  ))}
+                  {actions && (
+                    <TableCell className="pr-6 text-right">
+                      <Skeleton className="h-4 w-full rounded-md" />
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))
+            ) : data.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length + (actions ? 1 : 0)}

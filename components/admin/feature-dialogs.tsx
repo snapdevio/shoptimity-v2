@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select"
 import { upsertCategory, upsertFeature } from "@/actions/admin-features"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 // --- Category Dialog ---
 
@@ -140,7 +140,7 @@ export function CategoryEditDialog({
           </div>
           <DialogFooter>
             <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading && <Spinner className="mr-2 h-4 w-4" />}
               Save Category
             </Button>
           </DialogFooter>
@@ -309,7 +309,7 @@ export function FeatureEditDialog({
           </div>
           <DialogFooter>
             <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading && <Spinner className="mr-2 h-4 w-4" />}
               Save Feature
             </Button>
           </DialogFooter>

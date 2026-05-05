@@ -27,7 +27,8 @@ import {
   getPlanFeatureMappings,
 } from "@/actions/admin-features"
 import { toast } from "sonner"
-import { Check, Loader2 } from "lucide-react"
+import { Check } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
@@ -473,7 +474,7 @@ export function PlanEditDialog({
               </h3>
               {featuresLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                  <Spinner className="h-6 w-6 text-slate-400" />
                 </div>
               ) : (
                 <div className="grid gap-6 rounded-xl border bg-slate-50/50 p-4">
@@ -675,7 +676,7 @@ export function PlanEditDialog({
               disabled={loading}
               className="rounded-xl bg-orange-600 hover:bg-orange-700"
             >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading && <Spinner className="mr-2 h-4 w-4" />}
               {plan ? "Save Changes" : "Create Plan"}
             </Button>
           </DialogFooter>

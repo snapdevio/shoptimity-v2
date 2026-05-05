@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Spinner } from "@/components/ui/spinner"
 import { toast } from "sonner"
-import { Loader2, Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { getSettings, updateSettings } from "@/actions/admin-settings"
 
 export default function AdminSettingsPage() {
@@ -70,7 +71,7 @@ export default function AdminSettingsPage() {
   if (loading) {
     return (
       <div className="flex h-100 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Spinner className="h-8 w-8 text-primary" />
       </div>
     )
   }
@@ -85,7 +86,7 @@ export default function AdminSettingsPage() {
           </p>
         </div>
         <Button onClick={handleSave} disabled={saving}>
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {saving && <Spinner className="mr-2 h-4 w-4" />}
           Save Changes
         </Button>
       </div>
